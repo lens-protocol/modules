@@ -196,10 +196,10 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
      * @notice Processes a collect action for the given publication, this can only be called by the hub.
      *
      * @dev Process the collect by ensuring:
-     *  1. Underlying publication's auction has finished and has a winner.
+     *  1. Underlying publication's auction has finished.
      *  2. Parameters passed matches expected values (collector is the winner, correct referral info & no custom data).
      *  3. Publication has not been collected yet.
-     * Processing collect fees here depends on if they were executed through `processCollectFee` function or not.
+     * This function will also process collect fees if they have not been already processed through `processCollectFee`.
      *
      * @inheritdoc ICollectModule
      */
@@ -227,6 +227,9 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
             revert Errors.CollectNotAllowed();
         }
         if (auction.onlyFollowers) {
+            // TODO: If onlyFollowers enabled, we ask for it for each bid, maybe we can avoid it here unless we want to
+            //       enforce the collector to keep following at collection time. Seems unnecesary, as the collector can
+            //       unfollow right after collecting anyways. Maybe worth removing the validation to make it cheaper.
             _checkFollowValidity(profileId, collector);
         }
         auction.collected = true;
@@ -260,15 +263,14 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
     }
 
     /**
-     * @notice Offers a bid by the given amount on the given publication's auction. If the publication is a mirror,
+     * @notice Places a bid by the given amount on the given publication's auction. If the publication is a mirror,
      * the pointed publication auction will be used, setting the mirror's profileId as referrer if it's the first bid
      * in the auction.
      * Transaction will fail if the bid offered is below auction's current best price.
      *
      * @dev It will pull the tokens from the bidder to ensure the collect fees can be processed if the bidder ends up
-     * being the winner after auction ended. If a better bid appears in the future, funds can be withdrawn through the
-     * `withdraw` function.
-     * If the bidder has already bidded before and tokens are still in the contract, only the difference will be pulled.
+     * being the winner after auction ended. If a better bid is placed in the future by a different bidder, funds will
+     * be automatically transferred to the previous winner.
      *
      * @param profileId The token ID of the profile associated with the publication, could be a mirror.
      * @param pubId The publication ID associated with the publication, could be a mirror.
@@ -284,15 +286,14 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
     }
 
     /**
-     * @notice Using EIP-712 signatures, offers a bid by the given amount on the given publication's auction.
+     * @notice Using EIP-712 signatures, places a bid by the given amount on the given publication's auction.
      * If the publication is a mirror, the pointed publication auction will be used, setting the mirror's profileId
      * as referrer if it's the first bid in the auction.
      * Transaction will fail if the bid offered is below auction's current best price.
      *
      * @dev It will pull the tokens from the bidder to ensure the collect fees can be processed if the bidder ends up
-     * being the winner after auction ended. If a better bid appears in the future, funds can be withdrawn through the
-     * `withdraw` function.
-     * If the bidder has already bidded before and tokens are still in the contract, only the difference will be pulled.
+     * being the winner after auction ended. If a better bid is placed in the future by a different bidder, funds will
+     * be automatically transferred to the previous winner.
      *
      * @param profileId The token ID of the profile associated with the publication, could be a mirror.
      * @param pubId The publication ID associated with the publication, could be a mirror.
@@ -311,16 +312,15 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
     }
 
     /**
-     * @notice Offers a bid by the auction's curreny best price plus the given increment, ensuring the bidder will
-     * become the auction's winner after this transaction execution.
-     * Also, has a `bidPriceLimit` value to ensure the final bided amount does not exceed it.
+     * @notice Places a bid of the auction's current best price plus the given increment, ensuring the bidder will
+     * become the auction's winner after the transaction succeed.
+     * Also, has a `bidPriceLimit` value to ensure the final bidded amount does not exceed it.
      * If the publication is a mirror, the pointed publication auction will be used, setting the mirror's profileId as
      * referrer if it's the first bid in the auction.
      *
      * @dev It will pull the tokens from the bidder to ensure the collect fees can be processed if the bidder ends up
-     * being the winner after auction ended. If a better bid appears in the future, funds can be withdrawn through the
-     * `withdraw` function.
-     * If the bidder has already bidded before and tokens are still in the contract, only the difference will be pulled.
+     * being the winner after auction ended. If a better bid is placed in the future by a different bidder, funds will
+     * be automatically transferred to the previous winner.
      *
      * @param profileId The token ID of the profile associated with the publication, could be a mirror.
      * @param pubId The publication ID associated with the publication, could be a mirror.
@@ -345,16 +345,15 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
     }
 
     /**
-     * @notice Using EIP-712 signatures, offers a bid by the auction's curreny best price plus the given increment,
-     * ensuring the bidder will become the auction's winner after this transaction execution.
-     * Also, has a `bidPriceLimit` value to ensure the final bided amount does not exceed it.
+     * @notice Using EIP-712 signatures, places a bid of the auction's current best price plus the given increment,
+     * ensuring the bidder will become the auction's winner after the transaction succeed.
+     * Also, has a `bidPriceLimit` value to ensure the final bidded amount does not exceed it.
      * If the publication is a mirror, the pointed publication auction will be used, setting the mirror's profileId as
      * referrer if it's the first bid in the auction.
      *
      * @dev It will pull the tokens from the bidder to ensure the collect fees can be processed if the bidder ends up
-     * being the winner after auction ended. If a better bid appears in the future, funds can be withdrawn through the
-     * `withdraw` function.
-     * If the bidder has already bidded before and tokens are still in the contract, only the difference will be pulled.
+     * being the winner after auction ended. If a better bid is placed in the future by a different bidder, funds will
+     * be automatically transferred to the previous winner.
      *
      * @param profileId The token ID of the profile associated with the publication, could be a mirror.
      * @param pubId The publication ID associated with the publication, could be a mirror.
@@ -496,11 +495,13 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
         }
         if (bidder == address(0)) {
             // TODO: Check if we want to unallow recipient/profile-owner to bid, I think does not make sense as they
-            // could always use an alt account to do so if they want to. So better to avoid unnecessary checks.
+            //       could always use an alt account to do so if they want to. So better to avoid unnecessary checks.
             revert InvalidBidder();
         }
         _validateBidAmount(auction, amount);
         if (auction.onlyFollowers) {
+            // TODO: Evaluate if worth to do this validation on each bid or only for first bid of each bidder.
+            //       Basically, we can move it inside the referrerProfileIdOf if.
             _checkFollowValidity(profileId, bidder);
         }
         if (auction.referrerProfileIdOf[bidder] == 0) {
@@ -585,6 +586,8 @@ contract AuctionCollectModule is ICollectModule, FeeModuleBase, FollowValidation
             sig
         );
     }
+
+    //TODO: Functions below could be in a lib or something like that
 
     function _getRootPublication(uint256 profileId, uint256 pubId)
         internal
