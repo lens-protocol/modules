@@ -28,7 +28,7 @@ import {
 } from './../../__setup.spec';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { publisher } from '../../__setup.spec';
-import { getTimestamp, setNextBlockTimestamp } from '../../helpers/utils';
+import { getTimestamp, matchEvent, setNextBlockTimestamp, waitForTx } from '../../helpers/utils';
 import { signBidWithSigMessage } from '../../helpers/signatures/modules/collect/auction-collect-module';
 import { Domain } from '../../helpers/signatures/utils';
 
@@ -130,8 +130,8 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
     ).to.not.be.reverted;
   });
 
-  context('Negatives', function () {
-    context('Publication creation', function () {
+  context('Publication creation', function () {
+    context('Negatives', function () {
       it('User should fail to post setting zero duration', async function () {
         const collectModuleInitData = await getAuctionCollectModuleInitData({
           duration: ethers.constants.Zero,
@@ -201,6 +201,72 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
             referenceModuleInitData: [],
           })
         ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
+      });
+    });
+
+    context('Scenarios', function () {
+      it('User should succeed to create a publication when all parameters are valid and tx should emit expected event', async function () {
+        const collectModuleInitData = await getAuctionCollectModuleInitData({});
+        const tx = lensHub.connect(publisher).post({
+          profileId: FIRST_PROFILE_ID,
+          contentURI: MOCK_URI,
+          collectModule: auctionCollectModule.address,
+          collectModuleInitData: collectModuleInitData,
+          referenceModule: ethers.constants.AddressZero,
+          referenceModuleInitData: [],
+        });
+        const txReceipt = await waitForTx(tx);
+        matchEvent(
+          txReceipt,
+          'AuctionCreated',
+          [
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID,
+            ethers.constants.Zero,
+            DEFAULT_DURATION,
+            DEFAULT_MIN_TIME_AFTER_BID,
+            DEFAULT_RESERVE_PRICE,
+            DEFAULT_MIN_BID_INCREMENT,
+            REFERRAL_FEE_BPS,
+            currency.address,
+            feeRecipient.address,
+            false,
+          ],
+          auctionCollectModule
+        );
+      });
+
+      it('User should succeed to create a publication that burns the fees', async function () {
+        const collectModuleInitData = await getAuctionCollectModuleInitData({
+          recipient: ethers.constants.AddressZero,
+        });
+        const tx = lensHub.connect(publisher).post({
+          profileId: FIRST_PROFILE_ID,
+          contentURI: MOCK_URI,
+          collectModule: auctionCollectModule.address,
+          collectModuleInitData: collectModuleInitData,
+          referenceModule: ethers.constants.AddressZero,
+          referenceModuleInitData: [],
+        });
+        const txReceipt = await waitForTx(tx);
+        matchEvent(
+          txReceipt,
+          'AuctionCreated',
+          [
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID,
+            ethers.constants.Zero,
+            DEFAULT_DURATION,
+            DEFAULT_MIN_TIME_AFTER_BID,
+            DEFAULT_RESERVE_PRICE,
+            DEFAULT_MIN_BID_INCREMENT,
+            REFERRAL_FEE_BPS,
+            currency.address,
+            ethers.constants.AddressZero,
+            false,
+          ],
+          auctionCollectModule
+        );
       });
     });
   });
