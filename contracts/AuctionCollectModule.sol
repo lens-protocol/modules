@@ -468,6 +468,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         AuctionData memory auction
     ) internal view {
         if (
+            auction.duration == 0 ||
             auction.availableSinceTimestamp > block.timestamp ||
             (auction.startTimestamp > 0 && block.timestamp > auction.endTimestamp)
         ) {
@@ -482,7 +483,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
                 profileId,
                 bidder,
                 followNftTokenId,
-                auction.startTimestamp == 0 ? auction.startTimestamp : block.timestamp
+                auction.startTimestamp == 0 ? block.timestamp : auction.startTimestamp
             );
         }
     }
@@ -524,10 +525,10 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     }
 
     function _validateBidAmount(AuctionData memory auction, uint256 amount) internal pure {
-        bool isFirstBid = auction.winner == address(0);
+        bool auctionStartsWithCurrentBid = auction.winner == address(0);
         if (
-            (isFirstBid && amount < auction.reservePrice) ||
-            (!isFirstBid &&
+            (auctionStartsWithCurrentBid && amount < auction.reservePrice) ||
+            (!auctionStartsWithCurrentBid &&
                 (amount <= auction.winningBid ||
                     (auction.minBidIncrement > 0 &&
                         amount - auction.winningBid < auction.minBidIncrement)))
