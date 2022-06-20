@@ -48,6 +48,7 @@ export const LENS_HUB_NFT_SYMBOL = 'LPP';
 export const MOCK_PROFILE_HANDLE = 'satoshi.lens';
 export const FIRST_PROFILE_ID = 1;
 export const FIRST_PUB_ID = 1;
+export const FIRST_FOLLOW_NFT_ID = 1;
 export const MOCK_URI = 'https://ipfs.io/ipfs/QmY9dUwYu67puaWBMxRKW98LPbXCznPwHUbhX5NeWnCJbX';
 export const OTHER_MOCK_URI = 'https://ipfs.io/ipfs/QmTFLSXdEQ6qsSzaXaCSNtiv6wA56qq87ytXJ182dXDQJS';
 export const MOCK_FOLLOW_NFT_URI =
