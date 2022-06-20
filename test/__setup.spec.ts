@@ -47,17 +47,21 @@ export const LENS_HUB_NFT_NAME = 'Lens Protocol Profiles';
 export const LENS_HUB_NFT_SYMBOL = 'LPP';
 export const MOCK_PROFILE_HANDLE = 'satoshi.lens';
 export const FIRST_PROFILE_ID = 1;
+export const FIRST_PUB_ID = 1;
 export const MOCK_URI = 'https://ipfs.io/ipfs/QmY9dUwYu67puaWBMxRKW98LPbXCznPwHUbhX5NeWnCJbX';
 export const OTHER_MOCK_URI = 'https://ipfs.io/ipfs/QmTFLSXdEQ6qsSzaXaCSNtiv6wA56qq87ytXJ182dXDQJS';
 export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 
+export let chainId: number;
 export let accounts: SignerWithAddress[];
 export let deployer: SignerWithAddress;
 export let governance: SignerWithAddress;
+export let proxyAdmin: SignerWithAddress;
 export let treasury: SignerWithAddress;
 export let user: SignerWithAddress;
-export let otherUser: SignerWithAddress;
+export let anotherUser: SignerWithAddress;
+export let thirdUser: SignerWithAddress;
 export let publisher: SignerWithAddress;
 export let feeRecipient: SignerWithAddress;
 export let collector: SignerWithAddress;
@@ -89,16 +93,18 @@ export function makeSuiteCleanRoom(name: string, tests: () => void) {
 }
 
 before(async function () {
+  chainId = (await ethers.provider.getNetwork()).chainId;
   abiCoder = ethers.utils.defaultAbiCoder;
   accounts = await ethers.getSigners();
   deployer = accounts[0];
   governance = accounts[1];
-  treasury = accounts[2];
-  user = accounts[3];
-  otherUser = accounts[4];
-  publisher = accounts[5];
-  feeRecipient = accounts[6];
-  collector = accounts[7];
+  proxyAdmin = accounts[2];
+  treasury = accounts[3];
+  user = accounts[4];
+  anotherUser = accounts[5];
+  thirdUser = accounts[6];
+  publisher = accounts[7];
+  feeRecipient = accounts[8];
 
   // Deployment
   moduleGlobals = await new ModuleGlobals__factory(deployer).deploy(
@@ -142,12 +148,12 @@ before(async function () {
   ]);
   let proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
     lensHubImpl.address,
-    deployer.address,
+    proxyAdmin.address,
     data
   );
 
   // Connect the hub proxy to the LensHub factory and the user for ease of use.
-  lensHub = LensHub__factory.connect(proxy.address, user);
+  lensHub = LensHub__factory.connect(proxy.address, deployer);
 
   // Currency
   currency = await new Currency__factory(deployer).deploy();
@@ -177,14 +183,8 @@ before(async function () {
 
   // Profile creator whitelisting
   await expect(
-    lensHub.connect(governance).whitelistProfileCreator(user.address, true)
+    lensHub.connect(governance).whitelistProfileCreator(deployer.address, true)
   ).to.not.be.reverted;
-  await expect(
-    lensHub.connect(governance).whitelistProfileCreator(otherUser.address, true)
-  ).to.not.be.reverted;
-
-  expect(lensHub).to.not.be.undefined;
-  expect(currency).to.not.be.undefined;
 
   // Event library deployment is only needed for testing and is not reproduced in the live environment
   eventsLib = await new Events__factory(deployer).deploy();
