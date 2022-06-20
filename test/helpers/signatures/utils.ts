@@ -14,8 +14,6 @@ export function toStringOrNumber(bigNumberish: BigNumberish): string | number {
   }
 }
 
-export const MAX_INT = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-
 export const NONCES_FN = '0x7ecebe00';
 
 export const zeros = (numZeros: number) => ''.padEnd(numZeros, '0');

@@ -2,6 +2,7 @@
 
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish } from 'ethers';
+import { ethers } from 'hardhat';
 import {
   BID_WITH_SIG_DOMAIN,
   DEFAULT_BID_AMOUNT,
@@ -11,7 +12,6 @@ import {
   call,
   Domain,
   EIP712Domain,
-  MAX_INT,
   NONCES_FN,
   RSV,
   signData,
@@ -67,7 +67,7 @@ export async function signBidWithSigMessage({
   pubId = FIRST_PUB_ID,
   amount = DEFAULT_BID_AMOUNT,
   followNftTokenId = 0,
-  deadline = MAX_INT,
+  deadline = ethers.constants.MaxUint256,
   nonce,
 }: SignBidWithSigMessageData): Promise<BidWithSigMessage & RSV> {
   const message: BidWithSigMessage = {
