@@ -68,9 +68,20 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     error NoFeeToProcess();
     error InsufficientBidAmount();
     error InvalidBidder();
-    error LimitPriceExceeded();
 
-    event AuctionCreated(); // TODO: put params
+    event AuctionCreated(
+        uint256 profileId,
+        uint256 pubId,
+        uint256 availableSinceTimestamp,
+        uint256 duration,
+        uint256 minTimeAfterBid,
+        uint256 reservePrice,
+        uint256 minBidIncrement,
+        uint16 referralFee,
+        address currency,
+        address recipient,
+        bool onlyFollowers
+    );
     event BidPlaced(
         uint256 profileId,
         uint256 pubId,
@@ -187,7 +198,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         bytes calldata data
     ) external override onlyHub {
         AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
-        if (block.timestamp <= auction.endTimestamp) {
+        if (auction.startTimestamp <= block.timestamp && block.timestamp <= auction.endTimestamp) {
             revert ActiveAuction();
         }
         if (
@@ -231,7 +242,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
      */
     function processCollectFee(uint256 profileId, uint256 pubId) external {
         AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
-        if (block.timestamp <= auction.endTimestamp) {
+        if (auction.startTimestamp <= block.timestamp && block.timestamp <= auction.endTimestamp) {
             revert ActiveAuction();
         }
         if (auction.feeProcessed) {
@@ -347,6 +358,19 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         auction.currency = currency;
         auction.recipient = recipient;
         auction.onlyFollowers = onlyFollowers;
+        emit AuctionCreated(
+            profileId,
+            pubId,
+            availableSinceTimestamp,
+            duration,
+            minTimeAfterBid,
+            reservePrice,
+            minBidIncrement,
+            referralFee,
+            currency,
+            recipient,
+            onlyFollowers
+        );
     }
 
     function _processCollectFee(uint256 profileId, uint256 pubId) internal {
@@ -408,65 +432,102 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         uint256 followNftTokenId,
         address bidder
     ) internal {
-        AuctionData memory oldAuctionState = _auctionDataByPubByProfile[profileId][pubId];
+        AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
+        _validateBid(profileId, amount, followNftTokenId, bidder, auction);
+        uint256 referrerProfileIdSet = _setReferrerProfileId(
+            profileId,
+            pubId,
+            referrerProfileId,
+            bidder
+        );
+        _setNewAuctionStorageStateAfterBid(profileId, pubId, amount, bidder, auction);
+        if (auction.winner != address(0)) {
+            IERC20(auction.currency).safeTransferFrom(
+                address(this),
+                auction.winner,
+                auction.winningBid
+            );
+        }
+        IERC20(auction.currency).safeTransferFrom(bidder, address(this), amount);
+        emit BidPlaced(
+            profileId,
+            pubId,
+            referrerProfileIdSet == profileId ? 0 : referrerProfileIdSet, // Provides better semantics for indexers.
+            amount,
+            bidder,
+            auction.endTimestamp,
+            block.timestamp
+        );
+    }
+
+    function _validateBid(
+        uint256 profileId,
+        uint256 amount,
+        uint256 followNftTokenId,
+        address bidder,
+        AuctionData memory auction
+    ) internal view {
         if (
-            oldAuctionState.availableSinceTimestamp > block.timestamp ||
-            block.timestamp > oldAuctionState.endTimestamp
+            auction.availableSinceTimestamp > block.timestamp ||
+            (auction.startTimestamp > 0 && block.timestamp > auction.endTimestamp)
         ) {
             revert UnavailableAuction();
         }
         if (bidder == address(0)) {
             revert InvalidBidder();
         }
-        _validateBidAmount(oldAuctionState, amount);
-        if (oldAuctionState.onlyFollowers) {
+        _validateBidAmount(auction, amount);
+        if (auction.onlyFollowers) {
             _validateFollow(
                 profileId,
                 bidder,
                 followNftTokenId,
-                oldAuctionState.startTimestamp == 0
-                    ? oldAuctionState.startTimestamp
-                    : block.timestamp
+                auction.startTimestamp == 0 ? auction.startTimestamp : block.timestamp
             );
         }
+    }
+
+    function _setNewAuctionStorageStateAfterBid(
+        uint256 profileId,
+        uint256 pubId,
+        uint256 newWinningBid,
+        address newWinner,
+        AuctionData memory prevAuctionState
+    ) internal {
+        AuctionData storage nextAuctionState = _auctionDataByPubByProfile[profileId][pubId];
+        nextAuctionState.winner = newWinner;
+        nextAuctionState.winningBid = newWinningBid;
+        if (prevAuctionState.winner == address(0)) {
+            nextAuctionState.endTimestamp = block.timestamp + prevAuctionState.duration;
+            nextAuctionState.startTimestamp = block.timestamp;
+        } else {
+            if (
+                prevAuctionState.endTimestamp - block.timestamp < prevAuctionState.minTimeAfterBid
+            ) {
+                nextAuctionState.endTimestamp = block.timestamp + prevAuctionState.minTimeAfterBid;
+            }
+        }
+    }
+
+    function _setReferrerProfileId(
+        uint256 profileId,
+        uint256 pubId,
+        uint256 referrerProfileId,
+        address bidder
+    ) internal returns (uint256) {
         uint256 referrerProfileIdSet = _referrerProfileIdByPubByProfile[profileId][pubId][bidder];
         if (referrerProfileIdSet == 0) {
             _referrerProfileIdByPubByProfile[profileId][pubId][bidder] = referrerProfileId;
             referrerProfileIdSet = referrerProfileId;
         }
-        AuctionData storage newAuctionState = _auctionDataByPubByProfile[profileId][pubId];
-        newAuctionState.winner = bidder;
-        newAuctionState.winningBid = amount;
-        if (oldAuctionState.winner == address(0)) {
-            newAuctionState.endTimestamp = block.timestamp + oldAuctionState.duration;
-            newAuctionState.startTimestamp = block.timestamp;
-        } else {
-            if (oldAuctionState.endTimestamp - block.timestamp < oldAuctionState.minTimeAfterBid) {
-                newAuctionState.endTimestamp = block.timestamp + oldAuctionState.minTimeAfterBid;
-            }
-            IERC20(oldAuctionState.currency).safeTransferFrom(
-                address(this),
-                oldAuctionState.winner,
-                oldAuctionState.winningBid
-            );
-        }
-        IERC20(oldAuctionState.currency).safeTransferFrom(bidder, address(this), amount);
-        emit BidPlaced(
-            profileId,
-            pubId,
-            referrerProfileIdSet == profileId ? 0 : referrerProfileIdSet,
-            amount,
-            bidder,
-            oldAuctionState.endTimestamp,
-            block.timestamp
-        );
+        return referrerProfileIdSet;
     }
 
     function _validateBidAmount(AuctionData memory auction, uint256 amount) internal pure {
-        bool hasWinner = auction.winner != address(0);
+        bool isFirstBid = auction.winner == address(0);
         if (
-            (!hasWinner && amount < auction.reservePrice) ||
-            (hasWinner &&
+            (isFirstBid && amount < auction.reservePrice) ||
+            (!isFirstBid &&
                 (amount <= auction.winningBid ||
                     (auction.minBidIncrement > 0 &&
                         amount - auction.winningBid < auction.minBidIncrement)))
