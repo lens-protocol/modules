@@ -289,7 +289,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
     });
 
     context('Bid', function () {
-      before(async function () {
+      beforeEach(async function () {
         await expect(
           lensHub.connect(publisher).post({
             profileId: FIRST_PROFILE_ID,
@@ -521,7 +521,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
     });
 
     context('Bid with signature', function () {
-      before(async function () {
+      beforeEach(async function () {
         await expect(
           lensHub.connect(publisher).post({
             profileId: FIRST_PROFILE_ID,
@@ -532,8 +532,8 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
             referenceModuleInitData: [],
           })
         ).to.not.be.reverted;
-        mintAndApproveCurrency({});
-        mintAndApproveCurrency({ owner: anotherBidder });
+        await mintAndApproveCurrency({});
+        await mintAndApproveCurrency({ owner: anotherBidder });
       });
 
       context('Negatives', function () {
@@ -685,9 +685,324 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
     });
 
     context('Process collect and fees', function () {
+      beforeEach(async function () {
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: auctionCollectModule.address,
+            collectModuleInitData: await getAuctionCollectModuleInitData({}),
+            referenceModule: ethers.constants.AddressZero,
+            referenceModuleInitData: [],
+          })
+        ).to.not.be.reverted;
+        await mintAndApproveCurrency({});
+        await mintAndApproveCurrency({ owner: anotherBidder });
+      });
+
       context('Negatives', function () {
-        it('User should fail...', async function () {
-          // TODO: Negative test!
+        it('Process collect call should fail if caller is not the hub', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .processCollect(0, bidder.address, FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.be.revertedWith(ERRORS.NOT_HUB);
+        });
+
+        it('User should fail to process collect over unexistent publication', async function () {
+          const unexistentPubId = 69;
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, unexistentPubId, [])
+          ).to.be.revertedWith(ERRORS.PUBLICATION_DOES_NOT_EXIST);
+        });
+
+        it('User should fail to process collect over existent yet unavailable auction', async function () {
+          const futureTimestamp = (await getTimestamp()) + ONE_DAY_IN_SECONDS;
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({
+                availableSinceTimestamp: futureTimestamp,
+              }),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, pubId, [])
+          ).to.be.revertedWith(ERRORS.UNAVAILABLE_AUCTION);
+        });
+
+        it('User should fail to process collect over existent available but unstarted auction', async function () {
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.be.revertedWith(ERRORS.ONGOING_AUCTION);
+        });
+
+        it('User should fail to process collect over active auction', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.be.revertedWith(ERRORS.ONGOING_AUCTION);
+        });
+
+        it('User should fail to process collect if he is not the auction winner', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          const auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, FIRST_PUB_ID);
+          expect(auction.winner).to.be.equals(bidder.address);
+          expect(bidder.address).to.not.be.equal(anotherUser.address);
+          await expect(
+            lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
+        });
+
+        it('User should fail to process collect if collects through a publication that makes lens hub pass a wrong referrer profile ID', async function () {
+          await expect(
+            lensHub.createProfile({
+              to: anotherUser.address,
+              handle: 'referrer.lens',
+              imageURI: MOCK_URI,
+              followModule: ethers.constants.AddressZero,
+              followModuleInitData: [],
+              followNFTURI: MOCK_FOLLOW_NFT_URI,
+            })
+          ).to.not.be.reverted;
+          const referrerProfileId = FIRST_PROFILE_ID + 1;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: referrerProfileId,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const mirrorPubId = FIRST_PUB_ID;
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(referrerProfileId, mirrorPubId, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          const auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, FIRST_PUB_ID);
+          expect(auction.winner).to.be.equals(bidder.address);
+          const referrerProfileIdOfWinner = await auctionCollectModule.getReferrerProfileIdOf(
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID,
+            auction.winner
+          );
+          expect(referrerProfileIdOfWinner).to.be.equals(referrerProfileId);
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
+        });
+
+        it('User should fail to process collect if publication was already collected', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, FIRST_PUB_ID);
+          expect(auction.collected).to.be.true;
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.be.revertedWith(ERRORS.COLLECT_ALREADY_PROCESSED);
+        });
+
+        it('User should fail to process collect if is only for followers and and he is not following the publication owner', async function () {
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({ onlyFollowers: true }),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          await expect(lensHub.connect(bidder).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, pubId, DEFAULT_BID_AMOUNT, FIRST_FOLLOW_NFT_ID)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({
+            pubId: pubId,
+          });
+          const followNftAddress = await lensHub.getFollowNFT(FIRST_PROFILE_ID);
+          const followNft = await FollowNFT__factory.connect(followNftAddress, bidder);
+          await expect(
+            followNft.transferFrom(bidder.address, anotherUser.address, FIRST_FOLLOW_NFT_ID)
+          ).to.not.be.reverted;
+          await expect(
+            lensHub
+              .connect(bidder)
+              .collect(FIRST_PROFILE_ID, pubId, abiCoder.encode(['uint256'], [FIRST_FOLLOW_NFT_ID]))
+          ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
+        });
+
+        it('User should fail to process collect if is only for followers and and he followed publication owner after auction started', async function () {
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({ onlyFollowers: true }),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          await expect(lensHub.connect(bidder).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, pubId, DEFAULT_BID_AMOUNT, FIRST_FOLLOW_NFT_ID)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({
+            pubId: pubId,
+          });
+          const followNftAddress = await lensHub.getFollowNFT(FIRST_PROFILE_ID);
+          const followNft = await FollowNFT__factory.connect(followNftAddress, bidder);
+          await expect(followNft.burn(FIRST_FOLLOW_NFT_ID)).to.not.be.reverted;
+          await expect(lensHub.connect(bidder).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+          const newFollowNftId = FIRST_FOLLOW_NFT_ID + 1;
+          await expect(
+            lensHub
+              .connect(bidder)
+              .collect(FIRST_PROFILE_ID, pubId, abiCoder.encode(['uint256'], [newFollowNftId]))
+          ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
+        });
+
+        it('User should fail to process collect if auction was open for everyone and he passed any arbitrary data', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          const dataThatShouldNotBePassed = abiCoder.encode(['uint256'], [FIRST_FOLLOW_NFT_ID]);
+          await expect(
+            lensHub
+              .connect(bidder)
+              .collect(FIRST_PROFILE_ID, FIRST_PUB_ID, dataThatShouldNotBePassed)
+          ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
+        });
+
+        it('User should fail to process fees over unexistent publication', async function () {
+          const unexistentPubId = 69;
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .processCollectFee(FIRST_PROFILE_ID, unexistentPubId)
+          ).to.be.revertedWith(ERRORS.UNAVAILABLE_AUCTION);
+        });
+
+        it('User should fail to process fees over publication that uses another collect module', async function () {
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: freeCollectModule.address,
+              collectModuleInitData: abiCoder.encode(['bool'], [false]),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          await expect(
+            auctionCollectModule.connect(bidder).processCollectFee(FIRST_PROFILE_ID, pubId)
+          ).to.be.revertedWith(ERRORS.UNAVAILABLE_AUCTION);
+        });
+
+        it('User should fail to process fees over unstarted auction', async function () {
+          await expect(
+            auctionCollectModule.connect(bidder).processCollectFee(FIRST_PROFILE_ID, FIRST_PUB_ID)
+          ).to.be.revertedWith(ERRORS.ONGOING_AUCTION);
+        });
+
+        it('User should fail to process fees over active auction', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await expect(
+            auctionCollectModule.connect(bidder).processCollectFee(FIRST_PROFILE_ID, FIRST_PUB_ID)
+          ).to.be.revertedWith(ERRORS.ONGOING_AUCTION);
+        });
+
+        it('User should fail to process fees over auction that already processed fees through process collect call', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          const auctionBeforeCollect = await auctionCollectModule.getAuctionData(
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID
+          );
+          expect(auctionBeforeCollect.collected).to.be.false;
+          expect(auctionBeforeCollect.feeProcessed).to.be.false;
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const auctionAfterCollect = await auctionCollectModule.getAuctionData(
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID
+          );
+          expect(auctionAfterCollect.collected).to.be.true;
+          expect(auctionAfterCollect.feeProcessed).to.be.true;
+          await expect(
+            auctionCollectModule.connect(bidder).processCollectFee(FIRST_PROFILE_ID, FIRST_PUB_ID)
+          ).to.be.revertedWith(ERRORS.FEE_ALREADY_PROCESSED);
+        });
+
+        it('User should fail to process fees over auction that already processed fee through process fees call', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          const auctionBeforeCollectFee = await auctionCollectModule.getAuctionData(
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID
+          );
+          expect(auctionBeforeCollectFee.collected).to.be.false;
+          expect(auctionBeforeCollectFee.feeProcessed).to.be.false;
+          await expect(
+            auctionCollectModule.connect(bidder).processCollectFee(FIRST_PROFILE_ID, FIRST_PUB_ID)
+          ).to.not.be.reverted;
+          const auctionAfterCollectFee = await auctionCollectModule.getAuctionData(
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID
+          );
+          expect(auctionAfterCollectFee.collected).to.be.false;
+          expect(auctionAfterCollectFee.feeProcessed).to.be.true;
+          await expect(
+            auctionCollectModule.connect(bidder).processCollectFee(FIRST_PROFILE_ID, FIRST_PUB_ID)
+          ).to.be.revertedWith(ERRORS.FEE_ALREADY_PROCESSED);
         });
       });
 
