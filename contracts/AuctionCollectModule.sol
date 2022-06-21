@@ -247,10 +247,10 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
      */
     function processCollectFee(uint256 profileId, uint256 pubId) external {
         AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
-        if (block.timestamp < auction.availableSinceTimestamp) {
+        if (auction.duration == 0 || block.timestamp < auction.availableSinceTimestamp) {
             revert UnavailableAuction();
         }
-        if (block.timestamp <= auction.endTimestamp) {
+        if (auction.startTimestamp == 0 || block.timestamp <= auction.endTimestamp) {
             revert OngoingAuction();
         }
         if (auction.feeProcessed) {
@@ -507,12 +507,10 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         if (prevAuctionState.winner == address(0)) {
             nextAuctionState.endTimestamp = block.timestamp + prevAuctionState.duration;
             nextAuctionState.startTimestamp = block.timestamp;
-        } else {
-            if (
-                prevAuctionState.endTimestamp - block.timestamp < prevAuctionState.minTimeAfterBid
-            ) {
-                nextAuctionState.endTimestamp = block.timestamp + prevAuctionState.minTimeAfterBid;
-            }
+        } else if (
+            prevAuctionState.endTimestamp - block.timestamp < prevAuctionState.minTimeAfterBid
+        ) {
+            nextAuctionState.endTimestamp = block.timestamp + prevAuctionState.minTimeAfterBid;
         }
     }
 
