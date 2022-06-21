@@ -447,7 +447,13 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
             referrerProfileId,
             bidder
         );
-        _setNewAuctionStorageStateAfterBid(profileId, pubId, amount, bidder, auction);
+        uint256 endTimestamp = _setNewAuctionStorageStateAfterBid(
+            profileId,
+            pubId,
+            amount,
+            bidder,
+            auction
+        );
         if (auction.winner != address(0)) {
             IERC20(auction.currency).safeTransfer(auction.winner, auction.winningBid);
         }
@@ -460,7 +466,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
             amount,
             auction.onlyFollowers ? followNftTokenId : 0,
             bidder,
-            auction.endTimestamp,
+            endTimestamp,
             block.timestamp
         );
     }
@@ -493,24 +499,31 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         }
     }
 
+    /**
+     * @dev Returns `endTimestamp` of the new auction state
+     */
     function _setNewAuctionStorageStateAfterBid(
         uint256 profileId,
         uint256 pubId,
         uint256 newWinningBid,
         address newWinner,
         AuctionData memory prevAuctionState
-    ) internal {
+    ) internal returns (uint256) {
         AuctionData storage nextAuctionState = _auctionDataByPubByProfile[profileId][pubId];
         nextAuctionState.winner = newWinner;
         nextAuctionState.winningBid = newWinningBid;
+        uint256 endTimestamp = prevAuctionState.endTimestamp;
         if (prevAuctionState.winner == address(0)) {
-            nextAuctionState.endTimestamp = block.timestamp + prevAuctionState.duration;
+            endTimestamp = block.timestamp + prevAuctionState.duration;
+            nextAuctionState.endTimestamp = endTimestamp;
             nextAuctionState.startTimestamp = block.timestamp;
         } else if (
             prevAuctionState.endTimestamp - block.timestamp < prevAuctionState.minTimeAfterBid
         ) {
-            nextAuctionState.endTimestamp = block.timestamp + prevAuctionState.minTimeAfterBid;
+            endTimestamp = block.timestamp + prevAuctionState.minTimeAfterBid;
+            nextAuctionState.endTimestamp = endTimestamp;
         }
+        return endTimestamp;
     }
 
     function _setReferrerProfileId(
