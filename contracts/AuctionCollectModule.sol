@@ -87,6 +87,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         uint256 pubId,
         uint256 referrerProfileId,
         uint256 amount,
+        uint256 followNftTokenId,
         address bidder,
         uint256 endTimestamp,
         uint256 timestamp
@@ -449,11 +450,13 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
             );
         }
         IERC20(auction.currency).safeTransferFrom(bidder, address(this), amount);
+        // `referrerProfileId` and `followNftTokenId` event params are tweaked to provide better semantics for indexers.
         emit BidPlaced(
             profileId,
             pubId,
-            referrerProfileIdSet == profileId ? 0 : referrerProfileIdSet, // Provides better semantics for indexers.
+            referrerProfileIdSet == profileId ? 0 : referrerProfileIdSet,
             amount,
+            auction.onlyFollowers ? followNftTokenId : 0,
             bidder,
             auction.endTimestamp,
             block.timestamp
