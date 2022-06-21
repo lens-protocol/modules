@@ -328,16 +328,15 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
      * @param pubId The publication ID associated with the underlying publication.
      * @param bidder The address which the referrer profile should be returned.
      *
-     * @return The ID of the referrer profile. If returned value matches publication's profile ID means no referral,
-     * referrer being zero means no referral but because that bidder has not bidded yet on the given auction or the
-     * auction does not exist.
+     * @return The ID of the referrer profile. Zero means no referral.
      */
     function getReferrerProfileIdOf(
         uint256 profileId,
         uint256 pubId,
         address bidder
     ) external view returns (uint256) {
-        return _referrerProfileIdByPubByProfile[profileId][pubId][bidder];
+        uint256 referrerProfileId = _referrerProfileIdByPubByProfile[profileId][pubId][bidder];
+        return referrerProfileId == profileId ? 0 : referrerProfileId;
     }
 
     /**
