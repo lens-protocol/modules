@@ -7,7 +7,7 @@ import {
   BID_WITH_SIG_DOMAIN,
   DEFAULT_BID_AMOUNT,
 } from '../../../../modules/collect/auction-collect-module.spec';
-import { FIRST_PROFILE_ID, FIRST_PUB_ID } from '../../../../__setup.spec';
+import { FIRST_FOLLOW_NFT_ID, FIRST_PROFILE_ID, FIRST_PUB_ID } from '../../../../__setup.spec';
 import {
   call,
   Domain,
@@ -66,7 +66,7 @@ export async function signBidWithSigMessage({
   profileId = FIRST_PROFILE_ID,
   pubId = FIRST_PUB_ID,
   amount = DEFAULT_BID_AMOUNT,
-  followNftTokenId = 0,
+  followNftTokenId = FIRST_FOLLOW_NFT_ID,
   deadline = ethers.constants.MaxUint256,
   nonce,
 }: SignBidWithSigMessageData): Promise<BidWithSigMessage & RSV> {

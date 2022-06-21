@@ -3,7 +3,7 @@ import { parseEther } from '@ethersproject/units';
 import '@nomiclabs/hardhat-ethers';
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import { Currency, FollowNFT__factory } from '../../../typechain';
+import { AuctionCollectModule__factory, FollowNFT__factory } from '../../../typechain';
 import { ERRORS } from '../../helpers/errors';
 import {
   abiCoder,
@@ -15,7 +15,6 @@ import {
   FIRST_PROFILE_ID,
   FIRST_PUB_ID,
   freeCollectModule,
-  governance,
   lensHub,
   makeSuiteCleanRoom,
   MOCK_FOLLOW_NFT_URI,
@@ -26,14 +25,13 @@ import {
   REFERRAL_FEE_BPS,
   user,
   FIRST_FOLLOW_NFT_ID,
+  deployer,
 } from './../../__setup.spec';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { publisher } from '../../__setup.spec';
 import { getTimestamp, matchEvent, setNextBlockTimestamp, waitForTx } from '../../helpers/utils';
 import { signBidWithSigMessage } from '../../helpers/signatures/modules/collect/auction-collect-module';
 import { Domain } from '../../helpers/signatures/utils';
-import { ERC20, ERC20Interface } from '../../../typechain/ERC20';
-import { FAKE_PRIVATEKEY } from '../../helpers/constants';
 
 export const DEFAULT_BID_AMOUNT = parseEther('2');
 export let BID_WITH_SIG_DOMAIN: Domain;
@@ -304,7 +302,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
         ).to.not.be.reverted;
       });
 
-      context.only('Negatives', function () {
+      context('Negatives', function () {
         it('User should fail to bid for an unexistent publication', async function () {
           const unexistentPubId = 69;
           await expect(
@@ -522,13 +520,171 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
       });
     });
 
-    /// --------------------------------------
+    context('Bid with signature', function () {
+      before(async function () {
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: auctionCollectModule.address,
+            collectModuleInitData: await getAuctionCollectModuleInitData({}),
+            referenceModule: ethers.constants.AddressZero,
+            referenceModuleInitData: [],
+          })
+        ).to.not.be.reverted;
+        mintAndApproveCurrency({});
+        mintAndApproveCurrency({ owner: anotherBidder });
+      });
 
-    /// Template for next test context below
+      context('Negatives', function () {
+        it('User should fail to bid if bidder does not match signer', async function () {
+          const signature = await signBidWithSigMessage({ signer: anotherBidder });
+          await expect(
+            auctionCollectModule.bidWithSig(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              DEFAULT_BID_AMOUNT,
+              FIRST_FOLLOW_NFT_ID,
+              bidder.address,
+              signature
+            )
+          ).to.be.revertedWith(ERRORS.SIGNATURE_INVALID);
+        });
 
-    /// --------------------------------------
+        it('User should fail to bid if signed message deadline was exceeded', async function () {
+          const expiredDeadline = ethers.constants.One;
+          const signature = await signBidWithSigMessage({
+            signer: bidder,
+            deadline: expiredDeadline,
+          });
+          expect(expiredDeadline.lt(await getTimestamp())).to.be.true;
+          await expect(
+            auctionCollectModule.bidWithSig(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              DEFAULT_BID_AMOUNT,
+              FIRST_FOLLOW_NFT_ID,
+              bidder.address,
+              signature
+            )
+          ).to.be.revertedWith(ERRORS.SIGNATURE_EXPIRED);
+        });
 
-    context('Context', function () {
+        it('User should fail to bid if signed message had wrong nonce', async function () {
+          const currentNonce = await auctionCollectModule.nonces(bidder.address);
+          const invalidNonce = await currentNonce.add(5);
+          const signature = await signBidWithSigMessage({ signer: bidder, nonce: invalidNonce });
+          await expect(
+            auctionCollectModule.bidWithSig(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              DEFAULT_BID_AMOUNT,
+              FIRST_FOLLOW_NFT_ID,
+              bidder.address,
+              signature
+            )
+          ).to.be.revertedWith(ERRORS.SIGNATURE_INVALID);
+        });
+
+        it('User should fail to bid if signed message domain had wrong version', async function () {
+          const invalidVersion = '0';
+          const invalidDomain: Domain = {
+            name: 'AuctionCollectModule',
+            version: invalidVersion,
+            chainId: chainId,
+            verifyingContract: auctionCollectModule.address,
+          };
+          const signature = await signBidWithSigMessage({ signer: bidder, domain: invalidDomain });
+          await expect(
+            auctionCollectModule.bidWithSig(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              DEFAULT_BID_AMOUNT,
+              FIRST_FOLLOW_NFT_ID,
+              bidder.address,
+              signature
+            )
+          ).to.be.revertedWith(ERRORS.SIGNATURE_INVALID);
+        });
+
+        it('User should fail to bid if signed message domain had wrong chain ID', async function () {
+          const invalidChainId = 69;
+          expect(chainId).to.not.equals(invalidChainId);
+          const invalidDomain: Domain = {
+            name: 'AuctionCollectModule',
+            version: '1',
+            chainId: invalidChainId,
+            verifyingContract: auctionCollectModule.address,
+          };
+          const signature = await signBidWithSigMessage({ signer: bidder, domain: invalidDomain });
+          await expect(
+            auctionCollectModule.bidWithSig(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              DEFAULT_BID_AMOUNT,
+              FIRST_FOLLOW_NFT_ID,
+              bidder.address,
+              signature
+            )
+          ).to.be.revertedWith(ERRORS.SIGNATURE_INVALID);
+        });
+
+        it('User should fail to bid if signed message domain had wrong verifying contract', async function () {
+          const invalidVerifyingContract = (
+            await new AuctionCollectModule__factory(deployer).deploy(
+              lensHub.address,
+              moduleGlobals.address
+            )
+          ).address;
+          const invalidDomain: Domain = {
+            name: 'AuctionCollectModule',
+            version: '1',
+            chainId: chainId,
+            verifyingContract: invalidVerifyingContract,
+          };
+          const signature = await signBidWithSigMessage({ signer: bidder, domain: invalidDomain });
+          await expect(
+            auctionCollectModule.bidWithSig(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              DEFAULT_BID_AMOUNT,
+              FIRST_FOLLOW_NFT_ID,
+              bidder.address,
+              signature
+            )
+          ).to.be.revertedWith(ERRORS.SIGNATURE_INVALID);
+        });
+
+        it('User should fail to bid if signed message domain had wrong name', async function () {
+          const invalidName = 'Auction Collect Module';
+          const invalidDomain: Domain = {
+            name: invalidName,
+            version: '1',
+            chainId: chainId,
+            verifyingContract: auctionCollectModule.address,
+          };
+          const signature = await signBidWithSigMessage({ signer: bidder, domain: invalidDomain });
+          await expect(
+            auctionCollectModule.bidWithSig(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              DEFAULT_BID_AMOUNT,
+              FIRST_FOLLOW_NFT_ID,
+              bidder.address,
+              signature
+            )
+          ).to.be.revertedWith(ERRORS.SIGNATURE_INVALID);
+        });
+      });
+
+      context('Scenarios', function () {
+        it('User should succeed...', async function () {
+          // TODO: Scenario test!
+        });
+      });
+    });
+
+    context('Process collect and fees', function () {
       context('Negatives', function () {
         it('User should fail...', async function () {
           // TODO: Negative test!
