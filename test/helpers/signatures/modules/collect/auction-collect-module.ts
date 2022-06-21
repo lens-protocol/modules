@@ -66,7 +66,7 @@ export async function signBidWithSigMessage({
   profileId = FIRST_PROFILE_ID,
   pubId = FIRST_PUB_ID,
   amount = DEFAULT_BID_AMOUNT,
-  followNftTokenId = FIRST_FOLLOW_NFT_ID,
+  followNftTokenId = 0,
   deadline = ethers.constants.MaxUint256,
   nonce,
 }: SignBidWithSigMessageData): Promise<BidWithSigMessage & RSV> {
