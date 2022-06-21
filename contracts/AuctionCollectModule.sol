@@ -443,11 +443,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         );
         _setNewAuctionStorageStateAfterBid(profileId, pubId, amount, bidder, auction);
         if (auction.winner != address(0)) {
-            IERC20(auction.currency).safeTransferFrom(
-                address(this),
-                auction.winner,
-                auction.winningBid
-            );
+            IERC20(auction.currency).safeTransfer(auction.winner, auction.winningBid);
         }
         IERC20(auction.currency).safeTransferFrom(bidder, address(this), amount);
         // `referrerProfileId` and `followNftTokenId` event params are tweaked to provide better semantics for indexers.
