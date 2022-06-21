@@ -2,7 +2,7 @@ import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
 import { parseEther } from '@ethersproject/units';
 import '@nomiclabs/hardhat-ethers';
 import { expect } from 'chai';
-import { ethers } from 'hardhat';
+import { ethers, hardhatArguments, network } from 'hardhat';
 import { AuctionCollectModule__factory, FollowNFT__factory } from '../../../typechain';
 import { ERRORS } from '../../helpers/errors';
 import {
@@ -26,6 +26,7 @@ import {
   user,
   FIRST_FOLLOW_NFT_ID,
   deployer,
+  thirdUser,
 } from './../../__setup.spec';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { publisher } from '../../__setup.spec';
@@ -514,8 +515,185 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
       });
 
       context('Scenarios', function () {
-        it('User should succeed...', async function () {
-          // TODO: Scenario test!
+        beforeEach(async function () {
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({}),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          await mintAndApproveCurrency({});
+          await mintAndApproveCurrency({ owner: anotherBidder });
+        });
+
+        it('Funds should be deposited into the contract when a bid is placed', async function () {
+          const bidderBalanceBeforeBid = await currency.balanceOf(bidder.address);
+          const moduleBalanceBeforeBid = await currency.balanceOf(auctionCollectModule.address);
+          expect(moduleBalanceBeforeBid.isZero()).to.be.true;
+          const tx = auctionCollectModule
+            .connect(bidder)
+            .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0);
+          const txReceipt = await waitForTx(tx);
+          const txTimestamp = await getTimestamp();
+          const endTimestamp = DEFAULT_DURATION.add(txTimestamp);
+          matchEvent(
+            txReceipt,
+            'BidPlaced',
+            [
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              0,
+              DEFAULT_BID_AMOUNT,
+              0,
+              bidder.address,
+              endTimestamp,
+              txTimestamp,
+            ],
+            auctionCollectModule
+          );
+          const bidderBalanceAfterBid = await currency.balanceOf(bidder.address);
+          const moduleBalanceAfterBid = await currency.balanceOf(auctionCollectModule.address);
+          expect(moduleBalanceAfterBid.eq(DEFAULT_BID_AMOUNT)).to.be.true;
+          expect(
+            bidderBalanceAfterBid.eq(bidderBalanceBeforeBid.sub(DEFAULT_BID_AMOUNT))
+          ).to.be.true;
+        });
+
+        it('Funds should be returned to previous winner when a better bid is placed by another bidder', async function () {
+          const bidderBalanceBeforeBids = await currency.balanceOf(bidder.address);
+          const anotherBidderBalanceBeforeBids = await currency.balanceOf(anotherBidder.address);
+          const moduleBalanceBeforeBids = await currency.balanceOf(auctionCollectModule.address);
+          expect(moduleBalanceBeforeBids.isZero()).to.be.true;
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          const bidderBalanceAfter1stBid = await currency.balanceOf(bidder.address);
+          const anotherBidderAfter1stBid = await currency.balanceOf(anotherBidder.address);
+          const moduleBalanceAfter1stBid = await currency.balanceOf(auctionCollectModule.address);
+          expect(anotherBidderBalanceBeforeBids.eq(anotherBidderAfter1stBid)).to.be.true;
+          expect(moduleBalanceAfter1stBid.eq(DEFAULT_BID_AMOUNT)).to.be.true;
+          expect(
+            bidderBalanceAfter1stBid.eq(bidderBalanceBeforeBids.sub(DEFAULT_BID_AMOUNT))
+          ).to.be.true;
+          const secondBidAmount = DEFAULT_BID_AMOUNT.add(DEFAULT_MIN_BID_INCREMENT);
+          await expect(
+            auctionCollectModule
+              .connect(anotherBidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, secondBidAmount, 0)
+          ).to.not.be.reverted;
+          const bidderBalanceAfterBids = await currency.balanceOf(bidder.address);
+          const anotherBidderBalanceAfterBids = await currency.balanceOf(anotherBidder.address);
+          const moduleBalanceAfterBids = await currency.balanceOf(auctionCollectModule.address);
+          expect(bidderBalanceAfterBids.eq(bidderBalanceAfterBids)).to.be.true;
+          expect(moduleBalanceAfterBids.eq(secondBidAmount)).to.be.true;
+          expect(
+            anotherBidderBalanceAfterBids.eq(anotherBidderBalanceBeforeBids.sub(secondBidAmount))
+          ).to.be.true;
+        });
+
+        it('Auction should be extended by time set up by publisher in case of a bid placed when less than that time is left', async function () {
+          const oneMinuteInSeconds = BigNumber.from(60);
+          const fiveMinutes = oneMinuteInSeconds.mul(5);
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({
+                minTimeAfterBid: fiveMinutes,
+              }),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          await expect(
+            auctionCollectModule.connect(bidder).bid(FIRST_PROFILE_ID, pubId, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          let auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, pubId);
+          expect(auction.endTimestamp.eq(auction.startTimestamp.add(auction.duration)));
+          const endTimestampAfterFirstBid = auction.endTimestamp;
+          const secondBidTimestamp = endTimestampAfterFirstBid.sub(oneMinuteInSeconds).toNumber();
+          await setNextBlockTimestamp(secondBidTimestamp);
+          await expect(
+            auctionCollectModule
+              .connect(anotherBidder)
+              .bid(FIRST_PROFILE_ID, pubId, DEFAULT_BID_AMOUNT.add(DEFAULT_MIN_BID_INCREMENT), 0)
+          ).to.not.be.reverted;
+          auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, pubId);
+          expect(
+            auction.endTimestamp.eq(auction.minTimeAfterBid.add(secondBidTimestamp))
+          ).to.be.true;
+        });
+
+        it('Referrer profile ID should be set properly and only at first bid of each one', async function () {
+          let bidAmount = DEFAULT_BID_AMOUNT;
+          await lensHub.createProfile({
+            to: anotherBidder.address,
+            handle: 'referrer.lens',
+            imageURI: MOCK_URI,
+            followModule: ethers.constants.AddressZero,
+            followModuleInitData: [],
+            followNFTURI: MOCK_FOLLOW_NFT_URI,
+          });
+          const mirrorerProfileId = FIRST_PROFILE_ID + 1;
+          await expect(
+            lensHub.connect(anotherBidder).mirror({
+              profileId: mirrorerProfileId,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const mirrorPubId = FIRST_PUB_ID;
+          // Bidder places his first bid through original publication
+          await expect(
+            auctionCollectModule.connect(bidder).bid(FIRST_PUB_ID, FIRST_PUB_ID, bidAmount, 0)
+          ).to.not.be.reverted;
+          // Bidder's referrer profile ID should be 0, which means no referrer
+          expect(
+            await auctionCollectModule.getReferrerProfileIdOf(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              bidder.address
+            )
+          ).to.be.equals(0);
+          // Another bidder places his first bid through its own mirror publication
+          bidAmount = bidAmount.add(DEFAULT_MIN_BID_INCREMENT);
+          await expect(
+            auctionCollectModule
+              .connect(anotherBidder)
+              .bid(mirrorerProfileId, mirrorPubId, bidAmount, 0)
+          ).to.not.be.reverted;
+          // Another bidder's referrer profile ID should be his own profile
+          expect(
+            await auctionCollectModule.getReferrerProfileIdOf(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              anotherBidder.address
+            )
+          ).to.be.equals(mirrorerProfileId);
+          // Bidder places his second bid through another bidder's mirror
+          bidAmount = bidAmount.add(DEFAULT_MIN_BID_INCREMENT);
+          await expect(
+            auctionCollectModule.connect(bidder).bid(mirrorerProfileId, mirrorPubId, bidAmount, 0)
+          ).to.not.be.reverted;
+          // Bidder's referrer profile ID should still be 0, as referrer is set only through first bid of each bidder
+          expect(
+            await auctionCollectModule.getReferrerProfileIdOf(
+              FIRST_PROFILE_ID,
+              FIRST_PUB_ID,
+              bidder.address
+            )
+          ).to.be.equals(0);
         });
       });
     });
