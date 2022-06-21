@@ -63,9 +63,10 @@ struct AuctionData {
 contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
-    error ActiveAuction();
+    error OngoingAuction();
     error UnavailableAuction();
-    error NoFeeToProcess();
+    error CollectAlreadyProcessed();
+    error FeeAlreadyProcessed();
     error InsufficientBidAmount();
     error InvalidBidder();
 
@@ -199,8 +200,11 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         bytes calldata data
     ) external override onlyHub {
         AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
-        if (auction.startTimestamp <= block.timestamp && block.timestamp <= auction.endTimestamp) {
-            revert ActiveAuction();
+        if (block.timestamp < auction.availableSinceTimestamp) {
+            revert UnavailableAuction();
+        }
+        if (auction.startTimestamp == 0 || block.timestamp <= auction.endTimestamp) {
+            revert OngoingAuction();
         }
         if (
             collector != auction.winner ||
@@ -209,7 +213,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
             revert Errors.ModuleDataMismatch();
         }
         if (auction.collected) {
-            revert Errors.CollectNotAllowed();
+            revert CollectAlreadyProcessed();
         }
         if (auction.onlyFollowers) {
             _validateFollow(
@@ -243,11 +247,14 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
      */
     function processCollectFee(uint256 profileId, uint256 pubId) external {
         AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
-        if (auction.startTimestamp <= block.timestamp && block.timestamp <= auction.endTimestamp) {
-            revert ActiveAuction();
+        if (block.timestamp < auction.availableSinceTimestamp) {
+            revert UnavailableAuction();
+        }
+        if (block.timestamp <= auction.endTimestamp) {
+            revert OngoingAuction();
         }
         if (auction.feeProcessed) {
-            revert NoFeeToProcess();
+            revert FeeAlreadyProcessed();
         }
         _processCollectFee(profileId, pubId);
     }
@@ -468,7 +475,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     ) internal view {
         if (
             auction.duration == 0 ||
-            auction.availableSinceTimestamp > block.timestamp ||
+            block.timestamp < auction.availableSinceTimestamp ||
             (auction.startTimestamp > 0 && block.timestamp > auction.endTimestamp)
         ) {
             revert UnavailableAuction();

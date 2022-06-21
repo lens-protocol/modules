@@ -1,8 +1,9 @@
 export const ERRORS = {
   // AuctionCollectModule
-  ACTIVE_AUCTION: 'ActiveAuction()',
+  ONGOING_AUCTION: 'OngoingAuction()',
   UNAVAILABLE_AUCTION: 'UnavailableAuction()',
-  NO_FEE_TO_PROCESS: 'NoFeeToProcess()',
+  COLLECT_ALREADY_PROCESSED: 'CollectAlreadyProcessed()',
+  FEE_ALREADY_PROCESSED: 'FeeAlreadyProcessed()',
   INSUFFICIENT_BID_AMOUNT: 'InsufficientBidAmount()',
   INVALID_BIDDER: 'InvalidBidder()',
 
