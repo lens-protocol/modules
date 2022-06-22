@@ -2,7 +2,7 @@ import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
 import { parseEther } from '@ethersproject/units';
 import '@nomiclabs/hardhat-ethers';
 import { expect } from 'chai';
-import { ethers, hardhatArguments, network } from 'hardhat';
+import { ethers } from 'hardhat';
 import { AuctionCollectModule__factory, FollowNFT__factory } from '../../../typechain';
 import { ERRORS } from '../../helpers/errors';
 import {
@@ -29,14 +29,12 @@ import {
   thirdUser,
   treasury,
   TREASURY_FEE_BPS,
-  governance,
 } from './../../__setup.spec';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { publisher } from '../../__setup.spec';
 import { getTimestamp, matchEvent, setNextBlockTimestamp, waitForTx } from '../../helpers/utils';
 import { signBidWithSigMessage } from '../../helpers/signatures/modules/collect/auction-collect-module';
 import { Domain } from '../../helpers/signatures/utils';
-import { profile } from 'console';
 
 export const DEFAULT_BID_AMOUNT = parseEther('2');
 export let BID_WITH_SIG_DOMAIN: Domain;
