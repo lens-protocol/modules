@@ -27,12 +27,16 @@ import {
   FIRST_FOLLOW_NFT_ID,
   deployer,
   thirdUser,
+  treasury,
+  TREASURY_FEE_BPS,
+  governance,
 } from './../../__setup.spec';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { publisher } from '../../__setup.spec';
 import { getTimestamp, matchEvent, setNextBlockTimestamp, waitForTx } from '../../helpers/utils';
 import { signBidWithSigMessage } from '../../helpers/signatures/modules/collect/auction-collect-module';
 import { Domain } from '../../helpers/signatures/utils';
+import { profile } from 'console';
 
 export const DEFAULT_BID_AMOUNT = parseEther('2');
 export let BID_WITH_SIG_DOMAIN: Domain;
@@ -1429,8 +1433,153 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
       });
 
       context('Scenarios', function () {
-        it('User should succeed...', async function () {
-          // TODO: Scenario test!
+        it('User should win and collect an only followers auction borrowing different follow NFTs through the entire process', async function () {
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({ onlyFollowers: true }),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          // Two different users follow publisher profile before the auction starts
+          await expect(
+            lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+          ).to.not.be.reverted;
+          await expect(
+            lensHub.connect(thirdUser).follow([FIRST_PROFILE_ID], [[]])
+          ).to.not.be.reverted;
+          const secondFollowNftId = FIRST_FOLLOW_NFT_ID + 1;
+          const followNftAddress = await lensHub.getFollowNFT(FIRST_PROFILE_ID);
+          const followNft = await FollowNFT__factory.connect(followNftAddress, bidder);
+          // We verify the users has a follow NFT now but the bidder does not
+          expect((await followNft.balanceOf(bidder.address)).isZero()).to.be.true;
+          expect((await followNft.balanceOf(anotherUser.address)).isZero()).to.be.false;
+          expect((await followNft.balanceOf(thirdUser.address)).isZero()).to.be.false;
+          // Bidder takes follow NFT from anotherUser, places a bid and return it back
+          await expect(
+            followNft
+              .connect(anotherUser)
+              .transferFrom(anotherUser.address, bidder.address, FIRST_FOLLOW_NFT_ID)
+          ).to.not.be.reverted;
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, pubId, DEFAULT_BID_AMOUNT, FIRST_FOLLOW_NFT_ID)
+          ).to.not.be.reverted;
+          await expect(
+            followNft
+              .connect(bidder)
+              .transferFrom(bidder.address, anotherUser.address, FIRST_FOLLOW_NFT_ID)
+          ).to.not.be.reverted;
+          // Auction ends, bidder becomes the winner
+          await simulateAuctionEnd({
+            pubId: pubId,
+          });
+          // Bidder takes follow NFT from thirdUser to be able to collect
+          await expect(
+            followNft
+              .connect(thirdUser)
+              .transferFrom(thirdUser.address, bidder.address, secondFollowNftId)
+          ).to.not.be.reverted;
+          await expect(
+            lensHub
+              .connect(bidder)
+              .collect(FIRST_PROFILE_ID, pubId, abiCoder.encode(['uint256'], [secondFollowNftId]))
+          ).to.not.be.reverted;
+        });
+
+        it('Anoyone should succeed to trigger collect fees processing after auction finishes before the winner collects', async function () {
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          const treasuryBalanceBeforeFees = await currency.balanceOf(treasury.address);
+          const recipientBalanceBeforeFees = await currency.balanceOf(feeRecipient.address);
+          const tx = auctionCollectModule
+            .connect(anotherUser)
+            .processCollectFee(FIRST_PROFILE_ID, FIRST_PUB_ID);
+          const txReceipt = await waitForTx(tx);
+          matchEvent(
+            txReceipt,
+            'FeeProcessed',
+            [FIRST_PROFILE_ID, FIRST_PUB_ID, await getTimestamp()],
+            auctionCollectModule
+          );
+          const treasuryBalanceAfterFees = await currency.balanceOf(treasury.address);
+          const recipientBalanceAfterFees = await currency.balanceOf(feeRecipient.address);
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedTreausyFee = DEFAULT_BID_AMOUNT.mul(TREASURY_FEE_BPS).div(BPS_MAX);
+          const expectedRecipientFee = DEFAULT_BID_AMOUNT.sub(expectedTreausyFee);
+          expect(treasuryBalanceBeforeFees.isZero()).to.be.true;
+          expect(recipientBalanceBeforeFees.isZero()).to.be.true;
+          expect(treasuryBalanceAfterFees).to.be.equals(expectedTreausyFee);
+          expect(recipientBalanceAfterFees).to.be.equals(expectedRecipientFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(treasuryBalanceAfterFees);
+          expect(recipientBalanceAfterCollect).to.be.equals(recipientBalanceAfterFees);
+        });
+
+        it('Owner of referrer profile should receive a cut of the collect fees', async function () {
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Creates referrer profile who mirrors publication
+          await lensHub.createProfile({
+            to: anotherUser.address,
+            handle: 'referrer.lens',
+            imageURI: MOCK_URI,
+            followModule: ethers.constants.AddressZero,
+            followModuleInitData: [],
+            followNFTURI: MOCK_FOLLOW_NFT_URI,
+          });
+          const referrerProfileId = FIRST_PROFILE_ID + 1;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: referrerProfileId,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // Bidder places a bid through mirrored publication
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(referrerProfileId, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          // Auction finishes
+          await simulateAuctionEnd({});
+          // Collects through same mirrored publication as it is required
+          await expect(
+            lensHub.connect(bidder).collect(referrerProfileId, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceAfterCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedTreasuryFee = DEFAULT_BID_AMOUNT.mul(TREASURY_FEE_BPS).div(BPS_MAX);
+          const expectedScaledAmount = DEFAULT_BID_AMOUNT.sub(expectedTreasuryFee);
+          const expectedReferralFee = expectedScaledAmount.mul(REFERRAL_FEE_BPS).div(BPS_MAX);
+          const expectedRecipientFee = expectedScaledAmount.sub(expectedReferralFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(
+            treasuryBalanceBeforeCollect.add(expectedTreasuryFee)
+          );
+          expect(referrerBalanceAfterCollect).to.be.equals(
+            referrerBalanceBeforeCollect.add(expectedReferralFee)
+          );
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(expectedRecipientFee)
+          );
         });
       });
     });
