@@ -74,9 +74,9 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
   }: AuctionCollectModuleInitData): Promise<string> {
     return abiCoder.encode(
       [
-        'uint256',
-        'uint256',
-        'uint256',
+        'uint64',
+        'uint32',
+        'uint32',
         'uint256',
         'uint256',
         'uint16',
@@ -630,7 +630,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
           ).to.not.be.reverted;
           auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, pubId);
           expect(
-            auction.endTimestamp.eq(auction.minTimeAfterBid.add(secondBidTimestamp))
+            auction.endTimestamp.eq(auction.minTimeAfterBid + secondBidTimestamp)
           ).to.be.true;
         });
 
@@ -1014,7 +1014,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
           ).to.not.be.reverted;
           auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, pubId);
           expect(
-            auction.endTimestamp.eq(auction.minTimeAfterBid.add(secondBidTimestamp))
+            auction.endTimestamp.eq(auction.minTimeAfterBid + secondBidTimestamp)
           ).to.be.true;
         });
 

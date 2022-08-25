@@ -36,11 +36,11 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param feeProcessed Indicates whether the auction fee was already processed or not.
  */
 struct AuctionData {
-    uint256 availableSinceTimestamp;
-    uint256 startTimestamp;
-    uint256 duration;
-    uint256 minTimeAfterBid;
-    uint256 endTimestamp;
+    uint64 availableSinceTimestamp;
+    uint64 startTimestamp;
+    uint32 duration;
+    uint32 minTimeAfterBid;
+    uint64 endTimestamp;
     uint256 reservePrice;
     uint256 minBidIncrement;
     uint256 winningBid;
@@ -73,9 +73,9 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     event AuctionCreated(
         uint256 profileId,
         uint256 pubId,
-        uint256 availableSinceTimestamp,
-        uint256 duration,
-        uint256 minTimeAfterBid,
+        uint64 availableSinceTimestamp,
+        uint32 duration,
+        uint32 minTimeAfterBid,
         uint256 reservePrice,
         uint256 minBidIncrement,
         uint16 referralFee,
@@ -136,9 +136,9 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         (
-            uint256 availableSinceTimestamp,
-            uint256 duration,
-            uint256 minTimeAfterBid,
+            uint64 availableSinceTimestamp,
+            uint32 duration,
+            uint32 minTimeAfterBid,
             uint256 reservePrice,
             uint256 minBidIncrement,
             uint16 referralFee,
@@ -147,7 +147,7 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
             bool onlyFollowers
         ) = abi.decode(
                 data,
-                (uint256, uint256, uint256, uint256, uint256, uint16, address, address, bool)
+                (uint64, uint32, uint32, uint256, uint256, uint16, address, address, bool)
             );
         if (
             duration == 0 ||
@@ -345,9 +345,9 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     function _initAuction(
         uint256 profileId,
         uint256 pubId,
-        uint256 availableSinceTimestamp,
-        uint256 duration,
-        uint256 minTimeAfterBid,
+        uint64 availableSinceTimestamp,
+        uint32 duration,
+        uint32 minTimeAfterBid,
         uint256 reservePrice,
         uint256 minBidIncrement,
         uint16 referralFee,
@@ -515,13 +515,13 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         uint256 endTimestamp = prevAuctionState.endTimestamp;
         if (prevAuctionState.winner == address(0)) {
             endTimestamp = block.timestamp + prevAuctionState.duration;
-            nextAuctionState.endTimestamp = endTimestamp;
-            nextAuctionState.startTimestamp = block.timestamp;
+            nextAuctionState.endTimestamp = uint64(endTimestamp);
+            nextAuctionState.startTimestamp = uint64(block.timestamp);
         } else if (
             prevAuctionState.endTimestamp - block.timestamp < prevAuctionState.minTimeAfterBid
         ) {
             endTimestamp = block.timestamp + prevAuctionState.minTimeAfterBid;
-            nextAuctionState.endTimestamp = endTimestamp;
+            nextAuctionState.endTimestamp = uint64(endTimestamp);
         }
         return endTimestamp;
     }
