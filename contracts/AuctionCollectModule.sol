@@ -13,6 +13,7 @@ import {ILensHub} from '@aave/lens-protocol/contracts/interfaces/ILensHub.sol';
 import {IModuleGlobals} from '@aave/lens-protocol/contracts/interfaces/IModuleGlobals.sol';
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 
 /**
  * @notice A struct containing the necessary data to execute collect auctions.
@@ -60,7 +61,7 @@ struct AuctionData {
  * @notice This module works by creating an English auction for the underlying publication. After the auction ends, only
  * the auction winner is allowed to collect the publication.
  */
-contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
+contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
     error OngoingAuction();
@@ -107,7 +108,11 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     mapping(uint256 => mapping(uint256 => mapping(address => uint256)))
         internal _referrerProfileIdByPubByProfile;
 
-    constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
+    constructor(address hub, address moduleGlobals)
+        EIP712('AuctionCollectModule', '1')
+        ModuleBase(hub)
+        FeeModuleBase(moduleGlobals)
+    {}
 
     /**
      * @dev See `AuctionData` struct's natspec in order to understand `data` decoded values.
@@ -565,8 +570,6 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         );
     }
 
-    // TODO: Functions below could be in a lib or base contract
-
     function _validateFollow(
         uint256 profileId,
         address follower,
@@ -617,24 +620,9 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         bytes32 digest;
         unchecked {
             digest = keccak256(
-                abi.encodePacked('\x19\x01', _calculateDomainSeparator(), keccak256(message))
+                abi.encodePacked('\x19\x01', _domainSeparatorV4(), keccak256(message))
             );
         }
         return digest;
-    }
-
-    function _calculateDomainSeparator() internal view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256(
-                        'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'
-                    ),
-                    keccak256('AuctionCollectModule'),
-                    keccak256('1'),
-                    block.chainid,
-                    address(this)
-                )
-            );
     }
 }
