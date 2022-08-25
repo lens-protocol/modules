@@ -95,22 +95,6 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
     );
     event FeeProcessed(uint256 profileId, uint256 pubId, uint256 timestamp);
 
-    // keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)');
-    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
-        0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
-
-    // keccak256('1');
-    bytes32 internal constant EIP712_VERSION_HASH =
-        0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-
-    // keccak256('AuctionCollectModule');
-    bytes32 internal constant EIP712_NAME_HASH =
-        0xba22081bc5c1d1ec869a162d29727734a7f22077aed8b8d52bc9a23e7c5ed6ef;
-
-    // keccak256('BidWithSig(uint256 profileId,uint256 pubId,uint256 amount,uint256 followNftTokenId,uint256 nonce,uint256 deadline)');
-    bytes32 internal constant BID_WITH_SIG_TYPEHASH =
-        0x0379a8fff1df18e1c9ca9ee00af30bc25bd91f6f353825b7781e0b1ca9e89d5d;
-
     mapping(address => uint256) public nonces;
 
     mapping(uint256 => mapping(uint256 => AuctionData)) internal _auctionDataByPubByProfile;
@@ -315,7 +299,9 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
             followNftTokenId,
             bidder,
             sig,
-            BID_WITH_SIG_TYPEHASH
+            keccak256(
+                'BidWithSig(uint256 profileId,uint256 pubId,uint256 amount,uint256 followNftTokenId,uint256 nonce,uint256 deadline)'
+            )
         );
         (uint256 profileIdPointed, uint256 pubIdPointed) = _getRootPublication(profileId, pubId);
         _bid(profileIdPointed, pubIdPointed, profileId, amount, followNftTokenId, bidder);
@@ -641,9 +627,11 @@ contract AuctionCollectModule is FeeModuleBase, ModuleBase, ICollectModule {
         return
             keccak256(
                 abi.encode(
-                    EIP712_DOMAIN_TYPEHASH,
-                    EIP712_NAME_HASH,
-                    EIP712_VERSION_HASH,
+                    keccak256(
+                        'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'
+                    ),
+                    keccak256('AuctionCollectModule'),
+                    keccak256('1'),
                     block.chainid,
                     address(this)
                 )
