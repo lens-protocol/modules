@@ -3,6 +3,7 @@
 pragma solidity 0.8.10;
 
 import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
+import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
 import {FeeModuleBase} from '@aave/lens-protocol/contracts/core/modules/FeeModuleBase.sol';
 import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectModule.sol';
@@ -13,7 +14,6 @@ import {ILensHub} from '@aave/lens-protocol/contracts/interfaces/ILensHub.sol';
 import {IModuleGlobals} from '@aave/lens-protocol/contracts/interfaces/IModuleGlobals.sol';
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 
 /**
  * @notice A struct containing the necessary data to execute collect auctions.
@@ -162,6 +162,14 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         return data;
     }
 
+    /**
+     * @notice If the given publication has an auction, this function returns all its information.
+     *
+     * @param profileId The token ID of the profile associated with the underlying publication.
+     * @param pubId The publication ID associated with the underlying publication.
+     *
+     * @return The auction data for the given publication.
+     */
     function getAuctionData(uint256 profileId, uint256 pubId)
         external
         view
@@ -231,9 +239,6 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
      *
      * @dev This function allows anyone to process the collect fees, not needing to wait for `processCollect` to be
      * called, as long as the auction has finished, has a winner and the publication has not been collected yet.
-     * Why is this function necessary? Suppose someone wins the auction, but for some reason never calls the LensHub's
-     * `collect`. That would make `processCollect` of this module never been called and, consequently, collect wouldn't
-     * be processed, locking the fees in this contract forever.
      *
      * @param profileId The token ID of the profile associated with the underlying publication.
      * @param pubId The publication ID associated with the underlying publication.
@@ -296,7 +301,8 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
      * @param pubId The publication ID associated with the publication, could be a mirror.
      * @param amount The bid amount to offer.
      * @param followNftTokenId The token ID of the Follow NFT to use if the auction is configured as followers-only.
-     * @param bidder The address of the bidder, which should be
+     * @param bidder The address of the bidder.
+     * @param sig The EIP-712 signature for this operation.
      */
     function bidWithSig(
         uint256 profileId,
@@ -306,17 +312,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         address bidder,
         DataTypes.EIP712Signature calldata sig
     ) external {
-        _validateBidSignature(
-            profileId,
-            pubId,
-            amount,
-            followNftTokenId,
-            bidder,
-            sig,
-            keccak256(
-                'BidWithSig(uint256 profileId,uint256 pubId,uint256 amount,uint256 followNftTokenId,uint256 nonce,uint256 deadline)'
-            )
-        );
+        _validateBidSignature(profileId, pubId, amount, followNftTokenId, bidder, sig);
         (uint256 profileIdPointed, uint256 pubIdPointed) = _getRootPublication(profileId, pubId);
         _bid(profileIdPointed, pubIdPointed, profileId, amount, followNftTokenId, bidder);
     }
@@ -326,7 +322,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
      *
      * @param profileId The token ID of the profile associated with the underlying publication.
      * @param pubId The publication ID associated with the underlying publication.
-     * @param bidder The address which the referrer profile should be returned.
+     * @param bidder The address whose referrer profile should be returned.
      *
      * @return The ID of the referrer profile. Zero means no referral.
      */
@@ -340,7 +336,23 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
     }
 
     /**
+     * @notice Initializes the auction struct for the given publication.
+     *
      * @dev Auction initialization logic moved to this function to avoid stack too deep error.
+     *
+     * @param profileId The token ID of the profile associated with the underlying publication.
+     * @param pubId The publication ID associated with the underlying publication.
+     * @param availableSinceTimestamp The UNIX timestamp after bids can start to be placed.
+     * @param duration The seconds that the auction will last after the first bid has been placed.
+     * @param minTimeAfterBid The minimum time, in seconds, that must always remain between last bid's timestamp
+     *        and `endTimestamp`. This restriction could make `endTimestamp` to be re-computed and updated.
+     * @param reservePrice The minimum bid price accepted.
+     * @param minBidIncrement The minimum amount by which a new bid must overcome the last bid.
+     * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
+     *        Measured in basis points, each basis point represents 0.01%.
+     * @param currency The currency in which the bids are denominated.
+     * @param recipient The recipient of the auction's winner bid amount.
+     * @param onlyFollowers Indicates whether followers are the only allowed to bid, and collect, or not.
      */
     function _initAuction(
         uint256 profileId,
@@ -380,6 +392,15 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         );
     }
 
+    /**
+     * @notice Process the fees from the given publication's underlying auction.
+     *
+     * @dev It delegates the fee processing to `_processCollectFeeWithoutReferral` or `_processCollectFeeWithReferral`
+     *      depending if has referrer or not.
+     *
+     * @param profileId The token ID of the profile associated with the underlying publication.
+     * @param pubId The publication ID associated with the underlying publication.
+     */
     function _processCollectFee(uint256 profileId, uint256 pubId) internal {
         _auctionDataByPubByProfile[profileId][pubId].feeProcessed = true;
         uint256 referrerProfileId = _referrerProfileIdByPubByProfile[profileId][pubId][
@@ -403,6 +424,13 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         emit FeeProcessed(profileId, pubId, block.timestamp);
     }
 
+    /**
+     * @notice Process the fees sending the winner amount to the recipient.
+     *
+     * @param winnerBid The amount of the winner bid.
+     * @param currency The currency in which the bids are denominated.
+     * @param recipient The recipient of the auction's winner bid amount.
+     */
     function _processCollectFeeWithoutReferral(
         uint256 winnerBid,
         address currency,
@@ -417,6 +445,17 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         }
     }
 
+    /**
+     * @notice Process the fees sending the winner amount to the recipient and the corresponding referral fee to the
+     *         owner of the referrer profile.
+     *
+     * @param winnerBid The amount of the winner bid.
+     * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
+     *        Measured in basis points, each basis point represents 0.01%.
+     * @param referrerProfileId The token ID of the referrer's profile.
+     * @param currency The currency in which the bids are denominated.
+     * @param recipient The recipient of the auction's winner bid amount.
+     */
     function _processCollectFeeWithReferral(
         uint256 winnerBid,
         uint16 referralFee,
@@ -446,6 +485,17 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         }
     }
 
+    /**
+     * @notice Executes the given bid for the given auction. Each new successful bid transfers back the funds of the
+     *         previous winner and pulls funds from the new winning bidder.
+     *
+     * @param profileId The token ID of the profile associated with the underlying publication.
+     * @param pubId The publication ID associated with the underlying publication.
+     * @param referrerProfileId The token ID of the referrer's profile.
+     * @param amount The bid amount to offer.
+     * @param followNftTokenId The token ID of the Follow NFT to use if the auction is configured as followers-only.
+     * @param bidder The address of the bidder.
+     */
     function _bid(
         uint256 profileId,
         uint256 pubId,
@@ -456,7 +506,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
     ) internal {
         AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
         _validateBid(profileId, amount, followNftTokenId, bidder, auction);
-        uint256 referrerProfileIdSet = _setReferrerProfileId(
+        uint256 referrerProfileIdSet = _setReferrerProfileIdIfNotAlreadySet(
             profileId,
             pubId,
             referrerProfileId,
@@ -486,6 +536,15 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         );
     }
 
+    /**
+     * @notice Valides if the given bid is valid for the given auction.
+     *
+     * @param profileId The token ID of the profile associated with the underlying publication.
+     * @param amount The bid amount to offer.
+     * @param followNftTokenId The token ID of the Follow NFT to use if the auction is configured as followers-only.
+     * @param bidder The address of the bidder.
+     * @param auction The data of the auction where the bid is being placed.
+     */
     function _validateBid(
         uint256 profileId,
         uint256 amount,
@@ -515,7 +574,15 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
     }
 
     /**
-     * @dev Returns `endTimestamp` of the new auction state
+     * @notice Updates the state of the auction data after a successful bid.
+     *
+     * @param profileId The token ID of the profile associated with the underlying publication.
+     * @param pubId The publication ID associated with the underlying publication.
+     * @param newWinningBid The amount of the new winning bid.
+     * @param newWinner The new winning bidder.
+     * @param prevAuctionState The state of the auction data before the bid, which will be overrided.
+     *
+     * @return A UNIX timestamp representing the `endTimestamp` of the new auction state.
      */
     function _setNewAuctionStorageStateAfterBid(
         uint256 profileId,
@@ -541,7 +608,18 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         return endTimestamp;
     }
 
-    function _setReferrerProfileId(
+    /**
+     * @notice Sets the the given `referrerProfileId` if it is the first bid of the bidder, or returns the previously
+     *         set otherwise.
+     *
+     * @param profileId The token ID of the profile associated with the underlying publication.
+     * @param pubId The publication ID associated with the underlying publication.
+     * @param referrerProfileId The token ID of the referrer's profile.
+     * @param bidder The address of the bidder whose referrer profile id is being set.
+     *
+     * @return The token ID of the referrer profile for the given bidder. Being equals to `profileId` means no referrer.
+     */
+    function _setReferrerProfileIdIfNotAlreadySet(
         uint256 profileId,
         uint256 pubId,
         uint256 referrerProfileId,
@@ -555,6 +633,12 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         return referrerProfileIdSet;
     }
 
+    /**
+     * @notice Checks if the given bid amount is valid for the given auction.
+     *
+     * @param auction The auction where the bid amount validation should be performed.
+     * @param amount The bid amount to validate.
+     */
     function _validateBidAmount(AuctionData memory auction, uint256 amount) internal pure {
         bool auctionStartsWithCurrentBid = auction.winner == address(0);
         if (
@@ -568,32 +652,16 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         }
     }
 
-    function _validateBidSignature(
-        uint256 profileId,
-        uint256 pubId,
-        uint256 amount,
-        uint256 followNftTokenId,
-        address bidder,
-        DataTypes.EIP712Signature calldata sig,
-        bytes32 typehash
-    ) internal {
-        _validateRecoveredAddress(
-            _calculateDigest(
-                abi.encode(
-                    typehash,
-                    profileId,
-                    pubId,
-                    amount,
-                    followNftTokenId,
-                    nonces[bidder]++,
-                    sig.deadline
-                )
-            ),
-            bidder,
-            sig
-        );
-    }
-
+    /**
+     * @notice Checks the given Follow NFT is owned by the given follower, is part of the given followed profile's
+     *          follow NFT collection and was minted before the given deadline.
+     *
+     * @param profileId The token ID of the profile associated with the publication.
+     * @param follower The address performing the follow operation.
+     * @param followNftTokenId The token ID of the Follow NFT to use.
+     * @param maxValidFollowTimestamp The maximum timestamp for which Follow NFTs should have been minted before
+     *                                to be valid for this scenario.
+     */
     function _validateFollow(
         uint256 profileId,
         address follower,
@@ -610,6 +678,12 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         }
     }
 
+    /**
+     * @notice Returns the pointed publication if the passed one is a mirror, otherwise just returns the passed one.
+     *
+     * @param profileId The token ID of the profile associated with the publication, could be a mirror.
+     * @param pubId The publication ID associated with the publication, could be a mirror.
+     */
     function _getRootPublication(uint256 profileId, uint256 pubId)
         internal
         view
@@ -626,6 +700,50 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         }
     }
 
+    /**
+     * @notice Checks if the signature for the `bidWithSig` function is valid according EIP-712 standard.
+     *
+     * @param profileId The token ID of the profile associated with the publication, could be a mirror.
+     * @param pubId The publication ID associated with the publication, could be a mirror.
+     * @param amount The bid amount to offer.
+     * @param followNftTokenId The token ID of the Follow NFT to use if the auction is configured as followers-only.
+     * @param bidder The address of the bidder.
+     * @param sig The EIP-712 signature to validate.
+     */
+    function _validateBidSignature(
+        uint256 profileId,
+        uint256 pubId,
+        uint256 amount,
+        uint256 followNftTokenId,
+        address bidder,
+        DataTypes.EIP712Signature calldata sig
+    ) internal {
+        _validateRecoveredAddress(
+            _calculateDigest(
+                abi.encode(
+                    keccak256(
+                        'BidWithSig(uint256 profileId,uint256 pubId,uint256 amount,uint256 followNftTokenId,uint256 nonce,uint256 deadline)'
+                    ),
+                    profileId,
+                    pubId,
+                    amount,
+                    followNftTokenId,
+                    nonces[bidder]++,
+                    sig.deadline
+                )
+            ),
+            bidder,
+            sig
+        );
+    }
+
+    /**
+     * @notice Checks the recovered address is the expected signer for the given signature.
+     *
+     * @param digest The expected signed data.
+     * @param expectedAddress The address of the expected signer.
+     * @param sig The signature.
+     */
     function _validateRecoveredAddress(
         bytes32 digest,
         address expectedAddress,
@@ -640,13 +758,12 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         }
     }
 
+    /**
+     * @notice Calculates the digest for the given bytes according EIP-712 standard.
+     *
+     * @param message The message, as bytes, to calculate the digest from.
+     */
     function _calculateDigest(bytes memory message) internal view returns (bytes32) {
-        bytes32 digest;
-        unchecked {
-            digest = keccak256(
-                abi.encodePacked('\x19\x01', _domainSeparatorV4(), keccak256(message))
-            );
-        }
-        return digest;
+        return keccak256(abi.encodePacked('\x19\x01', _domainSeparatorV4(), keccak256(message)));
     }
 }
