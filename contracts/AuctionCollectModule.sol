@@ -188,35 +188,39 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         uint256 pubId,
         bytes calldata data
     ) external override onlyHub {
-        AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
-        if (block.timestamp < auction.availableSinceTimestamp) {
+        if (
+            block.timestamp < _auctionDataByPubByProfile[profileId][pubId].availableSinceTimestamp
+        ) {
             revert UnavailableAuction();
         }
-        if (auction.startTimestamp == 0 || block.timestamp <= auction.endTimestamp) {
+        if (
+            _auctionDataByPubByProfile[profileId][pubId].startTimestamp == 0 ||
+            block.timestamp <= _auctionDataByPubByProfile[profileId][pubId].endTimestamp
+        ) {
             revert OngoingAuction();
         }
         if (
-            collector != auction.winner ||
+            collector != _auctionDataByPubByProfile[profileId][pubId].winner ||
             referrerProfileId != _referrerProfileIdByPubByProfile[profileId][pubId][collector]
         ) {
             revert Errors.ModuleDataMismatch();
         }
-        if (auction.collected) {
+        if (_auctionDataByPubByProfile[profileId][pubId].collected) {
             revert CollectAlreadyProcessed();
         }
-        if (auction.onlyFollowers) {
+        if (_auctionDataByPubByProfile[profileId][pubId].onlyFollowers) {
             _validateFollow(
                 profileId,
                 collector,
                 abi.decode(data, (uint256)),
-                auction.startTimestamp
+                _auctionDataByPubByProfile[profileId][pubId].startTimestamp
             );
         } else if (data.length > 0) {
             // Prevents `LensHub` from emiting `Collected` event with wrong `data` parameter.
             revert Errors.ModuleDataMismatch();
         }
         _auctionDataByPubByProfile[profileId][pubId].collected = true;
-        if (!auction.feeProcessed) {
+        if (!_auctionDataByPubByProfile[profileId][pubId].feeProcessed) {
             _processCollectFee(profileId, pubId);
         }
     }
@@ -235,14 +239,19 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
      * @param pubId The publication ID associated with the underlying publication.
      */
     function processCollectFee(uint256 profileId, uint256 pubId) external {
-        AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
-        if (auction.duration == 0 || block.timestamp < auction.availableSinceTimestamp) {
+        if (
+            _auctionDataByPubByProfile[profileId][pubId].duration == 0 ||
+            block.timestamp < _auctionDataByPubByProfile[profileId][pubId].availableSinceTimestamp
+        ) {
             revert UnavailableAuction();
         }
-        if (auction.startTimestamp == 0 || block.timestamp <= auction.endTimestamp) {
+        if (
+            _auctionDataByPubByProfile[profileId][pubId].startTimestamp == 0 ||
+            block.timestamp <= _auctionDataByPubByProfile[profileId][pubId].endTimestamp
+        ) {
             revert OngoingAuction();
         }
-        if (auction.feeProcessed) {
+        if (_auctionDataByPubByProfile[profileId][pubId].feeProcessed) {
             revert FeeAlreadyProcessed();
         }
         _processCollectFee(profileId, pubId);
@@ -372,53 +381,68 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
     }
 
     function _processCollectFee(uint256 profileId, uint256 pubId) internal {
-        AuctionData memory auction = _auctionDataByPubByProfile[profileId][pubId];
         _auctionDataByPubByProfile[profileId][pubId].feeProcessed = true;
         uint256 referrerProfileId = _referrerProfileIdByPubByProfile[profileId][pubId][
-            auction.winner
+            _auctionDataByPubByProfile[profileId][pubId].winner
         ];
         if (referrerProfileId == profileId) {
-            _processCollectFeeWithoutReferral(auction);
+            _processCollectFeeWithoutReferral(
+                _auctionDataByPubByProfile[profileId][pubId].winningBid,
+                _auctionDataByPubByProfile[profileId][pubId].currency,
+                _auctionDataByPubByProfile[profileId][pubId].recipient
+            );
         } else {
-            _processCollectFeeWithReferral(auction, referrerProfileId);
+            _processCollectFeeWithReferral(
+                _auctionDataByPubByProfile[profileId][pubId].winningBid,
+                _auctionDataByPubByProfile[profileId][pubId].referralFee,
+                referrerProfileId,
+                _auctionDataByPubByProfile[profileId][pubId].currency,
+                _auctionDataByPubByProfile[profileId][pubId].recipient
+            );
         }
         emit FeeProcessed(profileId, pubId, block.timestamp);
     }
 
-    function _processCollectFeeWithoutReferral(AuctionData memory auction) internal {
+    function _processCollectFeeWithoutReferral(
+        uint256 winnerBid,
+        address currency,
+        address recipient
+    ) internal {
         (address treasury, uint16 treasuryFee) = _treasuryData();
-        uint256 treasuryAmount = (auction.winningBid * treasuryFee) / BPS_MAX;
-        uint256 adjustedAmount = auction.winningBid - treasuryAmount;
-        IERC20(auction.currency).safeTransfer(auction.recipient, adjustedAmount);
+        uint256 treasuryAmount = (winnerBid * treasuryFee) / BPS_MAX;
+        uint256 adjustedAmount = winnerBid - treasuryAmount;
+        IERC20(currency).safeTransfer(recipient, adjustedAmount);
         if (treasuryAmount > 0) {
-            IERC20(auction.currency).safeTransfer(treasury, treasuryAmount);
+            IERC20(currency).safeTransfer(treasury, treasuryAmount);
         }
     }
 
-    function _processCollectFeeWithReferral(AuctionData memory auction, uint256 referrerProfileId)
-        internal
-    {
+    function _processCollectFeeWithReferral(
+        uint256 winnerBid,
+        uint16 referralFee,
+        uint256 referrerProfileId,
+        address currency,
+        address recipient
+    ) internal {
         address treasury;
         uint256 treasuryAmount;
         // Avoids stack too deep.
         {
             uint16 treasuryFee;
             (treasury, treasuryFee) = _treasuryData();
-            treasuryAmount = (auction.winningBid * treasuryFee) / BPS_MAX;
+            treasuryAmount = (winnerBid * treasuryFee) / BPS_MAX;
         }
-        uint256 adjustedAmount = auction.winningBid - treasuryAmount;
-        if (auction.referralFee > 0) {
+        uint256 adjustedAmount = winnerBid - treasuryAmount;
+        if (referralFee > 0) {
             // The reason we levy the referral fee on the adjusted amount is so that referral fees
             // don't bypass the treasury fee, in essence referrals pay their fair share to the treasury.
-            uint256 referralAmount = (adjustedAmount * auction.referralFee) / BPS_MAX;
+            uint256 referralAmount = (adjustedAmount * referralFee) / BPS_MAX;
             adjustedAmount = adjustedAmount - referralAmount;
-            address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
-            IERC20(auction.currency).safeTransfer(referralRecipient, referralAmount);
+            IERC20(currency).safeTransfer(IERC721(HUB).ownerOf(referrerProfileId), referralAmount);
         }
-        address recipient = auction.recipient;
-        IERC20(auction.currency).safeTransfer(recipient, adjustedAmount);
+        IERC20(currency).safeTransfer(recipient, adjustedAmount);
         if (treasuryAmount > 0) {
-            IERC20(auction.currency).safeTransfer(treasury, treasuryAmount);
+            IERC20(currency).safeTransfer(treasury, treasuryAmount);
         }
     }
 
