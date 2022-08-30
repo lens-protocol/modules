@@ -390,14 +390,6 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
           ).to.be.revertedWith(ERRORS.UNAVAILABLE_AUCTION);
         });
 
-        it('User should fail to bid if bidder is address zero', async function () {
-          await expect(
-            auctionCollectModule
-              .connect(ethers.constants.AddressZero)
-              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
-          ).to.be.revertedWith(ERRORS.INVALID_BIDDER);
-        });
-
         it('User should fail to bid if does not have enough balance', async function () {
           await mintAndApproveCurrency({ amountToMint: 0 });
           await expect(

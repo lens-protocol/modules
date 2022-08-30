@@ -69,7 +69,6 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
     error CollectAlreadyProcessed();
     error FeeAlreadyProcessed();
     error InsufficientBidAmount();
-    error InvalidBidder();
 
     event AuctionCreated(
         uint256 profileId,
@@ -463,14 +462,8 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         address currency,
         address recipient
     ) internal {
-        address treasury;
-        uint256 treasuryAmount;
-        // Avoids stack too deep.
-        {
-            uint16 treasuryFee;
-            (treasury, treasuryFee) = _treasuryData();
-            treasuryAmount = (winnerBid * treasuryFee) / BPS_MAX;
-        }
+        (address treasury, uint16 treasuryFee) = _treasuryData();
+        uint256 treasuryAmount = (winnerBid * treasuryFee) / BPS_MAX;
         uint256 adjustedAmount = winnerBid - treasuryAmount;
         if (referralFee > 0) {
             // The reason we levy the referral fee on the adjusted amount is so that referral fees
@@ -559,9 +552,6 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         ) {
             revert UnavailableAuction();
         }
-        if (bidder == address(0)) {
-            revert InvalidBidder();
-        }
         _validateBidAmount(auction, amount);
         if (auction.onlyFollowers) {
             _validateFollow(
@@ -599,9 +589,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
             endTimestamp = block.timestamp + prevAuctionState.duration;
             nextAuctionState.endTimestamp = uint64(endTimestamp);
             nextAuctionState.startTimestamp = uint64(block.timestamp);
-        } else if (
-            prevAuctionState.endTimestamp - block.timestamp < prevAuctionState.minTimeAfterBid
-        ) {
+        } else if (endTimestamp - block.timestamp < prevAuctionState.minTimeAfterBid) {
             endTimestamp = block.timestamp + prevAuctionState.minTimeAfterBid;
             nextAuctionState.endTimestamp = uint64(endTimestamp);
         }
