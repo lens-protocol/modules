@@ -718,23 +718,25 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         address bidder,
         DataTypes.EIP712Signature calldata sig
     ) internal {
-        _validateRecoveredAddress(
-            _calculateDigest(
-                abi.encode(
-                    keccak256(
-                        'BidWithSig(uint256 profileId,uint256 pubId,uint256 amount,uint256 followNftTokenId,uint256 nonce,uint256 deadline)'
-                    ),
-                    profileId,
-                    pubId,
-                    amount,
-                    followNftTokenId,
-                    nonces[bidder]++,
-                    sig.deadline
-                )
-            ),
-            bidder,
-            sig
-        );
+        unchecked {
+            _validateRecoveredAddress(
+                _calculateDigest(
+                    abi.encode(
+                        keccak256(
+                            'BidWithSig(uint256 profileId,uint256 pubId,uint256 amount,uint256 followNftTokenId,uint256 nonce,uint256 deadline)'
+                        ),
+                        profileId,
+                        pubId,
+                        amount,
+                        followNftTokenId,
+                        nonces[bidder]++,
+                        sig.deadline
+                    )
+                ),
+                bidder,
+                sig
+            );
+        }
     }
 
     /**
