@@ -283,8 +283,8 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         uint256 amount,
         uint256 followNftTokenId
     ) external {
-        (uint256 profileIdPointed, uint256 pubIdPointed) = _getRootPublication(profileId, pubId);
-        _bid(profileIdPointed, pubIdPointed, profileId, amount, followNftTokenId, msg.sender);
+        (uint256 rootProfileId, uint256 rootPubId) = _getRootPublication(profileId, pubId);
+        _bid(rootProfileId, rootPubId, profileId, amount, followNftTokenId, msg.sender);
     }
 
     /**
@@ -313,8 +313,8 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         DataTypes.EIP712Signature calldata sig
     ) external {
         _validateBidSignature(profileId, pubId, amount, followNftTokenId, bidder, sig);
-        (uint256 profileIdPointed, uint256 pubIdPointed) = _getRootPublication(profileId, pubId);
-        _bid(profileIdPointed, pubIdPointed, profileId, amount, followNftTokenId, bidder);
+        (uint256 rootProfileId, uint256 rootPubId) = _getRootPublication(profileId, pubId);
+        _bid(rootProfileId, rootPubId, profileId, amount, followNftTokenId, bidder);
     }
 
     /**
