@@ -5,7 +5,6 @@ export const ERRORS = {
   COLLECT_ALREADY_PROCESSED: 'CollectAlreadyProcessed()',
   FEE_ALREADY_PROCESSED: 'FeeAlreadyProcessed()',
   INSUFFICIENT_BID_AMOUNT: 'InsufficientBidAmount()',
-  INVALID_BIDDER: 'InvalidBidder()',
 
   // Core
   CANNOT_INIT_IMPL: 'CannotInitImplementation()',

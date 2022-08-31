@@ -29,6 +29,7 @@ import {
   thirdUser,
   treasury,
   TREASURY_FEE_BPS,
+  governance,
 } from './../../__setup.spec';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { publisher } from '../../__setup.spec';
@@ -73,17 +74,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
     onlyFollowers = false,
   }: AuctionCollectModuleInitData): Promise<string> {
     return abiCoder.encode(
-      [
-        'uint256',
-        'uint256',
-        'uint256',
-        'uint256',
-        'uint256',
-        'uint16',
-        'address',
-        'address',
-        'bool',
-      ],
+      ['uint64', 'uint32', 'uint32', 'uint256', 'uint256', 'uint16', 'address', 'address', 'bool'],
       [
         availableSinceTimestamp,
         duration,
@@ -390,14 +381,6 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
           ).to.be.revertedWith(ERRORS.UNAVAILABLE_AUCTION);
         });
 
-        it('User should fail to bid if bidder is address zero', async function () {
-          await expect(
-            auctionCollectModule
-              .connect(ethers.constants.AddressZero)
-              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
-          ).to.be.revertedWith(ERRORS.INVALID_BIDDER);
-        });
-
         it('User should fail to bid if does not have enough balance', async function () {
           await mintAndApproveCurrency({ amountToMint: 0 });
           await expect(
@@ -629,9 +612,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
               .bid(FIRST_PROFILE_ID, pubId, DEFAULT_BID_AMOUNT.add(DEFAULT_MIN_BID_INCREMENT), 0)
           ).to.not.be.reverted;
           auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, pubId);
-          expect(
-            auction.endTimestamp.eq(auction.minTimeAfterBid.add(secondBidTimestamp))
-          ).to.be.true;
+          expect(auction.endTimestamp.eq(auction.minTimeAfterBid + secondBidTimestamp)).to.be.true;
         });
 
         it('Referrer profile ID should be set properly and only at first bid of each one', async function () {
@@ -1013,9 +994,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
               )
           ).to.not.be.reverted;
           auction = await auctionCollectModule.getAuctionData(FIRST_PROFILE_ID, pubId);
-          expect(
-            auction.endTimestamp.eq(auction.minTimeAfterBid.add(secondBidTimestamp))
-          ).to.be.true;
+          expect(auction.endTimestamp.eq(auction.minTimeAfterBid + secondBidTimestamp)).to.be.true;
         });
 
         it('Referrer profile ID should be set properly and only at first bid of each one', async function () {
@@ -1577,6 +1556,203 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
           );
           expect(recipientBalanceAfterCollect).to.be.equals(
             recipientBalanceBeforeCollect.add(expectedRecipientFee)
+          );
+        });
+
+        it('Owner of referrer profile should not receive collect fees if referrer fee was set to zero', async function () {
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({ referralFee: 0 }),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Creates referrer profile who mirrors publication
+          await lensHub.createProfile({
+            to: anotherUser.address,
+            handle: 'referrer.lens',
+            imageURI: MOCK_URI,
+            followModule: ethers.constants.AddressZero,
+            followModuleInitData: [],
+            followNFTURI: MOCK_FOLLOW_NFT_URI,
+          });
+          const referrerProfileId = FIRST_PROFILE_ID + 1;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: referrerProfileId,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: pubId,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // Bidder places a bid through mirrored publication
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(referrerProfileId, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          // Auction finishes
+          await simulateAuctionEnd({ pubId: pubId });
+          // Collects through same mirrored publication as it is required
+          await expect(
+            lensHub.connect(bidder).collect(referrerProfileId, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceAfterCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedTreasuryFee = DEFAULT_BID_AMOUNT.mul(TREASURY_FEE_BPS).div(BPS_MAX);
+          const expectedScaledAmount = DEFAULT_BID_AMOUNT.sub(expectedTreasuryFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(
+            treasuryBalanceBeforeCollect.add(expectedTreasuryFee)
+          );
+          expect(referrerBalanceAfterCollect).to.be.equals(referrerBalanceBeforeCollect);
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(expectedScaledAmount)
+          );
+        });
+
+        it('Owner should receive all collect fees when publication is collected through original publication and treasury fee was set to zero', async function () {
+          await expect(moduleGlobals.connect(governance).setTreasuryFee(0)).to.not.be.reverted;
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          await simulateAuctionEnd({});
+          await expect(
+            lensHub.connect(bidder).collect(FIRST_PUB_ID, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          expect(treasuryBalanceAfterCollect).to.be.equals(treasuryBalanceBeforeCollect);
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(DEFAULT_BID_AMOUNT)
+          );
+        });
+
+        it('Publication and referrer profile owners should share the entire fees between them if treasury feet was set to zero', async function () {
+          await expect(moduleGlobals.connect(governance).setTreasuryFee(0)).to.not.be.reverted;
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Creates referrer profile who mirrors publication
+          await lensHub.createProfile({
+            to: anotherUser.address,
+            handle: 'referrer.lens',
+            imageURI: MOCK_URI,
+            followModule: ethers.constants.AddressZero,
+            followModuleInitData: [],
+            followNFTURI: MOCK_FOLLOW_NFT_URI,
+          });
+          const referrerProfileId = FIRST_PROFILE_ID + 1;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: referrerProfileId,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // Bidder places a bid through mirrored publication
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(referrerProfileId, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          // Auction finishes
+          await simulateAuctionEnd({});
+          // Collects through same mirrored publication as it is required
+          await expect(
+            lensHub.connect(bidder).collect(referrerProfileId, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceAfterCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedReferralFee = DEFAULT_BID_AMOUNT.mul(REFERRAL_FEE_BPS).div(BPS_MAX);
+          const expectedRecipientFee = DEFAULT_BID_AMOUNT.sub(expectedReferralFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(treasuryBalanceBeforeCollect);
+          expect(referrerBalanceAfterCollect).to.be.equals(
+            referrerBalanceBeforeCollect.add(expectedReferralFee)
+          );
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(expectedRecipientFee)
+          );
+          expect(
+            recipientBalanceAfterCollect
+              .sub(recipientBalanceBeforeCollect)
+              .add(referrerBalanceAfterCollect)
+              .sub(referrerBalanceBeforeCollect)
+          ).to.be.equals(DEFAULT_BID_AMOUNT);
+        });
+
+        it('Publication owner should get the entire collect fees if referrer and treasury fees were set to zero', async function () {
+          await expect(moduleGlobals.connect(governance).setTreasuryFee(0)).to.not.be.reverted;
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: auctionCollectModule.address,
+              collectModuleInitData: await getAuctionCollectModuleInitData({ referralFee: 0 }),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          const pubId = FIRST_PUB_ID + 1;
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Creates referrer profile who mirrors publication
+          await lensHub.createProfile({
+            to: anotherUser.address,
+            handle: 'referrer.lens',
+            imageURI: MOCK_URI,
+            followModule: ethers.constants.AddressZero,
+            followModuleInitData: [],
+            followNFTURI: MOCK_FOLLOW_NFT_URI,
+          });
+          const referrerProfileId = FIRST_PROFILE_ID + 1;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: referrerProfileId,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: pubId,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // Bidder places a bid through mirrored publication
+          await expect(
+            auctionCollectModule
+              .connect(bidder)
+              .bid(referrerProfileId, FIRST_PUB_ID, DEFAULT_BID_AMOUNT, 0)
+          ).to.not.be.reverted;
+          // Auction finishes
+          await simulateAuctionEnd({ pubId: pubId });
+          // Collects through same mirrored publication as it is required
+          await expect(
+            lensHub.connect(bidder).collect(referrerProfileId, FIRST_PUB_ID, [])
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceAfterCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          expect(treasuryBalanceAfterCollect).to.be.equals(treasuryBalanceBeforeCollect);
+          expect(referrerBalanceAfterCollect).to.be.equals(referrerBalanceBeforeCollect);
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(DEFAULT_BID_AMOUNT)
           );
         });
       });
