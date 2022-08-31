@@ -22,13 +22,13 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param startTimestamp The UNIX timestamp of the first bid, i.e. when the auction started.
  * @param duration The seconds that the auction will last after the first bid has been placed.
  * @param minTimeAfterBid The minimum time, in seconds, that must always remain between last bid's timestamp
- *        and `endTimestamp`. This restriction could make `endTimestamp` to be re-computed and updated.
+ * and `endTimestamp`. This restriction could make `endTimestamp` to be re-computed and updated.
  * @param endTimestamp The end of auction UNIX timestamp after which bidding is impossible. Computed inside contract.
  * @param reservePrice The minimum bid price accepted.
  * @param minBidIncrement The minimum amount by which a new bid must overcome the last bid.
  * @param winningBid The winning bid amount.
  * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
- *        Measured in basis points, each basis point represents 0.01%.
+ * Measured in basis points, each basis point represents 0.01%.
  * @param currency The currency in which the bids are denominated.
  * @param recipient The recipient of the auction's winner bid amount.
  * @param winner The current auction winner.
@@ -344,11 +344,11 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
      * @param availableSinceTimestamp The UNIX timestamp after bids can start to be placed.
      * @param duration The seconds that the auction will last after the first bid has been placed.
      * @param minTimeAfterBid The minimum time, in seconds, that must always remain between last bid's timestamp
-     *        and `endTimestamp`. This restriction could make `endTimestamp` to be re-computed and updated.
+     * and `endTimestamp`. This restriction could make `endTimestamp` to be re-computed and updated.
      * @param reservePrice The minimum bid price accepted.
      * @param minBidIncrement The minimum amount by which a new bid must overcome the last bid.
      * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
-     *        Measured in basis points, each basis point represents 0.01%.
+     * Measured in basis points, each basis point represents 0.01%.
      * @param currency The currency in which the bids are denominated.
      * @param recipient The recipient of the auction's winner bid amount.
      * @param onlyFollowers Indicates whether followers are the only allowed to bid, and collect, or not.
@@ -395,7 +395,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
      * @notice Process the fees from the given publication's underlying auction.
      *
      * @dev It delegates the fee processing to `_processCollectFeeWithoutReferral` or `_processCollectFeeWithReferral`
-     *      depending if has referrer or not.
+     * depending if has referrer or not.
      *
      * @param profileId The token ID of the profile associated with the underlying publication.
      * @param pubId The publication ID associated with the underlying publication.
@@ -446,11 +446,11 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
 
     /**
      * @notice Process the fees sending the winner amount to the recipient and the corresponding referral fee to the
-     *         owner of the referrer profile.
+     * owner of the referrer profile.
      *
      * @param winnerBid The amount of the winner bid.
      * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
-     *        Measured in basis points, each basis point represents 0.01%.
+     * Measured in basis points, each basis point represents 0.01%.
      * @param referrerProfileId The token ID of the referrer's profile.
      * @param currency The currency in which the bids are denominated.
      * @param recipient The recipient of the auction's winner bid amount.
@@ -480,7 +480,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
 
     /**
      * @notice Executes the given bid for the given auction. Each new successful bid transfers back the funds of the
-     *         previous winner and pulls funds from the new winning bidder.
+     * previous winner and pulls funds from the new winning bidder.
      *
      * @param profileId The token ID of the profile associated with the underlying publication.
      * @param pubId The publication ID associated with the underlying publication.
@@ -598,7 +598,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
 
     /**
      * @notice Sets the the given `referrerProfileId` if it is the first bid of the bidder, or returns the previously
-     *         set otherwise.
+     * set otherwise.
      *
      * @param profileId The token ID of the profile associated with the underlying publication.
      * @param pubId The publication ID associated with the underlying publication.
@@ -642,13 +642,13 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
 
     /**
      * @notice Checks the given Follow NFT is owned by the given follower, is part of the given followed profile's
-     *          follow NFT collection and was minted before the given deadline.
+     * follow NFT collection and was minted before the given deadline.
      *
      * @param profileId The token ID of the profile associated with the publication.
      * @param follower The address performing the follow operation.
      * @param followNftTokenId The token ID of the Follow NFT to use.
-     * @param maxValidFollowTimestamp The maximum timestamp for which Follow NFTs should have been minted before
-     *                                to be valid for this scenario.
+     * @param maxValidFollowTimestamp The maximum timestamp for which Follow NFTs should have been minted before to be
+     * valid for this scenario.
      */
     function _validateFollow(
         uint256 profileId,
