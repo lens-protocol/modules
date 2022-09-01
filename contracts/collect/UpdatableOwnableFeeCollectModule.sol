@@ -48,6 +48,19 @@ contract UpdatableOwnableFeeCollectModule is
 {
     using SafeERC20 for IERC20;
 
+    error InvalidParameters();
+    error OnlyOwner();
+
+    event ModuleParametersUpdated(
+        uint256 indexed profileId,
+        uint256 indexed pubId,
+        uint256 amount,
+        address currency,
+        address recipient,
+        uint16 referralFee,
+        bool followerOnly
+    );
+
     uint256 internal _tokenIdCounter;
 
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
@@ -81,7 +94,6 @@ contract UpdatableOwnableFeeCollectModule is
             uint16 referralFee,
             bool followerOnly
         ) = abi.decode(data, (uint256, address, address, uint16, bool));
-        // NOTE: Intentionally removed the requirement of amount > 0
         if (!_currencyWhitelisted(currency) || recipient == address(0) || referralFee > BPS_MAX) {
             revert Errors.InitParamsInvalid();
         }
@@ -126,7 +138,6 @@ contract UpdatableOwnableFeeCollectModule is
         }
     }
 
-    // NOTE: Intentionally omitted the requirement of amount > 0
     function updateModuleParameters(
         uint256 profileId,
         uint256 pubId,
@@ -140,16 +151,25 @@ contract UpdatableOwnableFeeCollectModule is
             if (
                 !_currencyWhitelisted(currency) || recipient == address(0) || referralFee > BPS_MAX
             ) {
-                revert Errors.InitParamsInvalid();
+                revert InvalidParameters();
             } else {
                 _dataByPublicationByProfile[profileId][pubId].amount = amount;
                 _dataByPublicationByProfile[profileId][pubId].currency = currency;
                 _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
                 _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
                 _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
+                emit ModuleParametersUpdated(
+                    profileId,
+                    pubId,
+                    amount,
+                    currency,
+                    recipient,
+                    referralFee,
+                    followerOnly
+                );
             }
         } else {
-            revert('OnlyOwner');
+            revert OnlyOwner();
         }
     }
 
