@@ -94,7 +94,7 @@ contract UpdatableOwnableFeeCollectModule is
             uint16 referralFee,
             bool followerOnly
         ) = abi.decode(data, (uint256, address, address, uint16, bool));
-        if (!_currencyWhitelisted(currency) || recipient == address(0) || referralFee > BPS_MAX) {
+        if (!_currencyWhitelisted(currency) || referralFee > BPS_MAX) {
             revert Errors.InitParamsInvalid();
         }
 
@@ -148,9 +148,7 @@ contract UpdatableOwnableFeeCollectModule is
         bool followerOnly
     ) external virtual {
         if (ownerOf(_dataByPublicationByProfile[profileId][pubId].ownershipTokenId) == msg.sender) {
-            if (
-                !_currencyWhitelisted(currency) || recipient == address(0) || referralFee > BPS_MAX
-            ) {
+            if (!_currencyWhitelisted(currency) || referralFee > BPS_MAX) {
                 revert InvalidParameters();
             } else {
                 _dataByPublicationByProfile[profileId][pubId].amount = amount;
