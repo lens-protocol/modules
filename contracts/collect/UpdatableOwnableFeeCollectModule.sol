@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
+import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
+import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
 import {FeeModuleBase} from '@aave/lens-protocol/contracts/core/modules/FeeModuleBase.sol';
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
@@ -41,6 +43,7 @@ struct ProfilePublicationData {
  *
  */
 contract UpdatableOwnableFeeCollectModule is
+    EIP712,
     FeeModuleBase,
     FollowValidationModuleBase,
     LensNFTBase,
@@ -66,7 +69,11 @@ contract UpdatableOwnableFeeCollectModule is
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
 
-    constructor(address hub, address moduleGlobals) FeeModuleBase(moduleGlobals) ModuleBase(hub) {}
+    constructor(address hub, address moduleGlobals)
+        EIP712('UpdatableOwnableFeeCollectModule', '1')
+        FeeModuleBase(moduleGlobals)
+        ModuleBase(hub)
+    {}
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
@@ -147,28 +154,50 @@ contract UpdatableOwnableFeeCollectModule is
         uint16 referralFee,
         bool followerOnly
     ) external virtual {
-        if (ownerOf(_dataByPublicationByProfile[profileId][pubId].ownershipTokenId) == msg.sender) {
-            if (!_currencyWhitelisted(currency) || referralFee > BPS_MAX) {
-                revert InvalidParameters();
-            } else {
-                _dataByPublicationByProfile[profileId][pubId].amount = amount;
-                _dataByPublicationByProfile[profileId][pubId].currency = currency;
-                _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
-                _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
-                _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
-                emit ModuleParametersUpdated(
-                    profileId,
-                    pubId,
-                    amount,
-                    currency,
-                    recipient,
-                    referralFee,
-                    followerOnly
-                );
-            }
-        } else {
-            revert OnlyOwner();
-        }
+        _updateModuleParameters(
+            profileId,
+            pubId,
+            amount,
+            currency,
+            recipient,
+            referralFee,
+            followerOnly,
+            msg.sender
+        );
+    }
+
+    function updateModuleParametersWithSig(
+        uint256 profileId,
+        uint256 pubId,
+        uint256 amount,
+        address currency,
+        address recipient,
+        uint16 referralFee,
+        bool followerOnly,
+        address operator,
+        DataTypes.EIP712Signature calldata sig
+    ) external virtual {
+        _validateUpdateModuleParametersSignature(
+            profileId,
+            pubId,
+            amount,
+            currency,
+            recipient,
+            referralFee,
+            followerOnly,
+            operator,
+            sig
+        );
+        _updateModuleParameters(
+            profileId,
+            pubId,
+            amount,
+            currency,
+            recipient,
+            referralFee,
+            followerOnly,
+            operator
+        );
     }
 
     /**
@@ -248,6 +277,77 @@ contract UpdatableOwnableFeeCollectModule is
         IERC20(currency).safeTransferFrom(collector, recipient, adjustedAmount);
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
+    }
+
+    function _updateModuleParameters(
+        uint256 profileId,
+        uint256 pubId,
+        uint256 amount,
+        address currency,
+        address recipient,
+        uint16 referralFee,
+        bool followerOnly,
+        address operator
+    ) internal {
+        if (ownerOf(_dataByPublicationByProfile[profileId][pubId].ownershipTokenId) == operator) {
+            if (!_currencyWhitelisted(currency) || referralFee > BPS_MAX) {
+                revert InvalidParameters();
+            } else {
+                _dataByPublicationByProfile[profileId][pubId].amount = amount;
+                _dataByPublicationByProfile[profileId][pubId].currency = currency;
+                _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
+                _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
+                _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
+                emit ModuleParametersUpdated(
+                    profileId,
+                    pubId,
+                    amount,
+                    currency,
+                    recipient,
+                    referralFee,
+                    followerOnly
+                );
+            }
+        } else {
+            revert OnlyOwner();
+        }
+    }
+
+    function _validateUpdateModuleParametersSignature(
+        uint256 profileId,
+        uint256 pubId,
+        uint256 amount,
+        address currency,
+        address recipient,
+        uint16 referralFee,
+        bool followerOnly,
+        address operator,
+        DataTypes.EIP712Signature calldata sig
+    ) internal {
+        unchecked {
+            _validateRecoveredAddress(
+                _calculateDigest(
+                    bytes32(
+                        abi.encode(
+                            keccak256(
+                                'UpdateModuleParametersWithSig(uint256 profileId,uint256 pubId,uint256 amount,address currency,address recipient,uint16 referralFee,bool followerOnly,uint256 nonce,uint256 deadline)'
+                            ),
+                            profileId,
+                            pubId,
+                            amount,
+                            currency,
+                            recipient,
+                            referralFee,
+                            followerOnly,
+                            sigNonces[operator]++,
+                            sig.deadline
+                        )
+                    )
+                ),
+                operator,
+                sig
+            );
         }
     }
 }
