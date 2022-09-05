@@ -3,7 +3,7 @@ import { parseEther } from '@ethersproject/units';
 import '@nomiclabs/hardhat-ethers';
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import { FollowNFT__factory, UpdatableOwnableFeeCollectModule__factory } from '../../../typechain';
+import { UpdatableOwnableFeeCollectModule__factory } from '../../../typechain';
 import { ERRORS } from '../../helpers/errors';
 import {
   abiCoder,
@@ -14,7 +14,6 @@ import {
   feeRecipient,
   FIRST_PROFILE_ID,
   FIRST_PUB_ID,
-  freeCollectModule,
   lensHub,
   makeSuiteCleanRoom,
   MOCK_FOLLOW_NFT_URI,
@@ -24,9 +23,7 @@ import {
   anotherUser,
   REFERRAL_FEE_BPS,
   user,
-  FIRST_FOLLOW_NFT_ID,
   deployer,
-  thirdUser,
   treasury,
   TREASURY_FEE_BPS,
   governance,
@@ -43,6 +40,7 @@ export let UPDATE_MODULE_PARAMETERS_WITH_SIG_DOMAIN: Domain;
 
 makeSuiteCleanRoom('UpdatableOwnableFeeCollectModule', function () {
   const FIRST_TOKEN_ID = ethers.constants.One;
+  let DEFAULT_COLLECT_DATA;
 
   interface UpdatableOwnableFeeCollectModuleInitData {
     amount?: BigNumber;
@@ -942,6 +940,423 @@ makeSuiteCleanRoom('UpdatableOwnableFeeCollectModule', function () {
             REFERRAL_FEE_BPS,
             true,
           ]);
+        });
+      });
+    });
+
+    context('Collect fees', function () {
+      const REFERRER_PROFILE_ID = FIRST_PROFILE_ID + 1;
+
+      beforeEach(async function () {
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: updatableOwnableFeeCollectModule.address,
+            collectModuleInitData: await getUpdatableOwnableFeeCollectModuleInitData({}),
+            referenceModule: ethers.constants.AddressZero,
+            referenceModuleInitData: [],
+          })
+        ).to.not.be.reverted;
+        DEFAULT_COLLECT_DATA = abiCoder.encode(
+          ['address', 'uint256'],
+          [currency.address, DEFAULT_AMOUNT]
+        );
+      });
+
+      context('Negatives', function () {
+        it('Process collect call should fail if caller is not the hub', async function () {
+          await expect(
+            updatableOwnableFeeCollectModule
+              .connect(user)
+              .processCollect(0, user.address, FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.NOT_HUB);
+        });
+
+        it('User should fail to process collect over unexistent publication', async function () {
+          const unexistentPubId = 69;
+          expect(await lensHub.getPubType(FIRST_PROFILE_ID, unexistentPubId)).to.equals(
+            PubType.Nonexistent
+          );
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, unexistentPubId, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.PUBLICATION_DOES_NOT_EXIST);
+        });
+
+        it('User should fail to process collect if is only for followers and and he is not following the publication owner', async function () {
+          // Updates the parameters to set the publication as collectable only by followers
+          await expect(
+            updatableOwnableFeeCollectModule
+              .connect(publisher)
+              .updateModuleParameters(
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                DEFAULT_AMOUNT,
+                currency.address,
+                feeRecipient.address,
+                REFERRAL_FEE_BPS,
+                true
+              )
+          ).to.not.be.reverted;
+          // Executes the collect call
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
+        });
+
+        it('User should fail to process collect if the expected amount mismatch', async function () {
+          // The owner updates the parameters to raise the collect price
+          await expect(
+            updatableOwnableFeeCollectModule
+              .connect(publisher)
+              .updateModuleParameters(
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                DEFAULT_AMOUNT.mul(2),
+                currency.address,
+                feeRecipient.address,
+                REFERRAL_FEE_BPS,
+                false
+              )
+          ).to.not.be.reverted;
+          // Executes the collect call but passing through the old price as expected
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
+        });
+
+        it('User should fail to process collect if the expected currency mismatch', async function () {
+          // Executes the collect call but passing through a different currency as expected
+          const dataWithWrongCurrency = abiCoder.encode(
+            ['address', 'uint256'],
+            [ethers.constants.AddressZero, DEFAULT_AMOUNT]
+          );
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, dataWithWrongCurrency)
+          ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
+        });
+
+        it('User should fail to process collect if has not approved the currency to be spent by the module', async function () {
+          await mintAndApproveCurrency({ amountToApprove: 0 });
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.ERC20_INSUFFICIENT_ALLOWANCE);
+        });
+
+        it('User should fail to process collect if has approved the currency to be spent by the module but does not have enough balance', async function () {
+          await mintAndApproveCurrency({ amountToMint: 0 });
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.ERC20_TRANSFER_EXCEEDS_BALANCE);
+        });
+
+        it('User should fail to process collect if the expected amount mismatch when collecting through a mirror', async function () {
+          await expect(
+            lensHub.createProfile({
+              to: anotherUser.address,
+              handle: 'referrer.lens',
+              imageURI: MOCK_URI,
+              followModule: ethers.constants.AddressZero,
+              followModuleInitData: [],
+              followNFTURI: MOCK_FOLLOW_NFT_URI,
+            })
+          ).to.not.be.reverted;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: REFERRER_PROFILE_ID,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // The owner updates the parameters to raise the collect price
+          await expect(
+            updatableOwnableFeeCollectModule
+              .connect(publisher)
+              .updateModuleParameters(
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                DEFAULT_AMOUNT.mul(2),
+                currency.address,
+                feeRecipient.address,
+                REFERRAL_FEE_BPS,
+                false
+              )
+          ).to.not.be.reverted;
+          // Executes the collect call but passing through the old price as expected
+          await expect(
+            lensHub.connect(user).collect(REFERRER_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
+        });
+
+        it('User should fail to process collect if the expected currency mismatch when collecting through a mirror', async function () {
+          await expect(
+            lensHub.createProfile({
+              to: anotherUser.address,
+              handle: 'referrer.lens',
+              imageURI: MOCK_URI,
+              followModule: ethers.constants.AddressZero,
+              followModuleInitData: [],
+              followNFTURI: MOCK_FOLLOW_NFT_URI,
+            })
+          ).to.not.be.reverted;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: REFERRER_PROFILE_ID,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // Executes the collect call but passing through a different currency as expected
+          const dataWithWrongCurrency = abiCoder.encode(
+            ['address', 'uint256'],
+            [ethers.constants.AddressZero, DEFAULT_AMOUNT]
+          );
+          await expect(
+            lensHub.connect(user).collect(REFERRER_PROFILE_ID, FIRST_PUB_ID, dataWithWrongCurrency)
+          ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
+        });
+
+        it('User should fail to process collect if has not approved the currency to be spent by the module when collecting through a mirror', async function () {
+          await expect(
+            lensHub.createProfile({
+              to: anotherUser.address,
+              handle: 'referrer.lens',
+              imageURI: MOCK_URI,
+              followModule: ethers.constants.AddressZero,
+              followModuleInitData: [],
+              followNFTURI: MOCK_FOLLOW_NFT_URI,
+            })
+          ).to.not.be.reverted;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: REFERRER_PROFILE_ID,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          await mintAndApproveCurrency({ amountToApprove: 0 });
+          await expect(
+            lensHub.connect(user).collect(REFERRER_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.ERC20_INSUFFICIENT_ALLOWANCE);
+        });
+
+        it('User should fail to process collect if has approved the currency to be spent by the module but does not have enough balance when collecting through a mirror', async function () {
+          await expect(
+            lensHub.createProfile({
+              to: anotherUser.address,
+              handle: 'referrer.lens',
+              imageURI: MOCK_URI,
+              followModule: ethers.constants.AddressZero,
+              followModuleInitData: [],
+              followNFTURI: MOCK_FOLLOW_NFT_URI,
+            })
+          ).to.not.be.reverted;
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: REFERRER_PROFILE_ID,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          await mintAndApproveCurrency({ amountToMint: 0 });
+          await expect(
+            lensHub.connect(user).collect(REFERRER_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.be.revertedWith(ERRORS.ERC20_TRANSFER_EXCEEDS_BALANCE);
+        });
+      });
+
+      context('Scenarios', function () {
+        beforeEach(async function () {
+          // Creates a new profile
+          await expect(
+            lensHub.createProfile({
+              to: anotherUser.address,
+              handle: 'referrer.lens',
+              imageURI: MOCK_URI,
+              followModule: ethers.constants.AddressZero,
+              followModuleInitData: [],
+              followNFTURI: MOCK_FOLLOW_NFT_URI,
+            })
+          ).to.not.be.reverted;
+          // The created profile
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: REFERRER_PROFILE_ID,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: [],
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          await mintAndApproveCurrency({});
+        });
+
+        it('Owner of referrer profile should not receive collect fees if referrer fee was set to zero', async function () {
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Updates the parameters to remove the referrer fees
+          await expect(
+            updatableOwnableFeeCollectModule
+              .connect(publisher)
+              .updateModuleParameters(
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                DEFAULT_AMOUNT,
+                currency.address,
+                feeRecipient.address,
+                ethers.constants.Zero,
+                false
+              )
+          ).to.not.be.reverted;
+          // Collects through mirrored publication to set a referrer profile
+          await expect(
+            lensHub.connect(user).collect(REFERRER_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceAfterCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedTreasuryFee = DEFAULT_AMOUNT.mul(TREASURY_FEE_BPS).div(BPS_MAX);
+          const expectedScaledAmount = DEFAULT_AMOUNT.sub(expectedTreasuryFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(
+            treasuryBalanceBeforeCollect.add(expectedTreasuryFee)
+          );
+          expect(referrerBalanceAfterCollect).to.be.equals(referrerBalanceBeforeCollect);
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(expectedScaledAmount)
+          );
+        });
+
+        it('Fee recipient should receive all the fees except for the cut corresponding to the treasury', async function () {
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Collects through original publication to avoid setting a referrer profile
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedTreasuryFee = DEFAULT_AMOUNT.mul(TREASURY_FEE_BPS).div(BPS_MAX);
+          const expectedScaledAmount = DEFAULT_AMOUNT.sub(expectedTreasuryFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(
+            treasuryBalanceBeforeCollect.add(expectedTreasuryFee)
+          );
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(expectedScaledAmount)
+          );
+        });
+
+        it('Recipient, owner of referrer profile and treasury should receive a cut of the collect fees', async function () {
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Collects through mirrored publication to set a referrer profile
+          await expect(
+            lensHub.connect(user).collect(REFERRER_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceAfterCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedTreasuryFee = DEFAULT_AMOUNT.mul(TREASURY_FEE_BPS).div(BPS_MAX);
+          const expectedScaledAmount = DEFAULT_AMOUNT.sub(expectedTreasuryFee);
+          const expectedReferralFee = expectedScaledAmount.mul(REFERRAL_FEE_BPS).div(BPS_MAX);
+          const expectedRecipientFee = expectedScaledAmount.sub(expectedReferralFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(
+            treasuryBalanceBeforeCollect.add(expectedTreasuryFee)
+          );
+          expect(referrerBalanceAfterCollect).to.be.equals(
+            referrerBalanceBeforeCollect.add(expectedReferralFee)
+          );
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(expectedRecipientFee)
+          );
+        });
+
+        it('Owner should receive all collect fees when publication is collected through original publication and treasury fee was set to zero', async function () {
+          // Sets treasury fee to zero
+          await expect(moduleGlobals.connect(governance).setTreasuryFee(0)).to.not.be.reverted;
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Collects through original publication to avoid setting a referrer profile
+          await expect(
+            lensHub.connect(user).collect(FIRST_PUB_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          expect(treasuryBalanceAfterCollect).to.be.equals(treasuryBalanceBeforeCollect);
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(DEFAULT_AMOUNT)
+          );
+        });
+
+        it('Fee recipient and referrer profile owner should share the entire fees between them if treasury feet was set to zero', async function () {
+          // Sets treasury fee to zero
+          await expect(moduleGlobals.connect(governance).setTreasuryFee(0)).to.not.be.reverted;
+          const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Collects through mirrored publication to set a referrer profile
+          await expect(
+            lensHub.connect(user).collect(REFERRER_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.not.be.reverted;
+          const treasuryBalanceAfterCollect = await currency.balanceOf(treasury.address);
+          const referrerBalanceAfterCollect = await currency.balanceOf(anotherUser.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          const expectedReferralFee = DEFAULT_AMOUNT.mul(REFERRAL_FEE_BPS).div(BPS_MAX);
+          const expectedRecipientFee = DEFAULT_AMOUNT.sub(expectedReferralFee);
+          expect(treasuryBalanceAfterCollect).to.be.equals(treasuryBalanceBeforeCollect);
+          expect(referrerBalanceAfterCollect).to.be.equals(
+            referrerBalanceBeforeCollect.add(expectedReferralFee)
+          );
+          expect(recipientBalanceAfterCollect).to.be.equals(
+            recipientBalanceBeforeCollect.add(expectedRecipientFee)
+          );
+          expect(
+            recipientBalanceAfterCollect
+              .sub(recipientBalanceBeforeCollect)
+              .add(referrerBalanceAfterCollect)
+              .sub(referrerBalanceBeforeCollect)
+          ).to.be.equals(DEFAULT_AMOUNT);
+        });
+
+        it('No fees charged if collect amount was set to zero', async function () {
+          const collectorBalanceBeforeCollect = await currency.balanceOf(user.address);
+          const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
+          // Updates the parameters to set the collect amount to zero
+          await expect(
+            updatableOwnableFeeCollectModule
+              .connect(publisher)
+              .updateModuleParameters(
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                ethers.constants.Zero,
+                currency.address,
+                feeRecipient.address,
+                REFERRAL_FEE_BPS,
+                false
+              )
+          ).to.not.be.reverted;
+          // Collects the publication
+          await expect(
+            lensHub.connect(user).collect(FIRST_PROFILE_ID, FIRST_PUB_ID, DEFAULT_COLLECT_DATA)
+          ).to.not.be.reverted;
+          const collectorBalanceAfterCollect = await currency.balanceOf(user.address);
+          const recipientBalanceAfterCollect = await currency.balanceOf(feeRecipient.address);
+          expect(recipientBalanceAfterCollect).to.be.equals(recipientBalanceBeforeCollect);
+          expect(collectorBalanceAfterCollect).to.be.equals(collectorBalanceBeforeCollect);
         });
       });
     });
