@@ -27,6 +27,8 @@ import {
   AuctionCollectModule__factory,
   FreeCollectModule__factory,
   FreeCollectModule,
+  UpdatableOwnableFeeCollectModule,
+  UpdatableOwnableFeeCollectModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import {
@@ -53,6 +55,7 @@ export const MOCK_URI = 'https://ipfs.io/ipfs/QmY9dUwYu67puaWBMxRKW98LPbXCznPwHU
 export const OTHER_MOCK_URI = 'https://ipfs.io/ipfs/QmTFLSXdEQ6qsSzaXaCSNtiv6wA56qq87ytXJ182dXDQJS';
 export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
+export const DEFAULT_AMOUNT = parseEther('2');
 
 export let chainId: number;
 export let accounts: SignerWithAddress[];
@@ -80,6 +83,7 @@ export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
 
 export let auctionCollectModule: AuctionCollectModule;
+export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -177,6 +181,15 @@ before(async function () {
   );
   await expect(
     lensHub.connect(governance).whitelistCollectModule(auctionCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  updatableOwnableFeeCollectModule = await new UpdatableOwnableFeeCollectModule__factory(
+    deployer
+  ).deploy(lensHub.address, moduleGlobals.address);
+  await expect(
+    lensHub
+      .connect(governance)
+      .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
