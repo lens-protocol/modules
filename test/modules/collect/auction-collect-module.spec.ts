@@ -1597,7 +1597,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
         );
       });
 
-      it('Owner should receive all collect fees when publication is collected through original publication and treasury fee was set to zero', async function () {
+      it('Fee recipient should receive all collect fees when publication is collected through original publication and treasury fee was set to zero', async function () {
         await expect(moduleGlobals.connect(governance).setTreasuryFee(0)).to.not.be.reverted;
         const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
         const recipientBalanceBeforeCollect = await currency.balanceOf(feeRecipient.address);
@@ -1618,7 +1618,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
         );
       });
 
-      it('Publication and referrer profile owners should share the entire fees between them if treasury feet was set to zero', async function () {
+      it('Fee recipient and referrer profile owners should share the entire fees between them if treasury feet was set to zero', async function () {
         await expect(moduleGlobals.connect(governance).setTreasuryFee(0)).to.not.be.reverted;
         const treasuryBalanceBeforeCollect = await currency.balanceOf(treasury.address);
         const referrerBalanceBeforeCollect = await currency.balanceOf(anotherUser.address);
