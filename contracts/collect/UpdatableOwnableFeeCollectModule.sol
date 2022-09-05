@@ -122,9 +122,16 @@ contract UpdatableOwnableFeeCollectModule is
     }
 
     /**
-     * @dev Processes a collect by:
-     *  1. Ensuring the collector is a follower
-     *  2. Charging a fee
+     * @notice Process the collect operation over the given publication, in this case by charging a fee.
+     *
+     * @dev Only callable by the LensHub contract. It delegates the fee processing to
+     * `_processCollectFeeWithoutReferral` or `_processCollectFeeWithReferral` depending if has referrer or not.
+     *
+     * @param referrerProfileId The LensHub profile token ID of the referrer's profile (only different in case of mirrors).
+     * @param collector The collector address.
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param data Custom data that must contain the expected fee currency and amount encoded.
      */
     function processCollect(
         uint256 referrerProfileId,
@@ -145,6 +152,19 @@ contract UpdatableOwnableFeeCollectModule is
         }
     }
 
+    /**
+     * @notice Allows the owner of the ownership-NFT corresponding to the given publication to update the parameters
+     * required to do a successful collect operation.
+     *
+     * @param profileId The token ID of the profile associated with the publication.
+     * @param pubId The publication ID associated with the publication.
+     * @param amount The amount of fee charged for each collect.
+     * @param currency The currency in which the amount is charged.
+     * @param recipient The address that will receive the collect fees.
+     * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
+     * Measured in basis points, each basis point represents 0.01%.
+     * @param followerOnly A boolean indicating whether followers are the only allowed to collect or not.
+     */
     function updateModuleParameters(
         uint256 profileId,
         uint256 pubId,
@@ -166,6 +186,21 @@ contract UpdatableOwnableFeeCollectModule is
         );
     }
 
+    /**
+     * @notice Allows the owner of the ownership-NFT corresponding to the given publication to update the parameters
+     * required to do a successful collect operation.
+     *
+     * @param profileId The token ID of the profile associated with the publication.
+     * @param pubId The publication ID associated with the publication.
+     * @param amount The amount of fee charged for each collect.
+     * @param currency The currency in which the amount is charged.
+     * @param recipient The address that will receive the collect fees.
+     * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
+     * Measured in basis points, each basis point represents 0.01%.
+     * @param followerOnly A boolean indicating whether followers are the only allowed to collect or not.
+     * @param operator The address that is executing this parameter update. Should match the recovered signer.
+     * @param sig The EIP-712 signature for this operation.
+     */
     function updateModuleParametersWithSig(
         uint256 profileId,
         uint256 pubId,
@@ -217,6 +252,14 @@ contract UpdatableOwnableFeeCollectModule is
         return _dataByPublicationByProfile[profileId][pubId];
     }
 
+    /**
+     * @notice Process the collect fee without referral.
+     *
+     * @param collector The collector address.
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param data Custom data that must contain the expected fee currency and amount encoded.
+     */
     function _processCollect(
         address collector,
         uint256 profileId,
@@ -238,6 +281,15 @@ contract UpdatableOwnableFeeCollectModule is
         }
     }
 
+    /**
+     * @notice Process the collect fee with referral.
+     *
+     * @param referrerProfileId The LensHub profile token ID of the referrer's profile.
+     * @param collector The collector address.
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param data Custom data that must contain the expected fee currency and amount encoded.
+     */
     function _processCollectWithReferral(
         uint256 referrerProfileId,
         address collector,
@@ -280,6 +332,19 @@ contract UpdatableOwnableFeeCollectModule is
         }
     }
 
+    /**
+     * @notice Internal function to abstract the logic regarding the parameter updating.
+     *
+     * @param profileId The token ID of the profile associated with the publication.
+     * @param pubId The publication ID associated with the publication.
+     * @param amount The amount of fee charged for each collect.
+     * @param currency The currency in which the amount is charged.
+     * @param recipient The address that will receive the collect fees.
+     * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
+     * Measured in basis points, each basis point represents 0.01%.
+     * @param followerOnly A boolean indicating whether followers are the only allowed to collect or not.
+     * @param operator The address that is executing this parameter update.
+     */
     function _updateModuleParameters(
         uint256 profileId,
         uint256 pubId,
@@ -314,6 +379,20 @@ contract UpdatableOwnableFeeCollectModule is
         }
     }
 
+    /**
+     * @notice Checks if the signature for the `bidWithSig` function is valid according EIP-712 standard.
+     *
+     * @param profileId The token ID of the profile associated with the publication.
+     * @param pubId The publication ID associated with the publication.
+     * @param amount The amount of fee charged for each collect.
+     * @param currency The currency in which the amount is charged.
+     * @param recipient The address that will receive the collect fees.
+     * @param referralFee The percentage of the fee that will be transferred to the referrer in case of having one.
+     * Measured in basis points, each basis point represents 0.01%.
+     * @param followerOnly A boolean indicating whether followers are the only allowed to collect or not.
+     * @param operator The address that is executing this parameter update. Should match the recovered signer.
+     * @param sig The EIP-712 signature for this operation.
+     */
     function _validateUpdateModuleParametersSignature(
         uint256 profileId,
         uint256 pubId,
