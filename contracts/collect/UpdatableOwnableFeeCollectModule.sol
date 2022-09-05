@@ -105,6 +105,10 @@ contract UpdatableOwnableFeeCollectModule is
             revert Errors.InitParamsInvalid();
         }
 
+        unchecked {
+            ++_tokenIdCounter;
+        }
+
         _mint(IERC721(HUB).ownerOf(profileId), _tokenIdCounter);
 
         _dataByPublicationByProfile[profileId][pubId].ownershipTokenId = _tokenIdCounter;
@@ -113,10 +117,6 @@ contract UpdatableOwnableFeeCollectModule is
         _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
         _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
         _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
-
-        unchecked {
-            ++_tokenIdCounter;
-        }
 
         return data;
     }
@@ -328,26 +328,33 @@ contract UpdatableOwnableFeeCollectModule is
         unchecked {
             _validateRecoveredAddress(
                 _calculateDigest(
-                    bytes32(
-                        abi.encode(
-                            keccak256(
-                                'UpdateModuleParametersWithSig(uint256 profileId,uint256 pubId,uint256 amount,address currency,address recipient,uint16 referralFee,bool followerOnly,uint256 nonce,uint256 deadline)'
-                            ),
-                            profileId,
-                            pubId,
-                            amount,
-                            currency,
-                            recipient,
-                            referralFee,
-                            followerOnly,
-                            sigNonces[operator]++,
-                            sig.deadline
-                        )
+                    abi.encode(
+                        keccak256(
+                            'UpdateModuleParametersWithSig(uint256 profileId,uint256 pubId,uint256 amount,address currency,address recipient,uint16 referralFee,bool followerOnly,uint256 nonce,uint256 deadline)'
+                        ),
+                        profileId,
+                        pubId,
+                        amount,
+                        currency,
+                        recipient,
+                        referralFee,
+                        followerOnly,
+                        sigNonces[operator]++,
+                        sig.deadline
                     )
                 ),
                 operator,
                 sig
             );
         }
+    }
+
+    /**
+     * @notice Calculates the digest for the given bytes according EIP-712 standard.
+     *
+     * @param message The message, as bytes, to calculate the digest from.
+     */
+    function _calculateDigest(bytes memory message) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked('\x19\x01', _domainSeparatorV4(), keccak256(message)));
     }
 }
