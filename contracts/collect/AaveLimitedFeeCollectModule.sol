@@ -38,6 +38,9 @@ struct ProfilePublicationData {
 
 error AaveMarketInactiveOrFrozen();
 
+// TODO change name of module
+// TODO add timed element
+
 /**
  * @title AaveLimitedFeeCollectModule
  * @author Lens Protocol

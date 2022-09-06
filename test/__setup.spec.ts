@@ -22,11 +22,17 @@ import {
   TransparentUpgradeableProxy__factory,
   Currency__factory,
   Currency,
+  ACurrency,
+  ACurrency__factory,
   ModuleGlobals,
   AuctionCollectModule,
   AuctionCollectModule__factory,
   FreeCollectModule__factory,
   FreeCollectModule,
+  MockLendingPool,
+  MockLendingPool__factory,
+  AaveLimitedFeeCollectModule,
+  AaveLimitedFeeCollectModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import {
@@ -51,6 +57,8 @@ export const FIRST_PUB_ID = 1;
 export const FIRST_FOLLOW_NFT_ID = 1;
 export const MOCK_URI = 'https://ipfs.io/ipfs/QmY9dUwYu67puaWBMxRKW98LPbXCznPwHUbhX5NeWnCJbX';
 export const OTHER_MOCK_URI = 'https://ipfs.io/ipfs/QmTFLSXdEQ6qsSzaXaCSNtiv6wA56qq87ytXJ182dXDQJS';
+export const MOCK_PROFILE_URI =
+  'https://ipfs.io/ipfs/Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu';
 export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 
@@ -61,15 +69,23 @@ export let governance: SignerWithAddress;
 export let proxyAdmin: SignerWithAddress;
 export let treasury: SignerWithAddress;
 export let user: SignerWithAddress;
+export let userTwo: SignerWithAddress;
 export let anotherUser: SignerWithAddress;
 export let thirdUser: SignerWithAddress;
 export let publisher: SignerWithAddress;
 export let feeRecipient: SignerWithAddress;
 export let collector: SignerWithAddress;
 
+export let userAddress: string;
+export let userTwoAddress: string;
+export let treasuryAddress: string;
+
 export let lensHubImpl: LensHub;
 export let lensHub: LensHub;
 export let currency: Currency;
+export let aCurrency: ACurrency;
+export let currencyTwo: Currency;
+export let lendingPool: MockLendingPool;
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
 export let hubLibs: LensHubLibraryAddresses;
@@ -80,6 +96,7 @@ export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
 
 export let auctionCollectModule: AuctionCollectModule;
+export let aaveLimitedFeeCollectModule: AaveLimitedFeeCollectModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -106,6 +123,11 @@ before(async function () {
   thirdUser = accounts[6];
   publisher = accounts[7];
   feeRecipient = accounts[8];
+  userTwo = accounts[9];
+
+  userAddress = await user.getAddress();
+  userTwoAddress = await userTwo.getAddress();
+  treasuryAddress = await treasury.getAddress();
 
   // Deployment
   moduleGlobals = await new ModuleGlobals__factory(deployer).deploy(
@@ -132,7 +154,7 @@ before(async function () {
   // nonce + 2 is impl
   // nonce + 3 is hub proxy
 
-  const hubProxyAddress = computeContractAddress(deployer.address, nonce + 3); //'0x' + keccak256(RLP.encode([deployerAddress, hubProxyNonce])).substr(26);
+  const hubProxyAddress = computeContractAddress(deployer.address, nonce + 3); // '0x' + keccak256(RLP.encode([deployerAddress, hubProxyNonce])).substr(26);
 
   followNFTImpl = await new FollowNFT__factory(deployer).deploy(hubProxyAddress);
   collectNFTImpl = await new CollectNFT__factory(deployer).deploy(hubProxyAddress);
@@ -142,12 +164,12 @@ before(async function () {
     collectNFTImpl.address
   );
 
-  let data = lensHubImpl.interface.encodeFunctionData('initialize', [
+  const data = lensHubImpl.interface.encodeFunctionData('initialize', [
     LENS_HUB_NFT_NAME,
     LENS_HUB_NFT_SYMBOL,
     governance.address,
   ]);
-  let proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
+  const proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
     lensHubImpl.address,
     proxyAdmin.address,
     data
@@ -158,6 +180,14 @@ before(async function () {
 
   // Currency
   currency = await new Currency__factory(deployer).deploy();
+  currencyTwo = await new Currency__factory(deployer).deploy();
+  aCurrency = await new ACurrency__factory(deployer).deploy();
+
+  // LendingPool
+  lendingPool = await new MockLendingPool__factory(deployer).deploy(
+    currency.address,
+    aCurrency.address
+  );
 
   // Currency whitelisting
   await expect(
@@ -175,8 +205,18 @@ before(async function () {
     lensHub.address,
     moduleGlobals.address
   );
+  aaveLimitedFeeCollectModule = await new AaveLimitedFeeCollectModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address,
+    lendingPool.address
+  );
+
   await expect(
     lensHub.connect(governance).whitelistCollectModule(auctionCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  await expect(
+    lensHub.connect(governance).whitelistCollectModule(aaveLimitedFeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
