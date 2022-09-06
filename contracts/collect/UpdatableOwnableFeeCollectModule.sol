@@ -353,28 +353,26 @@ contract UpdatableOwnableFeeCollectModule is
         bool followerOnly,
         address operator
     ) internal {
-        if (ownerOf(_dataByPublicationByProfile[profileId][pubId].ownershipTokenId) == operator) {
-            if (!_currencyWhitelisted(currency) || referralFee > BPS_MAX) {
-                revert InvalidParameters();
-            } else {
-                _dataByPublicationByProfile[profileId][pubId].amount = amount;
-                _dataByPublicationByProfile[profileId][pubId].currency = currency;
-                _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
-                _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
-                _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
-                emit ModuleParametersUpdated(
-                    profileId,
-                    pubId,
-                    amount,
-                    currency,
-                    recipient,
-                    referralFee,
-                    followerOnly
-                );
-            }
-        } else {
+        if (ownerOf(_dataByPublicationByProfile[profileId][pubId].ownershipTokenId) != operator) {
             revert OnlyOwner();
         }
+        if (!_currencyWhitelisted(currency) || referralFee > BPS_MAX) {
+            revert InvalidParameters();
+        }
+        _dataByPublicationByProfile[profileId][pubId].amount = amount;
+        _dataByPublicationByProfile[profileId][pubId].currency = currency;
+        _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
+        _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
+        _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
+        emit ModuleParametersUpdated(
+            profileId,
+            pubId,
+            amount,
+            currency,
+            recipient,
+            referralFee,
+            followerOnly
+        );
     }
 
     /**
