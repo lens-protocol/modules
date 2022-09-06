@@ -106,12 +106,10 @@ contract UpdatableOwnableFeeCollectModule is
         }
 
         unchecked {
-            ++_tokenIdCounter;
+            uint256 tokenId = ++_tokenIdCounter;
+            _mint(IERC721(HUB).ownerOf(profileId), tokenId);
+            _dataByPublicationByProfile[profileId][pubId].ownershipTokenId = tokenId;
         }
-
-        _mint(IERC721(HUB).ownerOf(profileId), _tokenIdCounter);
-
-        _dataByPublicationByProfile[profileId][pubId].ownershipTokenId = _tokenIdCounter;
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
         _dataByPublicationByProfile[profileId][pubId].currency = currency;
         _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
