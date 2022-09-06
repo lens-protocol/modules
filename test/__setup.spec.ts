@@ -110,7 +110,7 @@ export function makeSuiteCleanRoom(name: string, tests: () => void) {
   });
 }
 
-before(async function () {
+beforeEach(async function () {
   chainId = (await ethers.provider.getNetwork()).chainId;
   abiCoder = ethers.utils.defaultAbiCoder;
   accounts = await ethers.getSigners();

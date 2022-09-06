@@ -121,7 +121,7 @@ makeSuiteCleanRoom('AuctionCollectModule', function () {
     await currency.connect(owner).approve(spender, amountToApprove);
   }
 
-  before(async function () {
+  beforeEach(async function () {
     BID_WITH_SIG_DOMAIN = {
       name: 'AuctionCollectModule',
       version: '1',
