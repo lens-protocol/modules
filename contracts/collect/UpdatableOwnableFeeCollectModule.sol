@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
+import {Base64} from '@openzeppelin/contracts/utils/Base64.sol';
 import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
 import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
@@ -13,6 +14,7 @@ import {ILensHub} from '@aave/lens-protocol/contracts/interfaces/ILensHub.sol';
 import {LensNFTBase} from '@aave/lens-protocol/contracts/core/base/LensNFTBase.sol';
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import {Strings} from '@openzeppelin/contracts/utils/Strings.sol';
 
 /**
  * @notice A struct containing the necessary data to execute collect actions on a publication.
@@ -31,6 +33,17 @@ struct ProfilePublicationData {
     address recipient;
     uint16 referralFee;
     bool followerOnly;
+}
+
+/**
+ * @notice A struct containing the publication composite identifier.
+ *
+ * @param profileId The token ID of the profile associated with the publication.
+ * @param pubId The publication ID associated with the publication.
+ */
+struct Publication {
+    uint256 profileId;
+    uint256 pubId;
 }
 
 /**
@@ -69,11 +82,48 @@ contract UpdatableOwnableFeeCollectModule is
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
 
+    mapping(uint256 => Publication) internal _publicationByTokenId;
+
     constructor(address hub, address moduleGlobals)
         EIP712('UpdatableOwnableFeeCollectModule', '1')
         FeeModuleBase(moduleGlobals)
         ModuleBase(hub)
     {}
+
+    /**
+     * @dev Returns the Uniform Resource Identifier (URI) for the given token.
+     *
+     * @param tokenId The ID of the token whose URI is being queried.
+     *
+     * @return string The corresponding token URI.
+     */
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        if (!_exists(tokenId)) {
+            revert Errors.TokenDoesNotExist();
+        }
+        string memory pubIdString = string(
+            abi.encodePacked(
+                Strings.toString(_publicationByTokenId[tokenId].profileId),
+                '-',
+                Strings.toString(_publicationByTokenId[tokenId].pubId)
+            )
+        );
+        return
+            string(
+                abi.encodePacked(
+                    'data:application/json;base64,',
+                    Base64.encode(
+                        abi.encodePacked(
+                            '{ "name": "Ownership of Lens Publication #',
+                            pubIdString,
+                            '","description": "Owning this NFT allows the owner to change the collect parameters of the #',
+                            pubIdString,
+                            ' publication.", "image": "ipfs://bafkreifclgvhtotpoquwoo7enjof6xfqjbthukddkxagtykjfnc3kh6khm" }'
+                        )
+                    )
+                )
+            );
+    }
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
@@ -108,6 +158,7 @@ contract UpdatableOwnableFeeCollectModule is
         unchecked {
             uint256 tokenId = ++_tokenIdCounter;
             _mint(IERC721(HUB).ownerOf(profileId), tokenId);
+            _publicationByTokenId[tokenId] = Publication(profileId, pubId);
             _dataByPublicationByProfile[profileId][pubId].ownershipTokenId = tokenId;
         }
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
@@ -248,6 +299,28 @@ contract UpdatableOwnableFeeCollectModule is
         returns (ProfilePublicationData memory)
     {
         return _dataByPublicationByProfile[profileId][pubId];
+    }
+
+    /**
+     * @notice Returns the underlying publication corresponding to the given token ID.
+     *
+     * @param tokenId The ID of the token whose underlying publication is being queried.
+     *
+     * @return PublicationStruct The PublicationStruct of the given publication.
+     */
+    function getPublicationByTokenId(uint256 tokenId)
+        public
+        view
+        returns (DataTypes.PublicationStruct memory)
+    {
+        if (!_exists(tokenId)) {
+            revert Errors.TokenDoesNotExist();
+        }
+        return
+            ILensHub(HUB).getPub(
+                _publicationByTokenId[tokenId].profileId,
+                _publicationByTokenId[tokenId].pubId
+            );
     }
 
     /**
