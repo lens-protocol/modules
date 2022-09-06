@@ -35,6 +35,7 @@ import { getTimestamp, matchEvent, setNextBlockTimestamp, waitForTx } from '../.
 import { Domain } from '../../helpers/signatures/utils';
 import { PubType } from '../../helpers/constants';
 import { signUpdateModuleParametersWithSigMessage } from '../../helpers/signatures/modules/collect/updatable-ownable-fee-collect-module';
+import { base64 } from 'ethers/lib/utils';
 
 export let UPDATE_MODULE_PARAMETERS_WITH_SIG_DOMAIN: Domain;
 
@@ -258,6 +259,87 @@ makeSuiteCleanRoom('UpdatableOwnableFeeCollectModule', function () {
           expect(await updatableOwnableFeeCollectModule.ownerOf(FIRST_TOKEN_ID)).to.be.equals(
             publisher.address
           );
+        });
+      });
+    });
+
+    context('Publication reverse resolution by token ID', function () {
+      context('Negatives', function () {
+        it('Fails to retrieve publication if token ID does not exist', async function () {
+          expect(await updatableOwnableFeeCollectModule.totalSupply()).to.be.equals(
+            ethers.constants.Zero
+          );
+          await expect(
+            updatableOwnableFeeCollectModule.getPublicationByTokenId(FIRST_TOKEN_ID)
+          ).to.revertedWith(ERRORS.TOKEN_DOES_NOT_EXIST);
+        });
+      });
+
+      context('Scenarios', function () {
+        it('Returns the correct information after publication has been created', async function () {
+          // Creates publication
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: updatableOwnableFeeCollectModule.address,
+              collectModuleInitData: await getUpdatableOwnableFeeCollectModuleInitData({}),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // Checks the reverse publication resolution by token ID gets the correct information
+          expect(
+            await updatableOwnableFeeCollectModule.getPublicationByTokenId(FIRST_TOKEN_ID)
+          ).to.eqls([
+            ethers.constants.Zero,
+            ethers.constants.Zero,
+            MOCK_URI,
+            ethers.constants.AddressZero,
+            updatableOwnableFeeCollectModule.address,
+            ethers.constants.AddressZero,
+          ]);
+        });
+      });
+    });
+
+    context('Ownership NFT token URI', function () {
+      context('Negatives', function () {
+        it('Fails to retrieve the token URI if token ID does not exist', async function () {
+          expect(await updatableOwnableFeeCollectModule.totalSupply()).to.be.equals(
+            ethers.constants.Zero
+          );
+          await expect(updatableOwnableFeeCollectModule.tokenURI(FIRST_TOKEN_ID)).to.revertedWith(
+            ERRORS.TOKEN_DOES_NOT_EXIST
+          );
+        });
+      });
+
+      context('Scenarios', function () {
+        it('Returns the correct token URI after publication has been created', async function () {
+          // Creates publication
+          await expect(
+            lensHub.connect(publisher).post({
+              profileId: FIRST_PROFILE_ID,
+              contentURI: MOCK_URI,
+              collectModule: updatableOwnableFeeCollectModule.address,
+              collectModuleInitData: await getUpdatableOwnableFeeCollectModuleInitData({}),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+          // Checks the reverse publication resolution by token ID gets the correct information
+          const tokenURI = await updatableOwnableFeeCollectModule.tokenURI(FIRST_TOKEN_ID);
+          const jsonMetadataBase64String = tokenURI.split('data:application/json;base64,')[1];
+          const jsonMetadataBytes = ethers.utils.base64.decode(jsonMetadataBase64String);
+          const jsonMetadataString = ethers.utils.toUtf8String(jsonMetadataBytes);
+          const jsonMetadata = JSON.parse(jsonMetadataString);
+          expect(jsonMetadata).to.eql({
+            name: 'Ownership of Lens Publication #1-1',
+            description:
+              'Owning this NFT allows the owner to change the collect parameters of the #1-1 publication.',
+            image: 'ipfs://bafkreifclgvhtotpoquwoo7enjof6xfqjbthukddkxagtykjfnc3kh6khm',
+          });
         });
       });
     });
