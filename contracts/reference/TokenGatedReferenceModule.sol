@@ -36,7 +36,7 @@ contract TokenGatedReferenceModule is ModuleBase, IReferenceModule {
     ) external override returns (bytes memory) {
         // TODO: Maybe add a min threshold
         _tokenAddressByPublicationByProfile[profileId][pubId] = abi.decode(data, (address));
-        return new bytes(0);
+        return data;
     }
 
     /**
