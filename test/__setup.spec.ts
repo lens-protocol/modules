@@ -188,6 +188,9 @@ beforeEach(async function () {
 
   // Aave Pool - currencyTwo is set as unsupported asset (in Aave, not Lens) for testing
   aavePool = await new MockPool__factory(deployer).deploy(aCurrency.address, currencyTwo.address);
+  aavePoolAddressesProvider = await new MockPoolAddressesProvider__factory(deployer).deploy(
+    aavePool.address
+  );
 
   // Currency whitelisting
   await expect(
@@ -211,7 +214,7 @@ beforeEach(async function () {
   aaveLimitedFeeCollectModule = await new AaveLimitedFeeCollectModule__factory(deployer).deploy(
     lensHub.address,
     moduleGlobals.address,
-    aavePool.address, // TODO replace with MockPoolAddressesProvider - which still needs to be deployed above
+    aavePoolAddressesProvider.address,
     {
       gasLimit: 12450000,
     }
