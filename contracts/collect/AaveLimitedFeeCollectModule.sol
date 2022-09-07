@@ -50,11 +50,9 @@ error AaveMarketInactiveOrFrozen();
 contract AaveLimitedFeeCollectModule is EIP712, FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
-    // Pool Address Provider on Polygon for Aave v3
-    IPoolAddressesProvider public constant POOL_ADDRESSES_PROVIDER =
-        IPoolAddressesProvider(0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb);
+    // Pool Address Provider on Polygon for Aave v3 - set in constructor
+    IPoolAddressesProvider public immutable POOL_ADDRESSES_PROVIDER;
 
-    address public aavePoolDataProvider;
     address public aavePool;
 
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
@@ -65,18 +63,19 @@ contract AaveLimitedFeeCollectModule is EIP712, FeeModuleBase, FollowValidationM
     constructor(
         address hub,
         address moduleGlobals,
-        address _lendingPool
+        IPoolAddressesProvider poolAddressesProvider
     ) EIP712('AaveLimitedFeeCollectModule', '1') ModuleBase(hub) FeeModuleBase(moduleGlobals) {
-        // Retrieve Aave addresses on module deployment
-        aavePoolDataProvider = POOL_ADDRESSES_PROVIDER.getPoolDataProvider();
+
+        POOL_ADDRESSES_PROVIDER = poolAddressesProvider;
+
+        // Retrieve Aave pool address on module deployment
         aavePool = POOL_ADDRESSES_PROVIDER.getPool();
     }
 
     /**
      * @dev Anyone can call this function to update Aave v3 addresses.
      */
-    function updateAaveAddresses() public {
-        aavePoolDataProvider = POOL_ADDRESSES_PROVIDER.getPoolDataProvider();
+    function updateAavePoolAddress() public {
         aavePool = POOL_ADDRESSES_PROVIDER.getPool();
     }
 
@@ -111,12 +110,6 @@ contract AaveLimitedFeeCollectModule is EIP712, FeeModuleBase, FollowValidationM
             referralFee > BPS_MAX ||
             amount < BPS_MAX
         ) revert Errors.InitParamsInvalid();
-
-        // Get Aave v3 market config data for currency
-        (, , , , , , , , bool isActive, bool isFrozen) = IPoolDataProvider(aavePoolDataProvider)
-            .getReserveConfigurationData(currency);
-
-        if (!isActive || isFrozen) revert AaveMarketInactiveOrFrozen();
 
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
@@ -199,13 +192,16 @@ contract AaveLimitedFeeCollectModule is EIP712, FeeModuleBase, FollowValidationM
         address beneficiary,
         uint256 amount
     ) internal {
-        // TODO add try catch
-        if (true) {
-            IERC20(currency).safeTransferFrom(from, address(this), amount);
-            IERC20(currency).approve(aavePool, amount);
-            IPool(aavePool).supply(currency, amount, beneficiary, 0);
-        } else {
-            IERC20(currency).safeTransferFrom(from, beneficiary, amount);
+        // First, transfer funds to this contract
+        IERC20(currency).safeTransferFrom(from, address(this), amount);
+        IERC20(currency).approve(aavePool, amount);
+
+        // Then, attempt to supply funds in Aave v3, sending aTokens to beneficiary
+        try IPool(aavePool).supply(currency, amount, beneficiary, 0) {
+            // deposit refer
+        } catch {
+            // If supply() above fails, send funds directly to beneficiary
+            IERC20(currency).safeTransfer(beneficiary, amount);
         }
     }
 
@@ -241,7 +237,7 @@ contract AaveLimitedFeeCollectModule is EIP712, FeeModuleBase, FollowValidationM
 
             address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
 
-            IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
+            _transferFromAndDepositToAaveIfApplicable(currency, collector, referralRecipient, referralAmount);
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
