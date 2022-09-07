@@ -46,6 +46,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         followNFTURI: MOCK_FOLLOW_NFT_URI,
       })
     ).to.not.be.reverted;
+
     await expect(
       lensHub.connect(governance).whitelistCollectModule(aaveLimitedFeeCollectModule.address, true)
     ).to.not.be.reverted;
@@ -229,7 +230,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
       it('UserTwo should mirror the original post, fail to collect from their mirror without following the original profile', async function () {
         const secondProfileId = FIRST_PROFILE_ID + 1;
         await expect(
-          lensHub.connect(userTwo).createProfile({
+          lensHub.createProfile({
             to: userTwoAddress,
             handle: 'usertwo',
             imageURI: MOCK_PROFILE_URI,
@@ -238,6 +239,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
             followNFTURI: MOCK_FOLLOW_NFT_URI,
           })
         ).to.not.be.reverted;
+
         await expect(
           lensHub.connect(userTwo).mirror({
             profileId: secondProfileId,
@@ -261,7 +263,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
       it('UserTwo should mirror the original post, fail to collect from their mirror passing a different expected price in data', async function () {
         const secondProfileId = FIRST_PROFILE_ID + 1;
         await expect(
-          lensHub.connect(userTwo).createProfile({
+          lensHub.createProfile({
             to: userTwoAddress,
             handle: 'usertwo',
             imageURI: MOCK_PROFILE_URI,
@@ -294,7 +296,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
       it('UserTwo should mirror the original post, fail to collect from their mirror passing a different expected currency in data', async function () {
         const secondProfileId = FIRST_PROFILE_ID + 1;
         await expect(
-          lensHub.connect(userTwo).createProfile({
+          lensHub.createProfile({
             to: userTwoAddress,
             handle: 'usertwo',
             imageURI: MOCK_PROFILE_URI,
