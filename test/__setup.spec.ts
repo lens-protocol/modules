@@ -214,10 +214,7 @@ beforeEach(async function () {
   aaveLimitedFeeCollectModule = await new AaveLimitedFeeCollectModule__factory(deployer).deploy(
     lensHub.address,
     moduleGlobals.address,
-    aavePoolAddressesProvider.address,
-    {
-      gasLimit: 12450000,
-    }
+    aavePoolAddressesProvider.address
   );
 
   await expect(

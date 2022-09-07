@@ -65,7 +65,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           [0, DEFAULT_COLLECT_PRICE, currency.address, userAddress, REFERRAL_FEE_BPS]
         );
         await expect(
-          lensHub.post({
+          lensHub.connect(user).post({
             profileId: FIRST_PROFILE_ID,
             contentURI: MOCK_URI,
             collectModule: aaveLimitedFeeCollectModule.address,
@@ -88,7 +88,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           ]
         );
         await expect(
-          lensHub.post({
+          lensHub.connect(user).post({
             profileId: FIRST_PROFILE_ID,
             contentURI: MOCK_URI,
             collectModule: aaveLimitedFeeCollectModule.address,
@@ -111,7 +111,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           ]
         );
         await expect(
-          lensHub.post({
+          lensHub.connect(user).post({
             profileId: FIRST_PROFILE_ID,
             contentURI: MOCK_URI,
             collectModule: aaveLimitedFeeCollectModule.address,
@@ -128,7 +128,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           [DEFAULT_COLLECT_LIMIT, DEFAULT_COLLECT_PRICE, currency.address, userAddress, 10001]
         );
         await expect(
-          lensHub.post({
+          lensHub.connect(user).post({
             profileId: FIRST_PROFILE_ID,
             contentURI: MOCK_URI,
             collectModule: aaveLimitedFeeCollectModule.address,
@@ -145,7 +145,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           [DEFAULT_COLLECT_LIMIT, 9999, currency.address, userAddress, REFERRAL_FEE_BPS]
         );
         await expect(
-          lensHub.post({
+          lensHub.connect(user).post({
             profileId: FIRST_PROFILE_ID,
             contentURI: MOCK_URI,
             collectModule: aaveLimitedFeeCollectModule.address,
@@ -170,7 +170,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           ]
         );
         await expect(
-          lensHub.post({
+          lensHub.connect(user).post({
             profileId: FIRST_PROFILE_ID,
             contentURI: MOCK_URI,
             collectModule: aaveLimitedFeeCollectModule.address,
@@ -335,7 +335,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           REFERRAL_FEE_BPS,
         ]
       );
-      const tx = lensHub.post({
+      const tx = lensHub.connect(user).post({
         profileId: FIRST_PROFILE_ID,
         contentURI: MOCK_URI,
         collectModule: aaveLimitedFeeCollectModule.address,
@@ -371,7 +371,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         ]
       );
       await expect(
-        lensHub.post({
+        lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
           contentURI: MOCK_URI,
           collectModule: aaveLimitedFeeCollectModule.address,
@@ -401,7 +401,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         ]
       );
       await expect(
-        lensHub.post({
+        lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
           contentURI: MOCK_URI,
           collectModule: aaveLimitedFeeCollectModule.address,
@@ -447,7 +447,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         ]
       );
       await expect(
-        lensHub.post({
+        lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
           contentURI: MOCK_URI,
           collectModule: aaveLimitedFeeCollectModule.address,
@@ -493,7 +493,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         ]
       );
       await expect(
-        lensHub.post({
+        lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
           contentURI: MOCK_URI,
           collectModule: aaveLimitedFeeCollectModule.address,
@@ -541,7 +541,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         ]
       );
       await expect(
-        lensHub.post({
+        lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
           contentURI: MOCK_URI,
           collectModule: aaveLimitedFeeCollectModule.address,
@@ -609,7 +609,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         [DEFAULT_COLLECT_LIMIT, DEFAULT_COLLECT_PRICE, currency.address, userAddress, 0]
       );
       await expect(
-        lensHub.post({
+        lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
           contentURI: MOCK_URI,
           collectModule: aaveLimitedFeeCollectModule.address,
@@ -677,7 +677,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         ]
       );
       await expect(
-        lensHub.post({
+        lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
           contentURI: MOCK_URI,
           collectModule: aaveLimitedFeeCollectModule.address,
