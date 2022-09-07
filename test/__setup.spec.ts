@@ -29,8 +29,10 @@ import {
   AuctionCollectModule__factory,
   FreeCollectModule__factory,
   FreeCollectModule,
-  MockLendingPool,
-  MockLendingPool__factory,
+  MockPool,
+  MockPool__factory,
+  MockPoolAddressesProvider,
+  MockPoolAddressesProvider__factory,
   AaveLimitedFeeCollectModule,
   AaveLimitedFeeCollectModule__factory,
 } from '../typechain';
@@ -85,7 +87,8 @@ export let lensHub: LensHub;
 export let currency: Currency;
 export let aCurrency: ACurrency;
 export let currencyTwo: Currency;
-export let lendingPool: MockLendingPool;
+export let aavePool: MockPool;
+export let aavePoolAddressesProvider: MockPoolAddressesProvider;
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
 export let hubLibs: LensHubLibraryAddresses;
@@ -183,15 +186,15 @@ beforeEach(async function () {
   currencyTwo = await new Currency__factory(deployer).deploy();
   aCurrency = await new ACurrency__factory(deployer).deploy();
 
-  // LendingPool
-  lendingPool = await new MockLendingPool__factory(deployer).deploy(
-    currency.address,
-    aCurrency.address
-  );
+  // Aave Pool - currencyTwo is set as unsupported asset (in Aave, not Lens) for testing
+  aavePool = await new MockPool__factory(deployer).deploy(aCurrency.address, currencyTwo.address);
 
   // Currency whitelisting
   await expect(
     moduleGlobals.connect(governance).whitelistCurrency(currency.address, true)
+  ).to.not.be.reverted;
+  await expect(
+    moduleGlobals.connect(governance).whitelistCurrency(currencyTwo.address, true)
   ).to.not.be.reverted;
 
   // Modules used for testing purposes
@@ -208,7 +211,7 @@ beforeEach(async function () {
   aaveLimitedFeeCollectModule = await new AaveLimitedFeeCollectModule__factory(deployer).deploy(
     lensHub.address,
     moduleGlobals.address,
-    lendingPool.address,
+    aavePool.address, // TODO replace with MockPoolAddressesProvider - which still needs to be deployed above
     {
       gasLimit: 12450000,
     }

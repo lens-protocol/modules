@@ -10,11 +10,14 @@ interface IAToken {
 
 contract MockPool {
     address public aTokenAddress;
+    address public unsupportedToken;
 
-    constructor(
-        address _aTokenAddress)
+    error UnsupportedTokenSupplied();
+
+    constructor(address _aTokenAddress, address _unsupportedToken)
     {
         aTokenAddress = _aTokenAddress;
+        unsupportedToken = _unsupportedToken;
     }
 
     function supply(
@@ -23,6 +26,9 @@ contract MockPool {
         address onBehalfOf,
         uint16 referralCode
     ) external {
+
+        if(asset == unsupportedToken) revert UnsupportedTokenSupplied();
+
         IERC20(asset).transferFrom(msg.sender, aTokenAddress, amount);
 
         IAToken(aTokenAddress).mint(onBehalfOf, amount);
