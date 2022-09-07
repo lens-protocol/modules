@@ -6,6 +6,10 @@ export const ERRORS = {
   FEE_ALREADY_PROCESSED: 'FeeAlreadyProcessed()',
   INSUFFICIENT_BID_AMOUNT: 'InsufficientBidAmount()',
 
+  // UpdatableOwnableFeeCollectModule
+  ONLY_OWNER: 'OnlyOwner()',
+  INVALID_PARAMETERS: 'InvalidParameters()',
+
   // Core
   CANNOT_INIT_IMPL: 'CannotInitImplementation()',
   INITIALIZED: 'Initialized()',
