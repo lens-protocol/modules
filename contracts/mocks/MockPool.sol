@@ -8,23 +8,16 @@ interface IAToken {
     function mint(address to, uint256 amount) external;
 }
 
-contract MockLendingPool {
-    address[] public reserves;
+contract MockPool {
     address public aTokenAddress;
 
     constructor(
-        address _reserve,
         address _aTokenAddress)
     {
-        reserves.push(_reserve);
         aTokenAddress = _aTokenAddress;
     }
 
-    function getReservesList() external view returns (address[] memory) {
-        return reserves;
-    }
-
-    function deposit(
+    function supply(
         address asset,
         uint256 amount,
         address onBehalfOf,
