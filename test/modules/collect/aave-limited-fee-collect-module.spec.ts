@@ -542,7 +542,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           REFERRAL_FEE_BPS,
         ]
       );
-      console.log(1);
+
       await expect(
         lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
@@ -553,9 +553,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           referenceModuleInitData: [],
         })
       ).to.not.be.reverted;
-      console.log(2);
 
-      // TODO breaks here
       await expect(
         lensHub.createProfile({
           to: userTwoAddress,
@@ -567,7 +565,6 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      console.log(3);
       await expect(
         lensHub.connect(userTwo).mirror({
           profileId: secondProfileId,
@@ -578,7 +575,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           referenceModuleInitData: [],
         })
       ).to.not.be.reverted;
-      console.log(4);
+
       await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
         currency.connect(userTwo).approve(aaveLimitedFeeCollectModule.address, MAX_UINT256)
@@ -597,14 +594,14 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
         .sub(expectedTreasuryAmount)
         .mul(REFERRAL_FEE_BPS)
         .div(BPS_MAX);
-      const expectedReferrerAmount = BigNumber.from(MAX_UINT256)
-        .sub(DEFAULT_COLLECT_PRICE)
-        .add(expectedReferralAmount);
+      const expectedReferrerAmount = BigNumber.from(MAX_UINT256).sub(DEFAULT_COLLECT_PRICE);
+      // .add(expectedReferralAmount); - this amount is now paid in aTokens, so not added here
       const expectedRecipientAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .sub(expectedTreasuryAmount)
         .sub(expectedReferralAmount);
 
       expect(await currency.balanceOf(userTwoAddress)).to.eq(expectedReferrerAmount);
+      expect(await aCurrency.balanceOf(userTwoAddress)).to.eq(expectedReferralAmount);
       expect(await aCurrency.balanceOf(userAddress)).to.eq(expectedRecipientAmount);
       expect(await currency.balanceOf(treasuryAddress)).to.eq(expectedTreasuryAmount);
     });
