@@ -177,19 +177,19 @@ contract DegreesOfSeparationReferenceModule is ModuleBase, IReferenceModule {
     }
 
     /**
-     * @notice Gets the degrees of separation set for the given publication.
+     * @notice Gets the module configuration for the given publication.
      *
      * @param profileId The token ID of the profile publishing the publication.
      * @param pubId The associated publication's LensHub publication ID.
      *
-     * @return uint8 The degrees of separation set for the given publication.
+     * @return ModuleConfig The module configuration set for the given publication.
      */
-    function getDegreesOfSeparation(uint256 profileId, uint256 pubId)
+    function getModuleConfig(uint256 profileId, uint256 pubId)
         external
         view
-        returns (uint8)
+        returns (ModuleConfig memory)
     {
-        return _moduleConfigByPubByProfile[profileId][pubId].degreesOfSeparation;
+        return _moduleConfigByPubByProfile[profileId][pubId];
     }
 
     /**
