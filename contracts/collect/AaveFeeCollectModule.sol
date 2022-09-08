@@ -26,6 +26,7 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param recipient The recipient address associated with this publication.
  * @param currency The currency associated with this publication.
  * @param referralFee The referral fee associated with this publication.
+ * @param endTimestamp The end timestamp after which collecting is impossible.
  */
 struct ProfilePublicationData {
     uint256 collectLimit;
@@ -34,6 +35,7 @@ struct ProfilePublicationData {
     address recipient;
     address currency;
     uint16 referralFee;
+    uint40 endTimestamp;
 }
 
 /**
@@ -96,14 +98,16 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
             uint256 amount,
             address currency,
             address recipient,
-            uint16 referralFee
-        ) = abi.decode(data, (uint256, uint256, address, address, uint16));
+            uint16 referralFee,
+            uint40 endTimestamp
+        ) = abi.decode(data, (uint256, uint256, address, address, uint16, uint40));
         if (
             collectLimit == 0 ||
             !_currencyWhitelisted(currency) ||
             recipient == address(0) ||
             referralFee > BPS_MAX ||
-            amount < BPS_MAX
+            amount < BPS_MAX ||
+            endTimestamp < block.timestamp
         ) revert Errors.InitParamsInvalid();
 
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
@@ -111,6 +115,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         _dataByPublicationByProfile[profileId][pubId].currency = currency;
         _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
         _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
+        _dataByPublicationByProfile[profileId][pubId].endTimestamp = endTimestamp;
 
         return data;
     }
@@ -118,6 +123,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
     /**
      * @dev Processes a collect by:
      *  1. Ensuring the collector is a follower
+     *  2. Ensuring the current timestamp is less than or equal to the collect end timestamp
      *  2. Ensuring the collect does not pass the collect limit
      *  3. Charging a fee
      */
@@ -135,8 +141,12 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
             _dataByPublicationByProfile[profileId][pubId].collectLimit
         ) {
             revert Errors.MintLimitExceeded();
+        } else if (
+            block.timestamp > _dataByPublicationByProfile[profileId][pubId].endTimestamp 
+        ) {
+            revert Errors.CollectExpired();
         } else {
-            _dataByPublicationByProfile[profileId][pubId].currentCollects++;
+            ++_dataByPublicationByProfile[profileId][pubId].currentCollects;
             if (referrerProfileId == profileId) {
                 _processCollect(collector, profileId, pubId, data);
             } else {
