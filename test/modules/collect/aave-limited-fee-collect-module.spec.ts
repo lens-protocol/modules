@@ -542,6 +542,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           REFERRAL_FEE_BPS,
         ]
       );
+      console.log(1);
       await expect(
         lensHub.connect(user).post({
           profileId: FIRST_PROFILE_ID,
@@ -552,9 +553,11 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           referenceModuleInitData: [],
         })
       ).to.not.be.reverted;
+      console.log(2);
 
+      // TODO breaks here
       await expect(
-        lensHub.connect(userTwo).createProfile({
+        lensHub.createProfile({
           to: userTwoAddress,
           handle: 'usertwo',
           imageURI: MOCK_PROFILE_URI,
@@ -563,6 +566,8 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           followNFTURI: MOCK_FOLLOW_NFT_URI,
         })
       ).to.not.be.reverted;
+
+      console.log(3);
       await expect(
         lensHub.connect(userTwo).mirror({
           profileId: secondProfileId,
@@ -573,7 +578,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
           referenceModuleInitData: [],
         })
       ).to.not.be.reverted;
-
+      console.log(4);
       await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
         currency.connect(userTwo).approve(aaveLimitedFeeCollectModule.address, MAX_UINT256)
@@ -622,7 +627,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
       ).to.not.be.reverted;
 
       await expect(
-        lensHub.connect(userTwo).createProfile({
+        lensHub.createProfile({
           to: userTwoAddress,
           handle: 'usertwo',
           imageURI: MOCK_PROFILE_URI,
@@ -690,7 +695,7 @@ makeSuiteCleanRoom('AAVE Limited Fee Collect Module', function () {
       ).to.not.be.reverted;
 
       await expect(
-        lensHub.connect(userTwo).createProfile({
+        lensHub.createProfile({
           to: userTwoAddress,
           handle: 'usertwo',
           imageURI: MOCK_PROFILE_URI,
