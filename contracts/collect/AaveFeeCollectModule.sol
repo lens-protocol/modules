@@ -36,18 +36,13 @@ struct ProfilePublicationData {
     uint16 referralFee;
 }
 
-error AaveMarketInactiveOrFrozen();
-
-// TODO change name of module
-// TODO add timed element
-
 /**
- * @title AaveLimitedFeeCollectModule
+ * @title AaveFeeCollectModule
  * @author Lens Protocol
  *
  * @notice Extend the LimitedFeeCollectModule to deposit all received fees into the Aave Polygon Market (if applicable for the asset) and send the resulting aTokens to the beneficiary.
  */
-contract AaveLimitedFeeCollectModule is EIP712, FeeModuleBase, FollowValidationModuleBase, ICollectModule {
+contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
     // Pool Address Provider on Polygon for Aave v3 - set in constructor
@@ -64,7 +59,7 @@ contract AaveLimitedFeeCollectModule is EIP712, FeeModuleBase, FollowValidationM
         address hub,
         address moduleGlobals,
         IPoolAddressesProvider poolAddressesProvider
-    ) EIP712('AaveLimitedFeeCollectModule', '1') ModuleBase(hub) FeeModuleBase(moduleGlobals) {
+    ) ModuleBase(hub) FeeModuleBase(moduleGlobals) {
 
         POOL_ADDRESSES_PROVIDER = poolAddressesProvider;
 

@@ -33,8 +33,8 @@ import {
   MockPool__factory,
   MockPoolAddressesProvider,
   MockPoolAddressesProvider__factory,
-  AaveLimitedFeeCollectModule,
-  AaveLimitedFeeCollectModule__factory,
+  AaveFeeCollectModule,
+  AaveFeeCollectModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import {
@@ -99,7 +99,7 @@ export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
 
 export let auctionCollectModule: AuctionCollectModule;
-export let aaveLimitedFeeCollectModule: AaveLimitedFeeCollectModule;
+export let aaveFeeCollectModule: AaveFeeCollectModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -211,7 +211,7 @@ beforeEach(async function () {
     lensHub.address,
     moduleGlobals.address
   );
-  aaveLimitedFeeCollectModule = await new AaveLimitedFeeCollectModule__factory(deployer).deploy(
+  aaveFeeCollectModule = await new AaveFeeCollectModule__factory(deployer).deploy(
     lensHub.address,
     moduleGlobals.address,
     aavePoolAddressesProvider.address
@@ -222,7 +222,7 @@ beforeEach(async function () {
   ).to.not.be.reverted;
 
   await expect(
-    lensHub.connect(governance).whitelistCollectModule(aaveLimitedFeeCollectModule.address, true)
+    lensHub.connect(governance).whitelistCollectModule(aaveFeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
