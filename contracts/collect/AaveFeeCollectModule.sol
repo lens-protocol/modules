@@ -202,9 +202,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         IERC20(currency).approve(aavePool, amount);
 
         // Then, attempt to supply funds in Aave v3, sending aTokens to beneficiary
-        try IPool(aavePool).supply(currency, amount, beneficiary, 0) {
-            // deposit refer
-        } catch {
+        try IPool(aavePool).supply(currency, amount, beneficiary, 0) {} catch {
             // If supply() above fails, send funds directly to beneficiary
             IERC20(currency).safeTransfer(beneficiary, amount);
         }

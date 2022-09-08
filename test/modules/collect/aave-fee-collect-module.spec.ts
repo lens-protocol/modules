@@ -808,5 +808,62 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         ERRORS.MINT_LIMIT_EXCEEDED
       );
     });
+
+    it('User should post with aave fee collect module as the collect module but asset not supported by Aave, user two collects, user gets paid in base currency and not aTokens', async function () {
+      const secondProfileId = FIRST_PROFILE_ID + 1;
+      const collectModuleInitData = abiCoder.encode(
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        [
+          DEFAULT_COLLECT_LIMIT,
+          DEFAULT_COLLECT_PRICE,
+          currencyTwo.address,
+          userAddress,
+          REFERRAL_FEE_BPS,
+          DEFAULT_END_TIMESTAMP,
+        ]
+      );
+      await expect(
+        lensHub.connect(user).post({
+          profileId: FIRST_PROFILE_ID,
+          contentURI: MOCK_URI,
+          collectModule: aaveFeeCollectModule.address,
+          collectModuleInitData: collectModuleInitData,
+          referenceModule: ZERO_ADDRESS,
+          referenceModuleInitData: [],
+        })
+      ).to.not.be.reverted;
+
+      await expect(
+        lensHub.createProfile({
+          to: userTwoAddress,
+          handle: 'usertwo',
+          imageURI: MOCK_PROFILE_URI,
+          followModule: ZERO_ADDRESS,
+          followModuleInitData: [],
+          followNFTURI: MOCK_FOLLOW_NFT_URI,
+        })
+      ).to.not.be.reverted;
+
+      await expect(currencyTwo.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(
+        currencyTwo.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+      ).to.not.be.reverted;
+      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      const data = abiCoder.encode(
+        ['address', 'uint256'],
+        [currencyTwo.address, DEFAULT_COLLECT_PRICE]
+      );
+      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.not.be.reverted;
+
+      const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
+        .mul(TREASURY_FEE_BPS)
+        .div(BPS_MAX);
+      const expectedRecipientAmount =
+        BigNumber.from(DEFAULT_COLLECT_PRICE).sub(expectedTreasuryAmount);
+
+      expect(await currencyTwo.balanceOf(userAddress)).to.eq(expectedRecipientAmount);
+      expect(await aCurrency.balanceOf(userAddress)).to.eq(0);
+      expect(await currencyTwo.balanceOf(treasuryAddress)).to.eq(expectedTreasuryAmount);
+    });
   });
 });
