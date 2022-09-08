@@ -449,7 +449,7 @@ contract UpdatableOwnableFeeCollectModule is
     }
 
     /**
-     * @notice Checks if the signature for the `bidWithSig` function is valid according EIP-712 standard.
+     * @notice Checks if the signature for the `updateModuleParametersWithSig` function is valid according EIP-712.
      *
      * @param profileId The token ID of the profile associated with the publication.
      * @param pubId The publication ID associated with the publication.
