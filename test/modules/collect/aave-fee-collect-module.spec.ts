@@ -4,7 +4,7 @@ import '@nomiclabs/hardhat-ethers';
 import { expect } from 'chai';
 import { MAX_UINT256, ONE_DAY, ZERO_ADDRESS } from '../../helpers/constants';
 import { ERRORS } from '../../helpers/errors';
-import { getTimestamp, matchEvent, waitForTx } from '../../helpers/utils';
+import { getTimestamp, matchEvent, setNextBlockTimestamp, waitForTx } from '../../helpers/utils';
 import {
   abiCoder,
   BPS_MAX,
@@ -179,10 +179,28 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           })
         ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
       });
+
+      it('user should fail to post with aave fee collect module using end timestamp in the past', async function () {
+        const collectModuleInitData = abiCoder.encode(
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+          [DEFAULT_COLLECT_LIMIT, 9999, currency.address, userAddress, REFERRAL_FEE_BPS, 1]
+        );
+        await expect(
+          lensHub.connect(user).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: aaveFeeCollectModule.address,
+            collectModuleInitData: collectModuleInitData,
+            referenceModule: ZERO_ADDRESS,
+            referenceModuleInitData: [],
+          })
+        ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
+      });
     });
 
     context('Collecting', function () {
       beforeEach(async function () {
+        const currentTimePlus1Day = BigNumber.from(await getTimestamp()).add(ONE_DAY);
         const collectModuleInitData = abiCoder.encode(
           ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
           [
@@ -191,7 +209,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
             currency.address,
             userAddress,
             REFERRAL_FEE_BPS,
-            DEFAULT_END_TIMESTAMP,
+            currentTimePlus1Day,
           ]
         );
         await expect(
@@ -249,6 +267,26 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         await expect(
           lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
         ).to.be.revertedWith(ERRORS.ERC20_INSUFFICIENT_ALLOWANCE);
+      });
+
+      it('UserTwo should fail to collect after publication has expired', async function () {
+        await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+
+        await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+
+        const data = abiCoder.encode(
+          ['address', 'uint256'],
+          [currency.address, DEFAULT_COLLECT_PRICE]
+        );
+
+        // Fast forward 2 days, publication expired after 1 day
+        await setNextBlockTimestamp(
+          parseInt(BigNumber.from(await getTimestamp()).toString()) + ONE_DAY
+        );
+
+        await expect(
+          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
+        ).to.be.revertedWith(ERRORS.COLLECT_EXPIRED);
       });
 
       it('UserTwo should mirror the original post, fail to collect from their mirror without following the original profile', async function () {
