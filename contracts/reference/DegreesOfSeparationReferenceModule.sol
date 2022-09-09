@@ -31,8 +31,8 @@ struct ModuleConfig {
  * @title DegreesOfSeparationReferenceModule
  * @author Lens Protocol
  *
- * @notice This reference module allows to set a degree of separation N, and then allows to comment/mirror only to
- * profiles that are at most at N degrees of separation from the author of the root publication.
+ * @notice This reference module allows to set a degree of separation `n`, and then allows to comment/mirror only to
+ * profiles that are at most at `n` degrees of separation from the author of the root publication.
  */
 contract DegreesOfSeparationReferenceModule is EIP712, ModuleBase, IReferenceModule {
     event ModuleParametersUpdated(
@@ -44,8 +44,8 @@ contract DegreesOfSeparationReferenceModule is EIP712, ModuleBase, IReferenceMod
     );
 
     error InvalidDegreesOfSeparation();
-    error InvalidProfilePathLength();
     error OpereationDisabled();
+    error ProfilePathExceedsDegreesOfSeparation();
     error PublicationNotSetUp();
 
     /**
@@ -230,10 +230,10 @@ contract DegreesOfSeparationReferenceModule is EIP712, ModuleBase, IReferenceMod
 
     /**
      * @dev The data has encoded an array of integers, each integer is a profile ID, the whole array represents a path
-     * of n profiles.
+     * of N profiles.
      *
      * Let's define `X --> Y` as `The owner of X is following Y`. Then, being `path[i]` the i-th profile in the path,
-     * the following condition must be met:
+     * the following condition must be met for a given path of `n` profiles:
      *
      *    profileIdPointed --> path[0] --> path[1] --> path[2] --> ... --> path[n-2] --> path[n-1] --> profileId
      *
@@ -252,27 +252,33 @@ contract DegreesOfSeparationReferenceModule is EIP712, ModuleBase, IReferenceMod
         if (degreesOfSeparation == 0) {
             revert OpereationDisabled();
         }
-        if (profilePath.length == 0 || profilePath.length > degreesOfSeparation) {
-            revert InvalidProfilePathLength();
+        if (profilePath.length > degreesOfSeparation - 1) {
+            revert ProfilePathExceedsDegreesOfSeparation();
         }
-        address follower;
-        // Checks the owner of the profile authoring the root publication follows the first profile in the given path.
-        // In the previous notation: profileIdPointed --> path[0]
-        follower = IERC721(HUB).ownerOf(profileIdPointed);
-        _checkFollowValidity(profilePath[0], follower);
-        // Checks each profile owner in the path is following the profile coming next, according the given order.
-        // In the previous notaiton: path[0] --> path[1] --> path[2] --> ... --> path[n-2] --> path[n-1]
-        for (uint256 i = 0; i < profilePath.length - 1; ) {
-            follower = IERC721(HUB).ownerOf(profilePath[i]);
-            unchecked {
-                ++i;
+        address follower = IERC721(HUB).ownerOf(profileIdPointed);
+        if (profilePath.length > 0) {
+            // Checks the owner of the profile authoring the root publication follows the first profile in the path.
+            // In the previous notation: profileIdPointed --> path[0]
+            _checkFollowValidity(profilePath[0], follower);
+            // Checks each profile owner in the path is following the profile coming next, according the order.
+            // In the previous notaiton: path[0] --> path[1] --> path[2] --> ... --> path[n-2] --> path[n-1]
+            uint256 i;
+            while (i < profilePath.length - 1) {
+                follower = IERC721(HUB).ownerOf(profilePath[i]);
+                unchecked {
+                    ++i;
+                }
+                _checkFollowValidity(profilePath[i], follower);
             }
-            _checkFollowValidity(profilePath[i], follower);
+            // Checks the last profile in the path follows the profile commenting/mirroring.
+            // In the previous notation: path[n-1] --> profileId
+            follower = IERC721(HUB).ownerOf(profilePath[i]);
+            _checkFollowValidity(profileId, follower);
+        } else {
+            // Checks the owner of the profile authoring the root publication follows the profile commenting/mirroring.
+            // In the previous notation: profileIdPointed --> profileId
+            _checkFollowValidity(profileIdPointed, follower);
         }
-        // Checks the last profile in the given path follows the profile performing the comment or mirror.
-        // In the previous notation: path[n-1] --> profileId
-        follower = IERC721(HUB).ownerOf(profilePath[profilePath.length - 1]);
-        _checkFollowValidity(profileId, follower);
     }
 
     /**
