@@ -116,7 +116,7 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
     ).to.not.be.reverted;
   });
 
-  context.only('DegreesOfSeparationReferenceModule', function () {
+  context('DegreesOfSeparationReferenceModule', function () {
     context('Publication creation', function () {
       context('Negatives', function () {
         it('User should fail to post if using wrong degrees of separation as init value', async function () {
