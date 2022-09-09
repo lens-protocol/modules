@@ -10,6 +10,12 @@ export const ERRORS = {
   ONLY_OWNER: 'OnlyOwner()',
   INVALID_PARAMETERS: 'InvalidParameters()',
 
+  // DegreesOfSeparationReferenceModule
+  INVALID_DEGREES_OF_SEPARATION: 'InvalidDegreesOfSeparation()',
+  OPEREATION_DISABLED: 'OpereationDisabled()',
+  PROFILE_PATH_EXCEEDS_DEGREES_OF_SEPARATION: 'ProfilePathExceedsDegreesOfSeparation()',
+  PUBLICATION_NOT_SET_UP: 'PublicationNotSetUp()',
+
   // Core
   CANNOT_INIT_IMPL: 'CannotInitImplementation()',
   INITIALIZED: 'Initialized()',

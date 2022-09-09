@@ -29,6 +29,8 @@ import {
   FreeCollectModule,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
+  DegreesOfSeparationReferenceModule,
+  DegreesOfSeparationReferenceModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import {
@@ -84,6 +86,8 @@ export let freeCollectModule: FreeCollectModule;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
+
+export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -190,6 +194,16 @@ before(async function () {
     lensHub
       .connect(governance)
       .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  // Reference modules
+  degreesOfSeparationReferenceModule = await new DegreesOfSeparationReferenceModule__factory(
+    deployer
+  ).deploy(lensHub.address);
+  await expect(
+    lensHub
+      .connect(governance)
+      .whitelistReferenceModule(degreesOfSeparationReferenceModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
