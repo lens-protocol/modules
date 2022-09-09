@@ -239,7 +239,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         ).to.not.be.reverted;
       });
 
-      it('UserTwo should fail to collect without following', async function () {
+      it('UserTwo should fail to collect without following if followerOnly is true', async function () {
         const data = abiCoder.encode(
           ['address', 'uint256'],
           [currency.address, DEFAULT_COLLECT_PRICE]
@@ -247,6 +247,46 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         await expect(
           lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
         ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
+      });
+
+      it('UserTwo should be able to collect without following if followerOnly is false', async function () {
+        // Post new publication with followerOnly == false
+        const currentTimePlus1Day = BigNumber.from(await getTimestamp()).add(ONE_DAY);
+        const collectModuleInitDataTwo = abiCoder.encode(
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
+          [
+            DEFAULT_COLLECT_LIMIT,
+            DEFAULT_COLLECT_PRICE,
+            currency.address,
+            userAddress,
+            REFERRAL_FEE_BPS,
+            false, // followerOnly = false
+            currentTimePlus1Day,
+          ]
+        );
+        await expect(
+          lensHub.connect(user).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: aaveFeeCollectModule.address,
+            collectModuleInitData: collectModuleInitDataTwo,
+            referenceModule: ZERO_ADDRESS,
+            referenceModuleInitData: [],
+          })
+        ).to.not.be.reverted;
+
+        const dataTwo = abiCoder.encode(
+          ['address', 'uint256'],
+          [currency.address, DEFAULT_COLLECT_PRICE]
+        );
+        await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+        await expect(
+          currency.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        ).to.not.be.reverted;
+        await expect(
+          // PubID = 2 here to test the followerOnly = false pub
+          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 2, dataTwo)
+        ).to.not.be.reverted;
       });
 
       it('UserTwo should fail to collect passing a different expected price in data', async function () {
