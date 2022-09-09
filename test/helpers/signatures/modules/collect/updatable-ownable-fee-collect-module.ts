@@ -15,7 +15,7 @@ import {
 } from '../../../../__setup.spec';
 import { Domain, EIP712Domain, RSV, signData, toStringOrNumber } from '../../utils';
 
-interface UpdateModuleParametersWithSigWithSigMessage {
+interface UpdateModuleParametersWithSigMessage {
   profileId: number | string;
   pubId: number | string;
   amount: number | string;
@@ -27,7 +27,7 @@ interface UpdateModuleParametersWithSigWithSigMessage {
   deadline: number | string;
 }
 
-const createTypedData = (message: UpdateModuleParametersWithSigWithSigMessage, domain: Domain) => {
+const createTypedData = (message: UpdateModuleParametersWithSigMessage, domain: Domain) => {
   const typedData = {
     types: {
       EIP712Domain,
@@ -78,9 +78,9 @@ export async function signUpdateModuleParametersWithSigMessage({
   nonce,
   deadline = ethers.constants.MaxUint256,
 }: SignUpdateModuleParametersWithSigMessageData): Promise<
-  UpdateModuleParametersWithSigWithSigMessage & RSV
+  UpdateModuleParametersWithSigMessage & RSV
 > {
-  const message: UpdateModuleParametersWithSigWithSigMessage = {
+  const message: UpdateModuleParametersWithSigMessage = {
     profileId: toStringOrNumber(profileId),
     pubId: toStringOrNumber(pubId),
     amount: toStringOrNumber(amount),
