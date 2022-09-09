@@ -6,6 +6,7 @@ import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
 import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
 import {Events} from '@aave/lens-protocol/contracts/libraries/Events.sol';
+import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {IFollowModule} from '@aave/lens-protocol/contracts/interfaces/IFollowModule.sol';
 import {ILensHub} from '@aave/lens-protocol/contracts/interfaces/ILensHub.sol';
@@ -34,7 +35,11 @@ struct ModuleConfig {
  * @notice This reference module allows to set a degree of separation `n`, and then allows to comment/mirror only to
  * profiles that are at most at `n` degrees of separation from the author of the root publication.
  */
-contract DegreesOfSeparationReferenceModule is EIP712, ModuleBase, IReferenceModule {
+contract DegreesOfSeparationReferenceModule is
+    EIP712,
+    FollowValidationModuleBase,
+    IReferenceModule
+{
     event ModuleParametersUpdated(
         uint256 indexed profileId,
         uint256 indexed pubId,
@@ -278,33 +283,6 @@ contract DegreesOfSeparationReferenceModule is EIP712, ModuleBase, IReferenceMod
             // Checks the owner of the profile authoring the root publication follows the profile commenting/mirroring.
             // In the previous notation: profileIdPointed --> profileId
             _checkFollowValidity(profileIdPointed, follower);
-        }
-    }
-
-    /**
-     * @notice Validates whether a given user is following a given profile.
-     *
-     * @dev It will revert if the user is not following the profile except the case when the user is the profile owner.
-     *
-     * @param profileId The ID of the profile that should be followed by the given user.
-     * @param user The address of the user that should be following the given profile.
-     */
-    function _checkFollowValidity(uint256 profileId, address user) internal view {
-        DataTypes.ProfileStruct memory followedProfile = ILensHub(HUB).getProfile(profileId);
-        bool isFollowing;
-        if (followedProfile.followModule != address(0)) {
-            isFollowing = IFollowModule(followedProfile.followModule).isFollowing(
-                profileId,
-                user,
-                0
-            );
-        } else {
-            isFollowing =
-                followedProfile.followNFT != address(0) &&
-                IERC721(followedProfile.followNFT).balanceOf(user) != 0;
-        }
-        if (!isFollowing && IERC721(HUB).ownerOf(profileId) != user) {
-            revert Errors.FollowInvalid();
         }
     }
 
