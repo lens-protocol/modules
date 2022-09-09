@@ -4,8 +4,10 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish } from 'ethers';
 import { ethers } from 'hardhat';
 import { DegreesOfSeparationReferenceModule__factory } from '../../../../../typechain';
-import { UPDATE_MODULE_PARAMETERS_WITH_SIG_DOMAIN } from '../../../../modules/collect/updatable-ownable-fee-collect-module.spec';
-import { DEFAULT_DEGREES_OF_SEPARATION } from '../../../../modules/reference/degrees-of-separation-reference-module.spec';
+import {
+  DEFAULT_DEGREES_OF_SEPARATION,
+  UPDATE_MODULE_PARAMETERS_WITH_SIG_DOMAIN,
+} from '../../../../modules/reference/degrees-of-separation-reference-module.spec';
 import { FIRST_PROFILE_ID, FIRST_PUB_ID } from '../../../../__setup.spec';
 import { Domain, EIP712Domain, RSV, signData, toStringOrNumber } from '../../utils';
 
