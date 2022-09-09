@@ -33,6 +33,7 @@ import {
 makeSuiteCleanRoom('Aave Fee Collect Module', function () {
   const DEFAULT_COLLECT_PRICE = parseEther('10');
   const DEFAULT_COLLECT_LIMIT = 3;
+  const DEFAULT_FOLLOWER_ONLY = true;
   const DEFAULT_END_TIMESTAMP = 9999999999; // ends in a very long time
 
   beforeEach(async function () {
@@ -62,13 +63,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
     context('Publication Creation', function () {
       it('user should fail to post with aave fee collect module using zero collect limit', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
           [
             0,
             DEFAULT_COLLECT_PRICE,
             currency.address,
             userAddress,
             REFERRAL_FEE_BPS,
+            DEFAULT_FOLLOWER_ONLY,
             DEFAULT_END_TIMESTAMP,
           ]
         );
@@ -86,13 +88,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       it('user should fail to post with aave fee collect module using unwhitelisted currency', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             userTwoAddress,
             userAddress,
             REFERRAL_FEE_BPS,
+            DEFAULT_FOLLOWER_ONLY,
             DEFAULT_END_TIMESTAMP,
           ]
         );
@@ -110,13 +113,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       it('user should fail to post with aave fee collect module using zero recipient', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             currency.address,
             ZERO_ADDRESS,
             REFERRAL_FEE_BPS,
+            DEFAULT_FOLLOWER_ONLY,
             DEFAULT_END_TIMESTAMP,
           ]
         );
@@ -134,13 +138,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       it('user should fail to post with aave fee collect module using referral fee greater than max BPS', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             currency.address,
             userAddress,
             10001,
+            DEFAULT_FOLLOWER_ONLY,
             DEFAULT_END_TIMESTAMP,
           ]
         );
@@ -158,13 +163,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       it('user should fail to post with aave fee collect module using amount lower than max BPS', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
           [
             DEFAULT_COLLECT_LIMIT,
             9999,
             currency.address,
             userAddress,
             REFERRAL_FEE_BPS,
+            DEFAULT_FOLLOWER_ONLY,
             DEFAULT_END_TIMESTAMP,
           ]
         );
@@ -182,8 +188,16 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       it('user should fail to post with aave fee collect module using end timestamp in the past', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
-          [DEFAULT_COLLECT_LIMIT, 9999, currency.address, userAddress, REFERRAL_FEE_BPS, 1]
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
+          [
+            DEFAULT_COLLECT_LIMIT,
+            9999,
+            currency.address,
+            userAddress,
+            REFERRAL_FEE_BPS,
+            DEFAULT_FOLLOWER_ONLY,
+            1,
+          ]
         );
         await expect(
           lensHub.connect(user).post({
@@ -202,13 +216,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
       beforeEach(async function () {
         const currentTimePlus1Day = BigNumber.from(await getTimestamp()).add(ONE_DAY);
         const collectModuleInitData = abiCoder.encode(
-          ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+          ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             currency.address,
             userAddress,
             REFERRAL_FEE_BPS,
+            DEFAULT_FOLLOWER_ONLY,
             currentTimePlus1Day,
           ]
         );
@@ -390,13 +405,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
   context('Scenarios', function () {
     it('User should post with aave fee collect module as the collect module and data, correct events should be emitted', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currency.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -426,13 +442,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
     it('User should post with aave fee collect module as the collect module and data, fetched publication data should be accurate', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currency.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -457,13 +474,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
     it('User should post with aave fee collect module as the collect module and data, user two follows, then collects and pays fee with currencyTwo, fee distribution is by currencyTwo', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currencyTwo.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -504,13 +522,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
     it('User should post with aave fee collect module as the collect module and data, user two follows, then collects and pays fee, fee distribution is valid', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currency.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -551,13 +570,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
     it('User should post with aave fee collect module as the collect module and data, user two follows, then collects twice, fee distribution is valid', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currency.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -600,13 +620,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
     it('User should post with aave fee collect module as the collect module and data, user two mirrors, follows, then collects from their mirror and pays fee, fee distribution is valid', async function () {
       const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currency.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -677,13 +698,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
     it('User should post with aave fee collect module as the collect module and data, with no referral fee, user two mirrors, follows, then collects from their mirror and pays fee, fee distribution is valid', async function () {
       const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currency.address,
           userAddress,
           0,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -746,13 +768,14 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
     it('User should post with aave fee collect module as the collect module and data, user two mirrors, follows, then collects once from the original, twice from the mirror, and fails to collect a third time from either the mirror or the original', async function () {
       const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currency.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );
@@ -810,15 +833,15 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
     });
 
     it('User should post with aave fee collect module as the collect module but asset not supported by Aave, user two collects, user gets paid in base currency and not aTokens', async function () {
-      const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
-        ['uint256', 'uint256', 'address', 'address', 'uint16', 'uint40'],
+        ['uint256', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint40'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           currencyTwo.address,
           userAddress,
           REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
           DEFAULT_END_TIMESTAMP,
         ]
       );

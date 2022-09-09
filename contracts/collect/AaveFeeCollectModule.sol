@@ -23,8 +23,8 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param collectLimit The maximum number of collects for this publication.
  * @param currentCollects The current number of collects for this publication.
  * @param amount The collecting cost associated with this publication.
- * @param recipient The recipient address associated with this publication.
  * @param currency The currency associated with this publication.
+ * @param recipient The recipient address associated with this publication.
  * @param referralFee The referral fee associated with this publication.
  * @param endTimestamp The end timestamp after which collecting is impossible.
  */
@@ -32,9 +32,10 @@ struct ProfilePublicationData {
     uint256 collectLimit;
     uint256 currentCollects;
     uint256 amount;
-    address recipient;
     address currency;
+    address recipient;
     uint16 referralFee;
+    bool followerOnly;
     uint40 endTimestamp;
 }
 
@@ -85,6 +86,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
      *      address currency: The currency address, must be internally whitelisted.
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
+     *      bool followerOnly: Whether only followers should be able to collect.
      *
      * @return An abi encoded bytes parameter, which is the same as the passed data parameter.
      */
@@ -99,8 +101,9 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
             address currency,
             address recipient,
             uint16 referralFee,
+            bool followerOnly,
             uint40 endTimestamp
-        ) = abi.decode(data, (uint256, uint256, address, address, uint16, uint40));
+        ) = abi.decode(data, (uint256, uint256, address, address, uint16, bool, uint40));
         if (
             collectLimit == 0 ||
             !_currencyWhitelisted(currency) ||
@@ -115,6 +118,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         _dataByPublicationByProfile[profileId][pubId].currency = currency;
         _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
         _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
+        _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
         _dataByPublicationByProfile[profileId][pubId].endTimestamp = endTimestamp;
 
         return data;
@@ -122,7 +126,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
     /**
      * @dev Processes a collect by:
-     *  1. Ensuring the collector is a follower
+     *  1. Ensuring the collector is a follower if followerOnly mode == true
      *  2. Ensuring the current timestamp is less than or equal to the collect end timestamp
      *  2. Ensuring the collect does not pass the collect limit
      *  3. Charging a fee
@@ -134,7 +138,8 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 pubId,
         bytes calldata data
     ) external override onlyHub {
-        _checkFollowValidity(profileId, collector);
+        if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
+            _checkFollowValidity(profileId, collector);
 
         if (
             _dataByPublicationByProfile[profileId][pubId].currentCollects >=
