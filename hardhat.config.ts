@@ -103,6 +103,7 @@ const config: HardhatUserConfig = {
       '@aave/lens-protocol/contracts/core/LensHub.sol',
       '@aave/lens-protocol/contracts/core/modules/ModuleGlobals.sol',
       '@aave/lens-protocol/contracts/core/modules/collect/FreeCollectModule.sol',
+      '@aave/lens-protocol/contracts/core/modules/follow/ProfileFollowModule.sol',
       '@aave/lens-protocol/contracts/core/FollowNFT.sol',
       '@aave/lens-protocol/contracts/core/CollectNFT.sol',
       '@aave/lens-protocol/contracts/mocks/Currency.sol',

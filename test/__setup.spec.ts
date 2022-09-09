@@ -33,6 +33,8 @@ import {
   DegreesOfSeparationReferenceModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
+import { ProfileFollowModule__factory } from '../typechain/factories/ProfileFollowModule__factory';
+import { ProfileFollowModule } from '../typechain/ProfileFollowModule';
 import {
   computeContractAddress,
   ProtocolState,
@@ -83,6 +85,7 @@ export let moduleGlobals: ModuleGlobals;
 export let followNFTImpl: FollowNFT;
 export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
+export let profileFollowModule: ProfileFollowModule;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
@@ -176,6 +179,10 @@ before(async function () {
   freeCollectModule = await new FreeCollectModule__factory(deployer).deploy(lensHub.address);
   await expect(
     lensHub.connect(governance).whitelistCollectModule(freeCollectModule.address, true)
+  ).to.not.be.reverted;
+  profileFollowModule = await new ProfileFollowModule__factory(deployer).deploy(lensHub.address);
+  await expect(
+    lensHub.connect(governance).whitelistFollowModule(profileFollowModule.address, true)
   ).to.not.be.reverted;
 
   // Collect modules
