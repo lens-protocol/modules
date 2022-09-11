@@ -235,7 +235,7 @@ contract DegreesOfSeparationReferenceModule is
 
     /**
      * @dev The data has encoded an array of integers, each integer is a profile ID, the whole array represents a path
-     * of N profiles.
+     * of `n` profiles.
      *
      * Let's define `X --> Y` as `The owner of X is following Y`. Then, being `path[i]` the i-th profile in the path,
      * the following condition must be met for a given path of `n` profiles:
