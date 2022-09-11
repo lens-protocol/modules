@@ -81,7 +81,7 @@ contract DegreesOfSeparationReferenceModule is
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
-    ) external override returns (bytes memory) {
+    ) external override onlyHub returns (bytes memory) {
         (bool commentsRestricted, bool mirrorsRestricted, uint8 degreesOfSeparation) = abi.decode(
             data,
             (bool, bool, uint8)
@@ -114,7 +114,7 @@ contract DegreesOfSeparationReferenceModule is
         uint256 profileIdPointed,
         uint256 pubIdPointed,
         bytes calldata data
-    ) external view override {
+    ) external view override onlyHub {
         if (_moduleConfigByPubByProfile[profileIdPointed][pubIdPointed].commentsRestricted) {
             _validateDegreesOfSeparationRestriction(
                 profileId,
@@ -141,7 +141,7 @@ contract DegreesOfSeparationReferenceModule is
         uint256 profileIdPointed,
         uint256 pubIdPointed,
         bytes calldata data
-    ) external view override {
+    ) external view override onlyHub {
         if (_moduleConfigByPubByProfile[profileIdPointed][pubIdPointed].mirrorsRestricted) {
             _validateDegreesOfSeparationRestriction(
                 profileId,

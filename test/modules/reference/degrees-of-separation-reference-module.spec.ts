@@ -119,6 +119,18 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
   context('DegreesOfSeparationReferenceModule', function () {
     context('Publication creation', function () {
       context('Negatives', function () {
+        it('Initialization should fail if it is not called by the hub', async function () {
+          await expect(
+            degreesOfSeparationReferenceModule
+              .connect(publisher)
+              .initializeReferenceModule(
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                await getDegreesOfSeparationReferenceModuleInitData({})
+              )
+          ).to.be.revertedWith(ERRORS.NOT_HUB);
+        });
+
         it('User should fail to post if using wrong degrees of separation as init value', async function () {
           const invalidDegreesOfSeparation = 5;
           await expect(
@@ -605,6 +617,19 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
       });
 
       context('Negatives', function () {
+        it('Process comment should fail if it is not called by the hub', async function () {
+          await expect(
+            degreesOfSeparationReferenceModule
+              .connect(ownerOfFirstDegreeProfile)
+              .processComment(
+                FIRST_DEGREE_PROFILE,
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                await getDegreesOfSeparationReferenceModuleInitData({})
+              )
+          ).to.be.revertedWith(ERRORS.NOT_HUB);
+        });
+
         it('User should fail to comment when degrees of separation is set as zero', async function () {
           await expect(
             degreesOfSeparationReferenceModule
@@ -815,6 +840,19 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
       });
 
       context('Negatives', function () {
+        it('Process mirror should fail if it is not called by the hub', async function () {
+          await expect(
+            degreesOfSeparationReferenceModule
+              .connect(ownerOfFirstDegreeProfile)
+              .processComment(
+                FIRST_DEGREE_PROFILE,
+                FIRST_PROFILE_ID,
+                FIRST_PUB_ID,
+                await getDegreesOfSeparationReferenceModuleInitData({})
+              )
+          ).to.be.revertedWith(ERRORS.NOT_HUB);
+        });
+
         it('User should fail to mirror when degrees of separation is set as zero', async function () {
           await expect(
             degreesOfSeparationReferenceModule
