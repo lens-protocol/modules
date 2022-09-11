@@ -728,6 +728,19 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
             })
           ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
         });
+
+        it('User should fail to comment if passed as one degree of separation but it is not followed by the author of root publication', async function () {
+          await expect(
+            lensHub.connect(ownerOfSecondDegreeProfile).mirror({
+              profileId: SECOND_DEGREE_PROFILE,
+              profileIdPointed: ROOT_AUTHOR_PROFILE,
+              pubIdPointed: FIRST_PROFILE_ID,
+              referenceModuleData: abiCoder.encode(['uint256[]'], [[]]),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
+        });
       });
 
       context('Scenarios', function () {
@@ -947,6 +960,19 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
                 ['uint256[]'],
                 [[FIRST_DEGREE_PROFILE, SECOND_DEGREE_PROFILE]]
               ),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
+        });
+
+        it('User should fail to mirror if passed as one degree of separation but it is not followed by the author of root publication', async function () {
+          await expect(
+            lensHub.connect(ownerOfSecondDegreeProfile).mirror({
+              profileId: SECOND_DEGREE_PROFILE,
+              profileIdPointed: ROOT_AUTHOR_PROFILE,
+              pubIdPointed: FIRST_PROFILE_ID,
+              referenceModuleData: abiCoder.encode(['uint256[]'], [[]]),
               referenceModule: ethers.constants.AddressZero,
               referenceModuleInitData: [],
             })
