@@ -282,7 +282,7 @@ contract DegreesOfSeparationReferenceModule is
         } else {
             // Checks the owner of the profile authoring the root publication follows the profile commenting/mirroring.
             // In the previous notation: profileIdPointed --> profileId
-            _checkFollowValidity(profileIdPointed, follower);
+            _checkFollowValidity(profileId, follower);
         }
     }
 

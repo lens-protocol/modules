@@ -811,6 +811,22 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
             })
           ).to.not.be.reverted;
         });
+
+        it('User should be able to comment if he the author of root publication', async function () {
+          await expect(
+            lensHub.connect(publisher).comment({
+              profileId: ROOT_AUTHOR_PROFILE,
+              contentURI: MOCK_URI,
+              profileIdPointed: ROOT_AUTHOR_PROFILE,
+              pubIdPointed: FIRST_PROFILE_ID,
+              referenceModuleData: abiCoder.encode(['uint256[]'], [[]]),
+              collectModule: freeCollectModule.address,
+              collectModuleInitData: abiCoder.encode(['bool'], [false]),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+        });
       });
     });
 
@@ -999,6 +1015,19 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
           await expect(
             lensHub.connect(ownerOfFirstDegreeProfile).mirror({
               profileId: FIRST_DEGREE_PROFILE,
+              profileIdPointed: ROOT_AUTHOR_PROFILE,
+              pubIdPointed: FIRST_PROFILE_ID,
+              referenceModuleData: abiCoder.encode(['uint256[]'], [[]]),
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: [],
+            })
+          ).to.not.be.reverted;
+        });
+
+        it('User should be able to mirror if he is the author of root publication', async function () {
+          await expect(
+            lensHub.connect(publisher).mirror({
+              profileId: ROOT_AUTHOR_PROFILE,
               profileIdPointed: ROOT_AUTHOR_PROFILE,
               pubIdPointed: FIRST_PROFILE_ID,
               referenceModuleData: abiCoder.encode(['uint256[]'], [[]]),
