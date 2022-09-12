@@ -22,6 +22,8 @@ import {
   TransparentUpgradeableProxy__factory,
   Currency__factory,
   Currency,
+  NFT__factory,
+  NFT,
   ModuleGlobals,
   AuctionCollectModule,
   AuctionCollectModule__factory,
@@ -29,6 +31,8 @@ import {
   FreeCollectModule,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
+  TokenGatedReferenceModule__factory,
+  TokenGatedReferenceModule,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import {
@@ -73,6 +77,7 @@ export let collector: SignerWithAddress;
 export let lensHubImpl: LensHub;
 export let lensHub: LensHub;
 export let currency: Currency;
+export let nft: NFT;
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
 export let hubLibs: LensHubLibraryAddresses;
@@ -84,6 +89,8 @@ export let freeCollectModule: FreeCollectModule;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
+
+export let tokenGatedReferenceModule: TokenGatedReferenceModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -163,6 +170,9 @@ before(async function () {
   // Currency
   currency = await new Currency__factory(deployer).deploy();
 
+  // NFT
+  nft = await new NFT__factory(deployer).deploy();
+
   // Currency whitelisting
   await expect(
     moduleGlobals.connect(governance).whitelistCurrency(currency.address, true)
@@ -190,6 +200,14 @@ before(async function () {
     lensHub
       .connect(governance)
       .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  // Reference modules
+  tokenGatedReferenceModule = await new TokenGatedReferenceModule__factory(deployer).deploy(
+    lensHub.address
+  );
+  await expect(
+    lensHub.connect(governance).whitelistReferenceModule(tokenGatedReferenceModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
