@@ -63,7 +63,6 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         address moduleGlobals,
         IPoolAddressesProvider poolAddressesProvider
     ) ModuleBase(hub) FeeModuleBase(moduleGlobals) {
-
         POOL_ADDRESSES_PROVIDER = poolAddressesProvider;
 
         // Retrieve Aave pool address on module deployment
@@ -146,9 +145,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
             _dataByPublicationByProfile[profileId][pubId].collectLimit
         ) {
             revert Errors.MintLimitExceeded();
-        } else if (
-            block.timestamp > _dataByPublicationByProfile[profileId][pubId].endTimestamp 
-        ) {
+        } else if (block.timestamp > _dataByPublicationByProfile[profileId][pubId].endTimestamp) {
             revert Errors.CollectExpired();
         } else {
             ++_dataByPublicationByProfile[profileId][pubId].currentCollects;
@@ -245,7 +242,12 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
             address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
 
-            _transferFromAndDepositToAaveIfApplicable(currency, collector, referralRecipient, referralAmount);
+            _transferFromAndDepositToAaveIfApplicable(
+                currency,
+                collector,
+                referralRecipient,
+                referralAmount
+            );
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
