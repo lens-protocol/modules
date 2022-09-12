@@ -146,7 +146,7 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
     });
 
     context('Negatives', function () {
-      it('User should fail to reference if they dont own enough tokens', async function () {
+      it('User should fail to mirror if they dont hold enough gating tokens', async function () {
         expect(await currency.balanceOf(user.address)).to.be.lt(minThreshold);
 
         await expect(
@@ -160,12 +160,28 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
           })
         ).to.be.revertedWith(ERRORS.NOT_ENOUGH_BALANCE);
       });
+
+      it('User should fail to comment if they dont hold enough gating tokens', async function () {
+        expect(await currency.balanceOf(user.address)).to.be.lt(minThreshold);
+        await expect(
+          lensHub.connect(user).comment({
+            profileId: SECOND_PROFILE_ID,
+            contentURI: MOCK_URI,
+            profileIdPointed: FIRST_PROFILE_ID,
+            pubIdPointed: FIRST_PUB_ID,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
+            referenceModuleData: '0x',
+            referenceModule: tokenGatedReferenceModule.address,
+            referenceModuleInitData: referenceModuleInitData,
+          })
+        ).to.be.revertedWith(ERRORS.NOT_ENOUGH_BALANCE);
+      });
     });
 
     context('Scenarios', function () {
-      it('Mirroring should work if mirrorer holds enough balance of gated tokens', async function () {
+      it('Mirroring should work if mirrorer holds enough gating tokens', async function () {
         await currency.mint(user.address, minThreshold);
-
         expect(await currency.balanceOf(user.address)).to.be.gte(minThreshold);
 
         await expect(
@@ -173,6 +189,25 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
             profileId: SECOND_PROFILE_ID,
             profileIdPointed: FIRST_PROFILE_ID,
             pubIdPointed: FIRST_PUB_ID,
+            referenceModuleData: '0x',
+            referenceModule: tokenGatedReferenceModule.address,
+            referenceModuleInitData: referenceModuleInitData,
+          })
+        ).to.not.be.reverted;
+      });
+
+      it('Commenting should work if commenter holds enough gating tokens', async function () {
+        await currency.mint(user.address, minThreshold);
+        expect(await currency.balanceOf(user.address)).to.be.gte(minThreshold);
+
+        await expect(
+          lensHub.connect(user).comment({
+            profileId: SECOND_PROFILE_ID,
+            contentURI: MOCK_URI,
+            profileIdPointed: FIRST_PROFILE_ID,
+            pubIdPointed: FIRST_PUB_ID,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
             referenceModuleData: '0x',
             referenceModule: tokenGatedReferenceModule.address,
             referenceModuleInitData: referenceModuleInitData,
@@ -207,7 +242,7 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
     });
 
     context('Negatives', function () {
-      it('User should fail to reference if they dont own enough tokens', async function () {
+      it('User should fail to mirror if they dont hold enough gating tokens', async function () {
         expect(await nft.balanceOf(user.address)).to.be.lt(minThreshold);
 
         await expect(
@@ -221,10 +256,28 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
           })
         ).to.be.revertedWith(ERRORS.NOT_ENOUGH_BALANCE);
       });
+
+      it('User should fail to comment if they dont hold enough gating tokens', async function () {
+        expect(await nft.balanceOf(user.address)).to.be.lt(minThreshold);
+
+        await expect(
+          lensHub.connect(user).comment({
+            profileId: SECOND_PROFILE_ID,
+            contentURI: MOCK_URI,
+            profileIdPointed: FIRST_PROFILE_ID,
+            pubIdPointed: FIRST_PUB_ID,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
+            referenceModuleData: '0x',
+            referenceModule: tokenGatedReferenceModule.address,
+            referenceModuleInitData: referenceModuleInitData,
+          })
+        ).to.be.revertedWith(ERRORS.NOT_ENOUGH_BALANCE);
+      });
     });
 
     context('Scenarios', function () {
-      it('Mirroring should work if mirrorer holds enough balance of gated tokens', async function () {
+      it('Mirroring should work if mirrorer holds enough gating tokens', async function () {
         await nft.mint(user.address, 1);
 
         expect(await nft.balanceOf(user.address)).to.be.gte(minThreshold);
@@ -234,6 +287,26 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
             profileId: SECOND_PROFILE_ID,
             profileIdPointed: FIRST_PROFILE_ID,
             pubIdPointed: FIRST_PUB_ID,
+            referenceModuleData: '0x',
+            referenceModule: tokenGatedReferenceModule.address,
+            referenceModuleInitData: referenceModuleInitData,
+          })
+        ).to.not.be.reverted;
+      });
+
+      it('Commenting should work if commenter holds enough gating tokens', async function () {
+        await nft.mint(user.address, 1);
+
+        expect(await nft.balanceOf(user.address)).to.be.gte(minThreshold);
+
+        await expect(
+          lensHub.connect(user).comment({
+            profileId: SECOND_PROFILE_ID,
+            contentURI: MOCK_URI,
+            profileIdPointed: FIRST_PROFILE_ID,
+            pubIdPointed: FIRST_PUB_ID,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
             referenceModuleData: '0x',
             referenceModule: tokenGatedReferenceModule.address,
             referenceModuleInitData: referenceModuleInitData,
