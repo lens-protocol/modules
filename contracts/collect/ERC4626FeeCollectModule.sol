@@ -8,10 +8,7 @@ import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectM
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 
-// import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-// import {IPoolDataProvider} from '../interfaces/IPoolDataProvider.sol';
-// import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
-
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -22,6 +19,7 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param collectLimit The maximum number of collects for this publication.
  * @param currentCollects The current number of collects for this publication.
  * @param amount The collecting cost associated with this publication.
+ * @param vault The ERC4626 compatible vault in which fees are deposited.
  * @param currency The currency associated with this publication.
  * @param recipient The recipient address associated with this publication.
  * @param referralFee The referral fee associated with this publication.
@@ -31,6 +29,7 @@ struct ProfilePublicationData {
     uint256 collectLimit;
     uint256 currentCollects;
     uint256 amount;
+    address vault; // ERC4626 Vault in which fees are deposited
     address currency;
     address recipient;
     uint16 referralFee;
@@ -39,40 +38,20 @@ struct ProfilePublicationData {
 }
 
 /**
- * @title AaveFeeCollectModule
+ * @title ERC4626FeeCollectModule
  * @author Lens Protocol
  *
- * @notice Extend the LimitedFeeCollectModule to deposit all received fees into the Aave Polygon Market (if applicable for the asset) and send the resulting aTokens to the beneficiary.
+ * @notice Extend the LimitedFeeCollectModule to deposit all received fees into an ERC-4626 compatible vault and send the resulting shares to the beneficiary.
  */
-contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
+contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
-
-    // Pool Address Provider on Polygon for Aave v3 - set in constructor
-    // IPoolAddressesProvider public immutable POOL_ADDRESSES_PROVIDER;
-
-    address public aavePool;
 
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
 
     address[] public reserves;
 
-    constructor(address hub, address moduleGlobals)
-        // IPoolAddressesProvider poolAddressesProvider
-        ModuleBase(hub)
-        FeeModuleBase(moduleGlobals)
-    {
-        // POOL_ADDRESSES_PROVIDER = poolAddressesProvider;
-        // Retrieve Aave pool address on module deployment
-        // aavePool = POOL_ADDRESSES_PROVIDER.getPool();
-    }
-
-    /**
-     * @dev Anyone can call this function to update Aave v3 addresses.
-     */
-    // function updateAavePoolAddress() public {
-    //     aavePool = POOL_ADDRESSES_PROVIDER.getPool();
-    // }
+    constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
@@ -80,6 +59,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
      * @param data The arbitrary data parameter, decoded into:
      *      uint256 collectLimit: The maximum amount of collects.
      *      uint256 amount: The currency total amount to levy.
+     *      address vault: The ERC4626 compatible vault in which fees are deposited.
      *      address currency: The currency address, must be internally whitelisted.
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
@@ -95,15 +75,17 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         (
             uint256 collectLimit,
             uint256 amount,
+            address vault,
             address currency,
             address recipient,
             uint16 referralFee,
             bool followerOnly,
             uint40 endTimestamp
-        ) = abi.decode(data, (uint256, uint256, address, address, uint16, bool, uint40));
+        ) = abi.decode(data, (uint256, uint256, address, address, address, uint16, bool, uint40));
         if (
             collectLimit == 0 ||
             !_currencyWhitelisted(currency) ||
+            vault == address(0) || // TODO should vaults also have a whitelist like currencies?
             recipient == address(0) ||
             referralFee > BPS_MAX ||
             amount < BPS_MAX ||
@@ -112,6 +94,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
+        _dataByPublicationByProfile[profileId][pubId].vault = vault;
         _dataByPublicationByProfile[profileId][pubId].currency = currency;
         _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
         _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
@@ -182,30 +165,33 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
+        address vault = _dataByPublicationByProfile[profileId][pubId].vault;
+
         (address treasury, uint16 treasuryFee) = _treasuryData();
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
         uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
         uint256 adjustedAmount = amount - treasuryAmount;
 
-        _transferFromAndDepositToAaveIfApplicable(currency, collector, recipient, adjustedAmount);
+        _transferFromAndDepositInVaultIfApplicable(currency, vault, collector, recipient, adjustedAmount);
         IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
     }
 
-    function _transferFromAndDepositToAaveIfApplicable(
+    function _transferFromAndDepositInVaultIfApplicable(
         address currency,
+        address vault, 
         address from,
         address beneficiary,
         uint256 amount
     ) internal {
         // First, transfer funds to this contract
         IERC20(currency).safeTransferFrom(from, address(this), amount);
-        IERC20(currency).approve(aavePool, amount);
+        IERC20(currency).approve(vault, amount);
 
         // Then, attempt to supply funds in Aave v3, sending aTokens to beneficiary
-        // try IPool(aavePool).supply(currency, amount, beneficiary, 0) {} catch {
-        //     // If supply() above fails, send funds directly to beneficiary
-        //     IERC20(currency).safeTransfer(beneficiary, amount);
-        // }
+        try IERC4626(vault).deposit(amount, beneficiary) {} catch {
+            // If supply() above fails, send funds directly to beneficiary
+            IERC20(currency).safeTransfer(beneficiary, amount);
+        }
     }
 
     function _processCollectWithReferral(
@@ -218,6 +204,8 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 amount = _dataByPublicationByProfile[profileId][pubId].amount;
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
+
+        address vault = _dataByPublicationByProfile[profileId][pubId].vault;
 
         uint256 referralFee = _dataByPublicationByProfile[profileId][pubId].referralFee;
         address treasury;
@@ -240,8 +228,9 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
             address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
 
-            _transferFromAndDepositToAaveIfApplicable(
+            _transferFromAndDepositInVaultIfApplicable(
                 currency,
+                vault,
                 collector,
                 referralRecipient,
                 referralAmount
@@ -249,7 +238,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
-        _transferFromAndDepositToAaveIfApplicable(currency, collector, recipient, adjustedAmount);
+        _transferFromAndDepositInVaultIfApplicable(currency, vault, collector, recipient, adjustedAmount);
 
         IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
     }
