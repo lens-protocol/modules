@@ -86,6 +86,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
      *      bool followerOnly: Whether only followers should be able to collect.
+     *      uint40 endTimestamp: The end timestamp after which collecting is impossible.
      *
      * @return An abi encoded bytes parameter, which is the same as the passed data parameter.
      */
