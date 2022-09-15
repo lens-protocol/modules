@@ -49,7 +49,7 @@ contract DegreesOfSeparationReferenceModule is
     );
 
     error InvalidDegreesOfSeparation();
-    error OpereationDisabled();
+    error OperationDisabled();
     error ProfilePathExceedsDegreesOfSeparation();
     error PublicationNotSetUp();
 
@@ -255,7 +255,7 @@ contract DegreesOfSeparationReferenceModule is
         uint256[] memory profilePath
     ) internal view {
         if (degreesOfSeparation == 0) {
-            revert OpereationDisabled();
+            revert OperationDisabled();
         }
         if (profilePath.length > degreesOfSeparation - 1) {
             revert ProfilePathExceedsDegreesOfSeparation();

@@ -12,7 +12,7 @@ export const ERRORS = {
 
   // DegreesOfSeparationReferenceModule
   INVALID_DEGREES_OF_SEPARATION: 'InvalidDegreesOfSeparation()',
-  OPEREATION_DISABLED: 'OpereationDisabled()',
+  OPERATION_DISABLED: 'OperationDisabled()',
   PROFILE_PATH_EXCEEDS_DEGREES_OF_SEPARATION: 'ProfilePathExceedsDegreesOfSeparation()',
   PUBLICATION_NOT_SET_UP: 'PublicationNotSetUp()',
 

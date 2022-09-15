@@ -648,7 +648,7 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
               referenceModule: ethers.constants.AddressZero,
               referenceModuleInitData: [],
             })
-          ).to.be.revertedWith(ERRORS.OPEREATION_DISABLED);
+          ).to.be.revertedWith(ERRORS.OPERATION_DISABLED);
         });
 
         it('User should fail to comment when passing a profile path which length exceeds the configured degrees of separation', async function () {
@@ -897,7 +897,7 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
               referenceModule: ethers.constants.AddressZero,
               referenceModuleInitData: [],
             })
-          ).to.be.revertedWith(ERRORS.OPEREATION_DISABLED);
+          ).to.be.revertedWith(ERRORS.OPERATION_DISABLED);
         });
 
         it('User should fail to mirror when passing a profile path which length exceeds the configured degrees of separation', async function () {
