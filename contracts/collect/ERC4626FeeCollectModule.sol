@@ -205,8 +205,6 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
-        address vault = _dataByPublicationByProfile[profileId][pubId].vault;
-
         uint256 referralFee = _dataByPublicationByProfile[profileId][pubId].referralFee;
         address treasury;
         uint256 treasuryAmount;
@@ -230,7 +228,7 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
 
             _transferFromAndDepositInVaultIfApplicable(
                 currency,
-                vault,
+                _dataByPublicationByProfile[profileId][pubId].vault,
                 collector,
                 referralRecipient,
                 referralAmount
@@ -238,7 +236,7 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
-        _transferFromAndDepositInVaultIfApplicable(currency, vault, collector, recipient, adjustedAmount);
+        _transferFromAndDepositInVaultIfApplicable(currency, _dataByPublicationByProfile[profileId][pubId].vault, collector, recipient, adjustedAmount);
 
         IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
     }
