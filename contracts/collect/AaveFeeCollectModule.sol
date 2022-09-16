@@ -105,12 +105,11 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
             uint40 endTimestamp
         ) = abi.decode(data, (uint256, uint256, address, address, uint16, bool, uint40));
         if (
-            collectLimit == 0 ||
             !_currencyWhitelisted(currency) ||
             recipient == address(0) ||
             referralFee > BPS_MAX ||
             amount < BPS_MAX ||
-            endTimestamp < block.timestamp
+            (endTimestamp < block.timestamp && endTimestamp > 0)
         ) revert Errors.InitParamsInvalid();
 
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
