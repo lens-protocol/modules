@@ -71,8 +71,8 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
     error InsufficientBidAmount();
 
     event AuctionCreated(
-        uint256 profileId,
-        uint256 pubId,
+        uint256 indexed profileId,
+        uint256 indexed pubId,
         uint64 availableSinceTimestamp,
         uint32 duration,
         uint32 minTimeAfterBid,
@@ -84,8 +84,8 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         bool onlyFollowers
     );
     event BidPlaced(
-        uint256 profileId,
-        uint256 pubId,
+        uint256 indexed profileId,
+        uint256 indexed pubId,
         uint256 referrerProfileId,
         uint256 amount,
         uint256 followNftTokenId,
@@ -93,7 +93,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
         uint256 endTimestamp,
         uint256 timestamp
     );
-    event FeeProcessed(uint256 profileId, uint256 pubId, uint256 timestamp);
+    event FeeProcessed(uint256 indexed profileId, uint256 indexed pubId, uint256 timestamp);
 
     mapping(address => uint256) public nonces;
 

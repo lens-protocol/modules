@@ -35,6 +35,8 @@ import {
   MockPoolAddressesProvider__factory,
   AaveFeeCollectModule,
   AaveFeeCollectModule__factory,
+  UpdatableOwnableFeeCollectModule,
+  UpdatableOwnableFeeCollectModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import {
@@ -63,6 +65,7 @@ export const MOCK_PROFILE_URI =
   'https://ipfs.io/ipfs/Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu';
 export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
+export const DEFAULT_AMOUNT = parseEther('2');
 
 export let chainId: number;
 export let accounts: SignerWithAddress[];
@@ -95,6 +98,7 @@ export let freeCollectModule: FreeCollectModule;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let aaveFeeCollectModule: AaveFeeCollectModule;
+export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -211,8 +215,18 @@ beforeEach(async function () {
     lensHub.connect(governance).whitelistCollectModule(auctionCollectModule.address, true)
   ).to.not.be.reverted;
 
+
   await expect(
     lensHub.connect(governance).whitelistCollectModule(aaveFeeCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  updatableOwnableFeeCollectModule = await new UpdatableOwnableFeeCollectModule__factory(
+    deployer
+  ).deploy(lensHub.address, moduleGlobals.address);
+  await expect(
+    lensHub
+      .connect(governance)
+      .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol

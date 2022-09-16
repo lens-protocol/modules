@@ -3,21 +3,10 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish } from 'ethers';
 import { ethers } from 'hardhat';
-import {
-  BID_WITH_SIG_DOMAIN,
-  DEFAULT_BID_AMOUNT,
-} from '../../../../modules/collect/auction-collect-module.spec';
-import { FIRST_FOLLOW_NFT_ID, FIRST_PROFILE_ID, FIRST_PUB_ID } from '../../../../__setup.spec';
-import {
-  call,
-  Domain,
-  EIP712Domain,
-  NONCES_FN,
-  RSV,
-  signData,
-  toStringOrNumber,
-  zeros,
-} from '../../utils';
+import { AuctionCollectModule__factory } from '../../../../../typechain';
+import { BID_WITH_SIG_DOMAIN } from '../../../../modules/collect/auction-collect-module.spec';
+import { DEFAULT_AMOUNT, FIRST_PROFILE_ID, FIRST_PUB_ID } from '../../../../__setup.spec';
+import { Domain, EIP712Domain, RSV, signData, toStringOrNumber } from '../../utils';
 
 interface BidWithSigMessage {
   profileId: number | string;
@@ -56,8 +45,8 @@ interface SignBidWithSigMessageData {
   pubId?: BigNumberish;
   amount?: BigNumberish;
   followNftTokenId?: BigNumberish;
-  deadline?: BigNumberish;
   nonce?: BigNumberish;
+  deadline?: BigNumberish;
 }
 
 export async function signBidWithSigMessage({
@@ -65,23 +54,22 @@ export async function signBidWithSigMessage({
   domain = BID_WITH_SIG_DOMAIN,
   profileId = FIRST_PROFILE_ID,
   pubId = FIRST_PUB_ID,
-  amount = DEFAULT_BID_AMOUNT,
+  amount = DEFAULT_AMOUNT,
   followNftTokenId = 0,
-  deadline = ethers.constants.MaxUint256,
   nonce,
+  deadline = ethers.constants.MaxUint256,
 }: SignBidWithSigMessageData): Promise<BidWithSigMessage & RSV> {
   const message: BidWithSigMessage = {
     profileId: toStringOrNumber(profileId),
     pubId: toStringOrNumber(pubId),
     amount: toStringOrNumber(amount),
     followNftTokenId: toStringOrNumber(followNftTokenId),
-    nonce:
-      (nonce ? toStringOrNumber(nonce) : nonce) ||
-      (await call(
-        signer.provider,
-        domain.verifyingContract,
-        `${NONCES_FN}${zeros(24)}${signer.address.substr(2)}`
-      )),
+    nonce: toStringOrNumber(
+      nonce ||
+        (await new AuctionCollectModule__factory(signer)
+          .attach(domain.verifyingContract)
+          .nonces(signer.address))
+    ),
     deadline: toStringOrNumber(deadline),
   };
 
