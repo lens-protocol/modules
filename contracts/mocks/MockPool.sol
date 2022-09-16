@@ -14,8 +14,7 @@ contract MockPool {
 
     error UnsupportedTokenSupplied();
 
-    constructor(address _aTokenAddress, address _unsupportedToken)
-    {
+    constructor(address _aTokenAddress, address _unsupportedToken) {
         aTokenAddress = _aTokenAddress;
         unsupportedToken = _unsupportedToken;
     }
@@ -26,8 +25,7 @@ contract MockPool {
         address onBehalfOf,
         uint16 referralCode
     ) external {
-
-        if(asset == unsupportedToken) revert UnsupportedTokenSupplied();
+        if (asset == unsupportedToken) revert UnsupportedTokenSupplied();
 
         IERC20(asset).transferFrom(msg.sender, aTokenAddress, amount);
 
