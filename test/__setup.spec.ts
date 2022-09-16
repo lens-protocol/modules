@@ -72,15 +72,10 @@ export let proxyAdmin: SignerWithAddress;
 export let treasury: SignerWithAddress;
 export let user: SignerWithAddress;
 export let anotherUser: SignerWithAddress;
-export let anotherUser: SignerWithAddress;
 export let thirdUser: SignerWithAddress;
 export let publisher: SignerWithAddress;
 export let feeRecipient: SignerWithAddress;
 export let collector: SignerWithAddress;
-
-export let userAddress: string;
-export let anotherUserAddress: string;
-export let treasuryAddress: string;
 
 export let lensHubImpl: LensHub;
 export let lensHub: LensHub;
@@ -127,10 +122,6 @@ beforeEach(async function () {
   publisher = accounts[7];
   feeRecipient = accounts[8];
   anotherUser = accounts[9];
-
-  userAddress = await user.getAddress();
-  anotherUserAddress = await anotherUser.getAddress();
-  treasuryAddress = await treasury.getAddress();
 
   // Deployment
   moduleGlobals = await new ModuleGlobals__factory(deployer).deploy(
