@@ -14,10 +14,6 @@ export function toStringOrNumber(bigNumberish: BigNumberish): string | number {
   }
 }
 
-export const NONCES_FN = '0x7ecebe00';
-
-export const zeros = (numZeros: number) => ''.padEnd(numZeros, '0');
-
 export interface Domain {
   name: string;
   version: string;
@@ -126,17 +122,10 @@ export const signData = async (provider: any, fromAddress: string, typeData: any
 };
 
 let chainIdOverride: null | number = null;
+
 export const setChainIdOverride = (id: number) => {
   chainIdOverride = id;
 };
+
 export const getChainId = async (provider: any): Promise<any> =>
   chainIdOverride || send(provider, 'eth_chainId');
-
-export const call = (provider: any, to: string, data: string) =>
-  send(provider, 'eth_call', [
-    {
-      to,
-      data,
-    },
-    'latest',
-  ]);
