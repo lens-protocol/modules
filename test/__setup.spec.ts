@@ -121,7 +121,6 @@ beforeEach(async function () {
   thirdUser = accounts[6];
   publisher = accounts[7];
   feeRecipient = accounts[8];
-  anotherUser = accounts[9];
 
   // Deployment
   moduleGlobals = await new ModuleGlobals__factory(deployer).deploy(
