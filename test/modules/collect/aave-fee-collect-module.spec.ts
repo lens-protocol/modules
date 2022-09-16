@@ -26,8 +26,8 @@ import {
   TREASURY_FEE_BPS,
   user,
   userAddress,
-  userTwo,
-  userTwoAddress,
+  anotherUser,
+  anotherUserAddress,
 } from '../../__setup.spec';
 
 makeSuiteCleanRoom('Aave Fee Collect Module', function () {
@@ -92,7 +92,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
-            userTwoAddress,
+            anotherUserAddress,
             userAddress,
             REFERRAL_FEE_BPS,
             DEFAULT_FOLLOWER_ONLY,
@@ -239,17 +239,17 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         ).to.not.be.reverted;
       });
 
-      it('UserTwo should fail to collect without following if followerOnly is true', async function () {
+      it('Second User should fail to collect without following if followerOnly is true', async function () {
         const data = abiCoder.encode(
           ['address', 'uint256'],
           [currency.address, DEFAULT_COLLECT_PRICE]
         );
         await expect(
-          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
+          lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
         ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
       });
 
-      it('UserTwo should be able to collect without following if followerOnly is false', async function () {
+      it('Second User should be able to collect without following if followerOnly is false', async function () {
         // Post new publication with followerOnly == false
         const currentTimePlus1Day = BigNumber.from(await getTimestamp()).add(ONE_DAY);
         const collectModuleInitDataTwo = abiCoder.encode(
@@ -279,55 +279,63 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           ['address', 'uint256'],
           [currency.address, DEFAULT_COLLECT_PRICE]
         );
-        await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+        await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
         await expect(
-          currency.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+          currency.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
         ).to.not.be.reverted;
         await expect(
           // PubID = 2 here to test the followerOnly = false pub
-          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 2, dataTwo)
+          lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 2, dataTwo)
         ).to.not.be.reverted;
       });
 
-      it('UserTwo should fail to collect passing a different expected price in data', async function () {
-        await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      it('Second User should fail to collect passing a different expected price in data', async function () {
+        await expect(
+          lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+        ).to.not.be.reverted;
 
         const data = abiCoder.encode(
           ['address', 'uint256'],
           [currency.address, DEFAULT_COLLECT_PRICE.div(2)]
         );
         await expect(
-          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
+          lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
         ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
       });
 
-      it('UserTwo should fail to collect passing a different expected currency in data', async function () {
-        await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      it('Second User should fail to collect passing a different expected currency in data', async function () {
+        await expect(
+          lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+        ).to.not.be.reverted;
 
         const data = abiCoder.encode(['address', 'uint256'], [userAddress, DEFAULT_COLLECT_PRICE]);
         await expect(
-          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
+          lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
         ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
       });
 
-      it('UserTwo should fail to collect without first approving module with currency', async function () {
-        await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      it('Second User should fail to collect without first approving module with currency', async function () {
+        await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
 
-        await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+        await expect(
+          lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+        ).to.not.be.reverted;
 
         const data = abiCoder.encode(
           ['address', 'uint256'],
           [currency.address, DEFAULT_COLLECT_PRICE]
         );
         await expect(
-          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
+          lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
         ).to.be.revertedWith(ERRORS.ERC20_INSUFFICIENT_ALLOWANCE);
       });
 
-      it('UserTwo should fail to collect after publication has expired', async function () {
-        await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      it('Second User should fail to collect after publication has expired', async function () {
+        await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
 
-        await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+        await expect(
+          lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+        ).to.not.be.reverted;
 
         const data = abiCoder.encode(
           ['address', 'uint256'],
@@ -340,15 +348,15 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         );
 
         await expect(
-          lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)
+          lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
         ).to.be.revertedWith(ERRORS.COLLECT_EXPIRED);
       });
 
-      it('UserTwo should mirror the original post, fail to collect from their mirror without following the original profile', async function () {
+      it('Second User should mirror the original post, fail to collect from their mirror without following the original profile', async function () {
         const secondProfileId = FIRST_PROFILE_ID + 1;
         await expect(
           lensHub.createProfile({
-            to: userTwoAddress,
+            to: anotherUserAddress,
             handle: 'usertwo',
             imageURI: MOCK_PROFILE_URI,
             followModule: ZERO_ADDRESS,
@@ -358,7 +366,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         ).to.not.be.reverted;
 
         await expect(
-          lensHub.connect(userTwo).mirror({
+          lensHub.connect(anotherUser).mirror({
             profileId: secondProfileId,
             profileIdPointed: FIRST_PROFILE_ID,
             pubIdPointed: 1,
@@ -372,16 +380,16 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           ['address', 'uint256'],
           [currency.address, DEFAULT_COLLECT_PRICE]
         );
-        await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.be.revertedWith(
-          ERRORS.FOLLOW_INVALID
-        );
+        await expect(
+          lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+        ).to.be.revertedWith(ERRORS.FOLLOW_INVALID);
       });
 
-      it('UserTwo should mirror the original post, fail to collect from their mirror passing a different expected price in data', async function () {
+      it('Second User should mirror the original post, fail to collect from their mirror passing a different expected price in data', async function () {
         const secondProfileId = FIRST_PROFILE_ID + 1;
         await expect(
           lensHub.createProfile({
-            to: userTwoAddress,
+            to: anotherUserAddress,
             handle: 'usertwo',
             imageURI: MOCK_PROFILE_URI,
             followModule: ZERO_ADDRESS,
@@ -390,7 +398,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           })
         ).to.not.be.reverted;
         await expect(
-          lensHub.connect(userTwo).mirror({
+          lensHub.connect(anotherUser).mirror({
             profileId: secondProfileId,
             profileIdPointed: FIRST_PROFILE_ID,
             pubIdPointed: 1,
@@ -400,21 +408,23 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           })
         ).to.not.be.reverted;
 
-        await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+        await expect(
+          lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+        ).to.not.be.reverted;
         const data = abiCoder.encode(
           ['address', 'uint256'],
           [currency.address, DEFAULT_COLLECT_PRICE.div(2)]
         );
-        await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.be.revertedWith(
-          ERRORS.MODULE_DATA_MISMATCH
-        );
+        await expect(
+          lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+        ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
       });
 
-      it('UserTwo should mirror the original post, fail to collect from their mirror passing a different expected currency in data', async function () {
+      it('Second User should mirror the original post, fail to collect from their mirror passing a different expected currency in data', async function () {
         const secondProfileId = FIRST_PROFILE_ID + 1;
         await expect(
           lensHub.createProfile({
-            to: userTwoAddress,
+            to: anotherUserAddress,
             handle: 'usertwo',
             imageURI: MOCK_PROFILE_URI,
             followModule: ZERO_ADDRESS,
@@ -423,7 +433,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           })
         ).to.not.be.reverted;
         await expect(
-          lensHub.connect(userTwo).mirror({
+          lensHub.connect(anotherUser).mirror({
             profileId: secondProfileId,
             profileIdPointed: FIRST_PROFILE_ID,
             pubIdPointed: 1,
@@ -433,11 +443,13 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
           })
         ).to.not.be.reverted;
 
-        await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+        await expect(
+          lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+        ).to.not.be.reverted;
         const data = abiCoder.encode(['address', 'uint256'], [userAddress, DEFAULT_COLLECT_PRICE]);
-        await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.be.revertedWith(
-          ERRORS.MODULE_DATA_MISMATCH
-        );
+        await expect(
+          lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+        ).to.be.revertedWith(ERRORS.MODULE_DATA_MISMATCH);
       });
     });
   });
@@ -536,16 +548,20 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      await expect(currencyTwo.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(currencyTwo.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
-        currencyTwo.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        currencyTwo.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
       ).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
       const data = abiCoder.encode(
         ['address', 'uint256'],
         [currencyTwo.address, DEFAULT_COLLECT_PRICE]
       );
-      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.not.be.reverted;
 
       const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .mul(TREASURY_FEE_BPS)
@@ -553,7 +569,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
       const expectedRecipientAmount =
         BigNumber.from(DEFAULT_COLLECT_PRICE).sub(expectedTreasuryAmount);
 
-      expect(await currencyTwo.balanceOf(userTwoAddress)).to.eq(
+      expect(await currencyTwo.balanceOf(anotherUserAddress)).to.eq(
         BigNumber.from(MAX_UINT256).sub(DEFAULT_COLLECT_PRICE)
       );
       expect(await currencyTwo.balanceOf(userAddress)).to.eq(expectedRecipientAmount);
@@ -584,16 +600,20 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
-        currency.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        currency.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
       ).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
       const data = abiCoder.encode(
         ['address', 'uint256'],
         [currency.address, DEFAULT_COLLECT_PRICE]
       );
-      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.not.be.reverted;
 
       const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .mul(TREASURY_FEE_BPS)
@@ -601,7 +621,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
       const expectedRecipientAmount =
         BigNumber.from(DEFAULT_COLLECT_PRICE).sub(expectedTreasuryAmount);
 
-      expect(await currency.balanceOf(userTwoAddress)).to.eq(
+      expect(await currency.balanceOf(anotherUserAddress)).to.eq(
         BigNumber.from(MAX_UINT256).sub(DEFAULT_COLLECT_PRICE)
       );
       expect(await aCurrency.balanceOf(userAddress)).to.eq(expectedRecipientAmount);
@@ -632,17 +652,23 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
-        currency.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        currency.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
       ).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
       const data = abiCoder.encode(
         ['address', 'uint256'],
         [currency.address, DEFAULT_COLLECT_PRICE]
       );
-      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.not.be.reverted;
 
       const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .mul(TREASURY_FEE_BPS)
@@ -650,7 +676,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
       const expectedRecipientAmount =
         BigNumber.from(DEFAULT_COLLECT_PRICE).sub(expectedTreasuryAmount);
 
-      expect(await currency.balanceOf(userTwoAddress)).to.eq(
+      expect(await currency.balanceOf(anotherUserAddress)).to.eq(
         BigNumber.from(MAX_UINT256).sub(BigNumber.from(DEFAULT_COLLECT_PRICE).mul(2))
       );
       expect(await aCurrency.balanceOf(userAddress)).to.eq(expectedRecipientAmount.mul(2));
@@ -685,7 +711,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       await expect(
         lensHub.createProfile({
-          to: userTwoAddress,
+          to: anotherUserAddress,
           handle: 'usertwo',
           imageURI: MOCK_PROFILE_URI,
           followModule: ZERO_ADDRESS,
@@ -695,7 +721,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
       ).to.not.be.reverted;
 
       await expect(
-        lensHub.connect(userTwo).mirror({
+        lensHub.connect(anotherUser).mirror({
           profileId: secondProfileId,
           profileIdPointed: FIRST_PROFILE_ID,
           pubIdPointed: 1,
@@ -705,16 +731,20 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
-        currency.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        currency.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
       ).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
       const data = abiCoder.encode(
         ['address', 'uint256'],
         [currency.address, DEFAULT_COLLECT_PRICE]
       );
-      await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+      ).to.not.be.reverted;
 
       const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .mul(TREASURY_FEE_BPS)
@@ -729,8 +759,8 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         .sub(expectedTreasuryAmount)
         .sub(expectedReferralAmount);
 
-      expect(await currency.balanceOf(userTwoAddress)).to.eq(expectedReferrerAmount);
-      expect(await aCurrency.balanceOf(userTwoAddress)).to.eq(expectedReferralAmount);
+      expect(await currency.balanceOf(anotherUserAddress)).to.eq(expectedReferrerAmount);
+      expect(await aCurrency.balanceOf(anotherUserAddress)).to.eq(expectedReferralAmount);
       expect(await aCurrency.balanceOf(userAddress)).to.eq(expectedRecipientAmount);
       expect(await currency.balanceOf(treasuryAddress)).to.eq(expectedTreasuryAmount);
     });
@@ -762,7 +792,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       await expect(
         lensHub.createProfile({
-          to: userTwoAddress,
+          to: anotherUserAddress,
           handle: 'usertwo',
           imageURI: MOCK_PROFILE_URI,
           followModule: ZERO_ADDRESS,
@@ -771,7 +801,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
       await expect(
-        lensHub.connect(userTwo).mirror({
+        lensHub.connect(anotherUser).mirror({
           profileId: secondProfileId,
           profileIdPointed: FIRST_PROFILE_ID,
           pubIdPointed: 1,
@@ -781,16 +811,20 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
-        currency.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        currency.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
       ).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
       const data = abiCoder.encode(
         ['address', 'uint256'],
         [currency.address, DEFAULT_COLLECT_PRICE]
       );
-      await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+      ).to.not.be.reverted;
 
       const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .mul(TREASURY_FEE_BPS)
@@ -798,7 +832,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
       const expectedRecipientAmount =
         BigNumber.from(DEFAULT_COLLECT_PRICE).sub(expectedTreasuryAmount);
 
-      expect(await currency.balanceOf(userTwoAddress)).to.eq(
+      expect(await currency.balanceOf(anotherUserAddress)).to.eq(
         BigNumber.from(MAX_UINT256).sub(DEFAULT_COLLECT_PRICE)
       );
       expect(await aCurrency.balanceOf(userAddress)).to.eq(expectedRecipientAmount);
@@ -832,7 +866,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       await expect(
         lensHub.createProfile({
-          to: userTwoAddress,
+          to: anotherUserAddress,
           handle: 'usertwo',
           imageURI: MOCK_PROFILE_URI,
           followModule: ZERO_ADDRESS,
@@ -841,7 +875,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
       await expect(
-        lensHub.connect(userTwo).mirror({
+        lensHub.connect(anotherUser).mirror({
           profileId: secondProfileId,
           profileIdPointed: FIRST_PROFILE_ID,
           pubIdPointed: 1,
@@ -851,25 +885,33 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      await expect(currency.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(currency.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
-        currency.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        currency.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
       ).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
       const data = abiCoder.encode(
         ['address', 'uint256'],
         [currency.address, DEFAULT_COLLECT_PRICE]
       );
-      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+      ).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+      ).to.not.be.reverted;
 
-      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.be.revertedWith(
-        ERRORS.MINT_LIMIT_EXCEEDED
-      );
-      await expect(lensHub.connect(userTwo).collect(secondProfileId, 1, data)).to.be.revertedWith(
-        ERRORS.MINT_LIMIT_EXCEEDED
-      );
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.be.revertedWith(ERRORS.MINT_LIMIT_EXCEEDED);
+      await expect(
+        lensHub.connect(anotherUser).collect(secondProfileId, 1, data)
+      ).to.be.revertedWith(ERRORS.MINT_LIMIT_EXCEEDED);
     });
 
     it('User should post with aave fee collect module as the collect module but asset not supported by Aave, user two collects, user gets paid in base currency and not aTokens', async function () {
@@ -898,7 +940,7 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
 
       await expect(
         lensHub.createProfile({
-          to: userTwoAddress,
+          to: anotherUserAddress,
           handle: 'usertwo',
           imageURI: MOCK_PROFILE_URI,
           followModule: ZERO_ADDRESS,
@@ -907,16 +949,20 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         })
       ).to.not.be.reverted;
 
-      await expect(currencyTwo.mint(userTwoAddress, MAX_UINT256)).to.not.be.reverted;
+      await expect(currencyTwo.mint(anotherUserAddress, MAX_UINT256)).to.not.be.reverted;
       await expect(
-        currencyTwo.connect(userTwo).approve(aaveFeeCollectModule.address, MAX_UINT256)
+        currencyTwo.connect(anotherUser).approve(aaveFeeCollectModule.address, MAX_UINT256)
       ).to.not.be.reverted;
-      await expect(lensHub.connect(userTwo).follow([FIRST_PROFILE_ID], [[]])).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
       const data = abiCoder.encode(
         ['address', 'uint256'],
         [currencyTwo.address, DEFAULT_COLLECT_PRICE]
       );
-      await expect(lensHub.connect(userTwo).collect(FIRST_PROFILE_ID, 1, data)).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.not.be.reverted;
 
       const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .mul(TREASURY_FEE_BPS)
