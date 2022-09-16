@@ -20,13 +20,13 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 /**
  * @notice A struct containing the necessary data to execute collect actions on a publication.
  *
- * @param collectLimit The maximum number of collects for this publication.
+ * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
  * @param currentCollects The current number of collects for this publication.
  * @param amount The collecting cost associated with this publication.
  * @param currency The currency associated with this publication.
  * @param recipient The recipient address associated with this publication.
  * @param referralFee The referral fee associated with this publication.
- * @param endTimestamp The end timestamp after which collecting is impossible.
+ * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
  */
 struct ProfilePublicationData {
     uint256 collectLimit;
@@ -140,12 +140,15 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
             _checkFollowValidity(profileId, collector);
 
+        uint256 endTimestamp = _dataByPublicationByProfile[profileId][pubId].endTimestamp;
+        uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
+
         if (
-            _dataByPublicationByProfile[profileId][pubId].currentCollects >=
-            _dataByPublicationByProfile[profileId][pubId].collectLimit
+            _dataByPublicationByProfile[profileId][pubId].currentCollects >= collectLimit &&
+            collectLimit != 0
         ) {
             revert Errors.MintLimitExceeded();
-        } else if (block.timestamp > _dataByPublicationByProfile[profileId][pubId].endTimestamp) {
+        } else if (block.timestamp > endTimestamp && endTimestamp != 0) {
             revert Errors.CollectExpired();
         } else {
             ++_dataByPublicationByProfile[profileId][pubId].currentCollects;
