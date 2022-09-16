@@ -108,7 +108,6 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
             !_currencyWhitelisted(currency) ||
             recipient == address(0) ||
             referralFee > BPS_MAX ||
-            amount < BPS_MAX ||
             (endTimestamp < block.timestamp && endTimestamp > 0)
         ) revert Errors.InitParamsInvalid();
 
