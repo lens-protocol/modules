@@ -260,6 +260,8 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
         _transferFromAndDepositToAaveIfApplicable(currency, collector, recipient, adjustedAmount);
 
-        IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        if (treasuryAmount > 0) {
+            IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
     }
 }
