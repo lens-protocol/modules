@@ -187,9 +187,13 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         (address treasury, uint16 treasuryFee) = _treasuryData();
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
         uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
-        uint256 adjustedAmount = amount - treasuryAmount;
 
-        _transferFromAndDepositToAaveIfApplicable(currency, collector, recipient, adjustedAmount);
+        _transferFromAndDepositToAaveIfApplicable(
+            currency,
+            collector,
+            recipient,
+            amount - treasuryAmount
+        );
         IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
     }
 
