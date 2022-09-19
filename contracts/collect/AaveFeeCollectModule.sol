@@ -143,7 +143,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
         uint256 currentCollects = _dataByPublicationByProfile[profileId][pubId].currentCollects;
 
-        if (currentCollects >= collectLimit && collectLimit != 0) {
+        if (collectLimit != 0 && currentCollects == collectLimit) {
             revert Errors.MintLimitExceeded();
         } else if (block.timestamp > endTimestamp && endTimestamp != 0) {
             revert Errors.CollectExpired();
