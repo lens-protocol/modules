@@ -50,7 +50,12 @@ contract TokenGatedReferenceModule is ModuleBase, IReferenceModule {
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         GateParams memory gateParams = abi.decode(data, (GateParams));
-        if (gateParams.tokenAddress == address(0) || gateParams.minThreshold == 0)
+
+        // Checking if the tokenAddress resembles ERC20/ERC721 token (by calling balanceOf() function)
+        (bool success, bytes memory result) = gateParams.tokenAddress.staticcall(
+            abi.encodeWithSignature('balanceOf(address)', address(this))
+        );
+        if (gateParams.minThreshold == 0 || !success || result.length == 0 || result.length > 32)
             revert Errors.InitParamsInvalid();
         _gateParamsByPublicationByProfile[profileId][pubId] = gateParams;
         emit TokenGatedReferencePublicationCreated(
