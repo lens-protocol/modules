@@ -701,14 +701,15 @@ makeSuiteCleanRoom('Aave Fee Collect Module', function () {
         .sub(expectedTreasuryAmount)
         .mul(REFERRAL_FEE_BPS)
         .div(BPS_MAX);
-      const expectedReferrerAmount = BigNumber.from(MAX_UINT256).sub(DEFAULT_COLLECT_PRICE);
-      // .add(expectedReferralAmount); - this amount is now paid in aTokens, so not added here
+      const expectedReferrerAmount = BigNumber.from(MAX_UINT256)
+        .sub(DEFAULT_COLLECT_PRICE)
+        .add(expectedReferralAmount);
       const expectedRecipientAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .sub(expectedTreasuryAmount)
         .sub(expectedReferralAmount);
 
       expect(await currency.balanceOf(anotherUser.address)).to.eq(expectedReferrerAmount);
-      expect(await aCurrency.balanceOf(anotherUser.address)).to.eq(expectedReferralAmount);
+      expect(await aCurrency.balanceOf(anotherUser.address)).to.eq(0);
       expect(await aCurrency.balanceOf(user.address)).to.eq(expectedRecipientAmount);
       expect(await currency.balanceOf(treasury.address)).to.eq(expectedTreasuryAmount);
     });

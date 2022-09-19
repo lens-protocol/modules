@@ -250,12 +250,8 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
             address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
 
-            _transferFromAndDepositToAaveIfApplicable(
-                currency,
-                collector,
-                referralRecipient,
-                referralAmount
-            );
+            // Send referral fee in normal ERC20 tokens
+            IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
