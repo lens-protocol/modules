@@ -81,13 +81,13 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
      *
      * @param data The arbitrary data parameter, decoded into:
-     *      uint256 collectLimit: The maximum amount of collects.
+     *      uint96 collectLimit: The maximum amount of collects.
      *      uint256 amount: The currency total amount to levy.
      *      address currency: The currency address, must be internally whitelisted.
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
      *      bool followerOnly: Whether only followers should be able to collect.
-     *      uint40 endTimestamp: The end timestamp after which collecting is impossible.
+     *      uint72 endTimestamp: The end timestamp after which collecting is impossible.
      *
      * @return An abi encoded bytes parameter, which is the same as the passed data parameter.
      */
