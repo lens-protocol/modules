@@ -19,6 +19,7 @@ library TestHelpers {
                 return uint256(entries[i].topics[1]); // 0 is always event topic
             }
         }
+        revert('No ProfileId creation event found');
     }
 
     function getCreatedPubIdFromEvents(Vm.Log[] memory entries) public pure returns (uint256) {
@@ -27,5 +28,6 @@ library TestHelpers {
                 return uint256(entries[i].topics[2]); // 0 is always event topic
             }
         }
+        revert('No PubId creation event found');
     }
 }

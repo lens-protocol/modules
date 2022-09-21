@@ -15,17 +15,23 @@ interface IToken {
 }
 
 /**
+ * @notice A struct containing the necessary data to execute TokenGated references.
+ *
+ * @param tokenAddress The address of ERC20/ERC721 token used for gating the reference
+ * @param minThreshold The minimum balance threshold of the gated token required to execute a reference
+ */
+struct GateParams {
+    address tokenAddress;
+    uint256 minThreshold;
+}
+
+/**
  * @title TokenGatedReferenceModule
  * @author Lens Protocol
  *
  * @notice A reference module that validates that the user who tries to reference has a required minimum balance of ERC20/ERC721 token.
  */
 contract TokenGatedReferenceModule is ModuleBase, IReferenceModule {
-    struct GateParams {
-        address tokenAddress;
-        uint256 minThreshold;
-    }
-
     event TokenGatedReferencePublicationCreated(
         uint256 indexed profileId,
         uint256 indexed pubId,
@@ -33,11 +39,11 @@ contract TokenGatedReferenceModule is ModuleBase, IReferenceModule {
         uint256 minThreshold
     );
 
-    constructor(address hub) ModuleBase(hub) {}
-
     error NotEnoughBalance();
 
     mapping(uint256 => mapping(uint256 => GateParams)) internal _gateParamsByPublicationByProfile;
+
+    constructor(address hub) ModuleBase(hub) {}
 
     /**
      * @dev The gating token address and minimum balance threshold is passed during initialization in data field (see `GateParams` struct)
@@ -55,8 +61,10 @@ contract TokenGatedReferenceModule is ModuleBase, IReferenceModule {
         (bool success, bytes memory result) = gateParams.tokenAddress.staticcall(
             abi.encodeWithSignature('balanceOf(address)', address(this))
         );
+        // We don't check if the contract exists cause we expect the return data anyway
         if (gateParams.minThreshold == 0 || !success || result.length == 0 || result.length > 32)
             revert Errors.InitParamsInvalid();
+
         _gateParamsByPublicationByProfile[profileId][pubId] = gateParams;
         emit TokenGatedReferencePublicationCreated(
             profileId,

@@ -57,6 +57,25 @@ contract TokenGatedReferenceModule_Publication is TokenGatedReferenceModuleBase 
         );
     }
 
+    function testCannotCallInitializeFromNonHub() public {
+        vm.expectRevert(Errors.NotHub.selector);
+        tokenGatedReferenceModule.initializeReferenceModule(
+            userProfileId,
+            1,
+            abi.encode(address(currency), 1)
+        );
+    }
+
+    function testCannotProcessCommentFromNonHub() public {
+        vm.expectRevert(Errors.NotHub.selector);
+        tokenGatedReferenceModule.processComment(userProfileId, userProfileId, 1, '');
+    }
+
+    function testCannotProcessMirrorFromNonHub() public {
+        vm.expectRevert(Errors.NotHub.selector);
+        tokenGatedReferenceModule.processMirror(userProfileId, userProfileId, 1, '');
+    }
+
     // Scenarios
     function testCreatePublicationWithTokenGatedReferenceModule() public {
         hub.post(
@@ -69,6 +88,23 @@ contract TokenGatedReferenceModule_Publication is TokenGatedReferenceModuleBase 
                 referenceModuleInitData: abi.encode(address(currency), 1)
             })
         );
+    }
+
+    function testCreatePublicationWithTokenGatedReferenceModuleEmitsExpectedEvents() public {
+        vm.recordLogs();
+        hub.post(
+            DataTypes.PostData({
+                profileId: userProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(freeCollectModule),
+                collectModuleInitData: abi.encode(false),
+                referenceModule: address(tokenGatedReferenceModule),
+                referenceModuleInitData: abi.encode(address(currency), 1)
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+        assertEq(pubId, 1);
     }
 }
 
@@ -133,7 +169,6 @@ contract TokenGatedReferenceModule_ERC20_Gated is TokenGatedReferenceModuleBase 
         );
         Vm.Log[] memory entries = vm.getRecordedLogs();
         pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
-        console.log('post created:', pubId);
     }
 
     // Negatives
