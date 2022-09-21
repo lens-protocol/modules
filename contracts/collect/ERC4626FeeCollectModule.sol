@@ -120,15 +120,16 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
             _checkFollowValidity(profileId, collector);
 
-        if (
-            _dataByPublicationByProfile[profileId][pubId].currentCollects >=
-            _dataByPublicationByProfile[profileId][pubId].collectLimit
-        ) {
+        uint256 endTimestamp = _dataByPublicationByProfile[profileId][pubId].endTimestamp;
+        uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
+        uint96 currentCollects = _dataByPublicationByProfile[profileId][pubId].currentCollects;
+
+        if (collectLimit != 0 && currentCollects == collectLimit) {
             revert Errors.MintLimitExceeded();
-        } else if (block.timestamp > _dataByPublicationByProfile[profileId][pubId].endTimestamp) {
+        } else if (block.timestamp > endTimestamp && endTimestamp != 0) {
             revert Errors.CollectExpired();
         } else {
-            ++_dataByPublicationByProfile[profileId][pubId].currentCollects;
+            _dataByPublicationByProfile[profileId][pubId].currentCollects = ++currentCollects;
             if (referrerProfileId == profileId) {
                 _processCollect(collector, profileId, pubId, data);
             } else {
