@@ -26,15 +26,15 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param endTimestamp The end timestamp after which collecting is impossible.
  */
 struct ProfilePublicationData {
-    uint256 collectLimit;
-    uint256 currentCollects;
     uint256 amount;
     address vault; // ERC4626 Vault in which fees are deposited
     address currency;
+    uint96 collectLimit;
+    uint96 currentCollects;
     address recipient;
     uint16 referralFee;
     bool followerOnly;
-    uint40 endTimestamp;
+    uint72 endTimestamp;
 }
 
 /**
@@ -57,13 +57,14 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
      *
      * @param data The arbitrary data parameter, decoded into:
-     *      uint256 collectLimit: The maximum amount of collects.
+     *      uint96 collectLimit: The maximum amount of collects. 0 for no limit.
      *      uint256 amount: The currency total amount to levy.
      *      address vault: The ERC4626 compatible vault in which fees are deposited.
      *      address currency: The currency address, must be internally whitelisted.
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
      *      bool followerOnly: Whether only followers should be able to collect.
+     *      uint72 endTimestamp: The end timestamp after which collecting is impossible. 0 for no expiry.
      *
      * @return An abi encoded bytes parameter, which is the same as the passed data parameter.
      */
@@ -73,23 +74,21 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         (
-            uint256 collectLimit,
+            uint96 collectLimit,
             uint256 amount,
             address vault,
             address currency,
             address recipient,
             uint16 referralFee,
             bool followerOnly,
-            uint40 endTimestamp
-        ) = abi.decode(data, (uint256, uint256, address, address, address, uint16, bool, uint40));
+            uint72 endTimestamp
+        ) = abi.decode(data, (uint96, uint256, address, address, address, uint16, bool, uint72));
         if (
-            collectLimit == 0 ||
             !_currencyWhitelisted(currency) ||
-            vault == address(0) || // TODO should vaults also have a whitelist like currencies?
+            vault == address(0) ||
             recipient == address(0) ||
             referralFee > BPS_MAX ||
-            amount < BPS_MAX ||
-            endTimestamp < block.timestamp
+            (endTimestamp < block.timestamp && endTimestamp > 0)
         ) revert Errors.InitParamsInvalid();
 
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
@@ -172,13 +171,19 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
         uint256 adjustedAmount = amount - treasuryAmount;
 
-        _transferFromAndDepositInVaultIfApplicable(currency, vault, collector, recipient, adjustedAmount);
+        _transferFromAndDepositInVaultIfApplicable(
+            currency,
+            vault,
+            collector,
+            recipient,
+            adjustedAmount
+        );
         IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
     }
 
     function _transferFromAndDepositInVaultIfApplicable(
         address currency,
-        address vault, 
+        address vault,
         address from,
         address beneficiary,
         uint256 amount
@@ -236,7 +241,13 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
-        _transferFromAndDepositInVaultIfApplicable(currency, _dataByPublicationByProfile[profileId][pubId].vault, collector, recipient, adjustedAmount);
+        _transferFromAndDepositInVaultIfApplicable(
+            currency,
+            _dataByPublicationByProfile[profileId][pubId].vault,
+            collector,
+            recipient,
+            adjustedAmount
+        );
 
         IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
     }
