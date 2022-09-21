@@ -170,16 +170,18 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         (address treasury, uint16 treasuryFee) = _treasuryData();
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
         uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
-        uint256 adjustedAmount = amount - treasuryAmount;
 
         _transferFromAndDepositInVaultIfApplicable(
             currency,
             vault,
             collector,
             recipient,
-            adjustedAmount
+            amount - treasuryAmount
         );
-        IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+
+        if (treasuryAmount > 0) {
+            IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
     }
 
     function _transferFromAndDepositInVaultIfApplicable(
