@@ -125,14 +125,11 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
     let referenceModuleInitData;
     const minThreshold = parseEther('10');
 
-    before(async function () {
+    beforeEach(async function () {
       referenceModuleInitData = await getTokenGatedReferenceModuleInitData({
         tokenAddress: currency.address,
         minThreshold,
       });
-    });
-
-    beforeEach(async function () {
       await expect(
         lensHub.connect(publisher).post({
           profileId: FIRST_PROFILE_ID,
@@ -221,14 +218,11 @@ makeSuiteCleanRoom('TokenGatedReferenceModule', function () {
     let referenceModuleInitData;
     const minThreshold = BigNumber.from(1);
 
-    before(async function () {
+    beforeEach(async function () {
       referenceModuleInitData = await getTokenGatedReferenceModuleInitData({
         tokenAddress: nft.address,
         minThreshold,
       });
-    });
-
-    beforeEach(async function () {
       await expect(
         lensHub.connect(publisher).post({
           profileId: FIRST_PROFILE_ID,
