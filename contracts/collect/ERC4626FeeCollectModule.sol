@@ -195,7 +195,7 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         IERC20(currency).safeTransferFrom(from, address(this), amount);
         IERC20(currency).approve(vault, amount);
 
-        // Then, attempt to supply funds in Aave v3, sending aTokens to beneficiary
+        // Then, attempt to deposit funds in vault, sending shares to beneficiary
         try IERC4626(vault).deposit(amount, beneficiary) {} catch {
             // If supply() above fails, send funds directly to beneficiary
             IERC20(currency).safeTransfer(beneficiary, amount);
@@ -234,13 +234,8 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
 
             address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
 
-            _transferFromAndDepositInVaultIfApplicable(
-                currency,
-                _dataByPublicationByProfile[profileId][pubId].vault,
-                collector,
-                referralRecipient,
-                referralAmount
-            );
+            // Send referral fee in normal ERC20 tokens
+            IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
@@ -252,6 +247,8 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
             adjustedAmount
         );
 
-        IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        if (treasuryAmount > 0) {
+            IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
     }
 }
