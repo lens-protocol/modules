@@ -3,9 +3,6 @@
 pragma solidity 0.8.10;
 
 import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
-import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
-import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
-import {Events} from '@aave/lens-protocol/contracts/libraries/Events.sol';
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {IFollowModule} from '@aave/lens-protocol/contracts/interfaces/IFollowModule.sol';
@@ -16,13 +13,11 @@ import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.
 /**
  * @notice Struct representing the module configuration for certain publication.
  *
- * @param setUp Indicates if the publication was set up to use this module, to then allow updating params.
  * @param commentsRestricted Indicates if the comment operation is restricted or open to everyone.
  * @param mirrorsRestricted Indicates if the mirror operation is restricted or open to everyone.
  * @param degreesOfSeparation The max degrees of separation allowed for restricted operations.
  */
 struct ModuleConfig {
-    bool setUp;
     bool commentsRestricted;
     bool mirrorsRestricted;
     uint8 degreesOfSeparation;
@@ -35,23 +30,10 @@ struct ModuleConfig {
  * @notice This reference module allows to set a degree of separation `n`, and then allows to comment/mirror only to
  * profiles that are at most at `n` degrees of separation from the author of the root publication.
  */
-contract DegreesOfSeparationReferenceModule is
-    EIP712,
-    FollowValidationModuleBase,
-    IReferenceModule
-{
-    event ModuleParametersUpdated(
-        uint256 indexed profileId,
-        uint256 indexed pubId,
-        bool commentsRestricted,
-        bool mirrorsRestricted,
-        uint8 degreesOfSeparation
-    );
-
+contract DegreesOfSeparationReferenceModule is FollowValidationModuleBase, IReferenceModule {
     error InvalidDegreesOfSeparation();
     error OperationDisabled();
     error ProfilePathExceedsDegreesOfSeparation();
-    error PublicationNotSetUp();
 
     /**
      * @dev Because of the "Six degrees of separation" theory, in the long term, setting up 5, 6 or more degrees of
@@ -61,11 +43,9 @@ contract DegreesOfSeparationReferenceModule is
      */
     uint8 constant MAX_DEGREES_OF_SEPARATION = 4;
 
-    mapping(address => uint256) public nonces;
-
     mapping(uint256 => mapping(uint256 => ModuleConfig)) internal _moduleConfigByPubByProfile;
 
-    constructor(address hub) EIP712('DegreesOfSeparationReferenceModule', '1') ModuleBase(hub) {}
+    constructor(address hub) ModuleBase(hub) {}
 
     /**
      * @notice Initializes data for a given publication being published. This can only be called by the hub.
@@ -90,7 +70,6 @@ contract DegreesOfSeparationReferenceModule is
             revert InvalidDegreesOfSeparation();
         }
         _moduleConfigByPubByProfile[profileId][pubId] = ModuleConfig(
-            true,
             commentsRestricted,
             mirrorsRestricted,
             degreesOfSeparation
@@ -150,71 +129,6 @@ contract DegreesOfSeparationReferenceModule is
                 abi.decode(data, (uint256[]))
             );
         }
-    }
-
-    /**
-     * @notice Updates the module parameters for the given publication.
-     *
-     * @param profileId The token ID of the profile publishing the publication.
-     * @param pubId The associated publication's LensHub publication ID.
-     * @param commentsRestricted Indicates if the comment operation is restricted or open to everyone.
-     * @param mirrorsRestricted Indicates if the mirror operation is restricted or open to everyone.
-     * @param degreesOfSeparation The max degrees of separation allowed for restricted operations.
-     */
-    function updateModuleParameters(
-        uint256 profileId,
-        uint256 pubId,
-        bool commentsRestricted,
-        bool mirrorsRestricted,
-        uint8 degreesOfSeparation
-    ) external {
-        _updateModuleParameters(
-            profileId,
-            pubId,
-            commentsRestricted,
-            mirrorsRestricted,
-            degreesOfSeparation,
-            msg.sender
-        );
-    }
-
-    /**
-     * @notice Updates the module parameters for the given publication through EIP-712 signatures.
-     *
-     * @param profileId The token ID of the profile publishing the publication.
-     * @param pubId The associated publication's LensHub publication ID.
-     * @param commentsRestricted Indicates if the comment operation is restricted or open to everyone.
-     * @param mirrorsRestricted Indicates if the mirror operation is restricted or open to everyone.
-     * @param degreesOfSeparation The max degrees of separation allowed for restricted operations.
-     * @param operator The address that is executing this parameter update. Should match the recovered signer.
-     * @param sig The EIP-712 signature for this operation.
-     */
-    function updateModuleParametersWithSig(
-        uint256 profileId,
-        uint256 pubId,
-        bool commentsRestricted,
-        bool mirrorsRestricted,
-        uint8 degreesOfSeparation,
-        address operator,
-        DataTypes.EIP712Signature calldata sig
-    ) external {
-        _validateUpdateModuleParametersSignature(
-            profileId,
-            pubId,
-            commentsRestricted,
-            mirrorsRestricted,
-            degreesOfSeparation,
-            operator,
-            sig
-        );
-        _updateModuleParameters(
-            profileId,
-            pubId,
-            commentsRestricted,
-            mirrorsRestricted,
-            degreesOfSeparation,
-            operator
-        );
     }
 
     /**
@@ -284,119 +198,5 @@ contract DegreesOfSeparationReferenceModule is
             // In the previous notation: profileIdPointed --> profileId
             _checkFollowValidity(profileId, follower);
         }
-    }
-
-    /**
-     * @notice Internal function to abstract the logic regarding the parameter updating.
-     *
-     * @param profileId The token ID of the profile publishing the publication.
-     * @param pubId The associated publication's LensHub publication ID.
-     * @param commentsRestricted Indicates if the comment operation is restricted or open to everyone.
-     * @param mirrorsRestricted Indicates if the mirror operation is restricted or open to everyone.
-     * @param degreesOfSeparation The max degrees of separation allowed for restricted operations.
-     * @param operator The address that is executing this parameter update. Should match the recovered signer.
-     */
-    function _updateModuleParameters(
-        uint256 profileId,
-        uint256 pubId,
-        bool commentsRestricted,
-        bool mirrorsRestricted,
-        uint8 degreesOfSeparation,
-        address operator
-    ) internal {
-        if (IERC721(HUB).ownerOf(profileId) != operator) {
-            revert Errors.NotProfileOwner();
-        }
-        if (!_moduleConfigByPubByProfile[profileId][pubId].setUp) {
-            revert PublicationNotSetUp();
-        }
-        if (degreesOfSeparation > MAX_DEGREES_OF_SEPARATION) {
-            revert InvalidDegreesOfSeparation();
-        }
-        _moduleConfigByPubByProfile[profileId][pubId] = ModuleConfig(
-            true,
-            commentsRestricted,
-            mirrorsRestricted,
-            degreesOfSeparation
-        );
-        emit ModuleParametersUpdated(
-            profileId,
-            pubId,
-            commentsRestricted,
-            mirrorsRestricted,
-            degreesOfSeparation
-        );
-    }
-
-    /**
-     * @notice Checks if the signature for the `UpdateModuleParametersWithSig` function is valid according EIP-712.
-     *
-     * @param profileId The token ID of the profile associated with the publication.
-     * @param pubId The publication ID associated with the publication.
-     * @param commentsRestricted Indicates if the comment operation is restricted or open to everyone.
-     * @param mirrorsRestricted Indicates if the mirror operation is restricted or open to everyone.
-     * @param degreesOfSeparation The max degrees of separation allowed for restricted operations.
-     * @param operator The address that is executing this parameter update. Should match the recovered signer.
-     * @param sig The EIP-712 signature for this operation.
-     */
-    function _validateUpdateModuleParametersSignature(
-        uint256 profileId,
-        uint256 pubId,
-        bool commentsRestricted,
-        bool mirrorsRestricted,
-        uint8 degreesOfSeparation,
-        address operator,
-        DataTypes.EIP712Signature calldata sig
-    ) internal {
-        unchecked {
-            _validateRecoveredAddress(
-                _calculateDigest(
-                    abi.encode(
-                        keccak256(
-                            'UpdateModuleParametersWithSig(uint256 profileId,uint256 pubId,bool commentsRestricted,bool mirrorsRestricted,uint8 degreesOfSeparation,uint256 nonce,uint256 deadline)'
-                        ),
-                        profileId,
-                        pubId,
-                        commentsRestricted,
-                        mirrorsRestricted,
-                        degreesOfSeparation,
-                        nonces[operator]++,
-                        sig.deadline
-                    )
-                ),
-                operator,
-                sig
-            );
-        }
-    }
-
-    /**
-     * @notice Checks the recovered address is the expected signer for the given signature.
-     *
-     * @param digest The expected signed data.
-     * @param expectedAddress The address of the expected signer.
-     * @param sig The signature.
-     */
-    function _validateRecoveredAddress(
-        bytes32 digest,
-        address expectedAddress,
-        DataTypes.EIP712Signature calldata sig
-    ) internal view {
-        if (sig.deadline < block.timestamp) {
-            revert Errors.SignatureExpired();
-        }
-        address recoveredAddress = ecrecover(digest, sig.v, sig.r, sig.s);
-        if (recoveredAddress == address(0) || recoveredAddress != expectedAddress) {
-            revert Errors.SignatureInvalid();
-        }
-    }
-
-    /**
-     * @notice Calculates the digest for the given bytes according EIP-712 standard.
-     *
-     * @param message The message, as bytes, to calculate the digest from.
-     */
-    function _calculateDigest(bytes memory message) internal view returns (bytes32) {
-        return keccak256(abi.encodePacked('\x19\x01', _domainSeparatorV4(), keccak256(message)));
     }
 }
