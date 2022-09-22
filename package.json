@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@aave/lens-protocol": "^1.0.2",
-    "@openzeppelin/contracts": "^4.7.3"
+    "@openzeppelin/contracts": "^4.7.3",
+    "solmate": "^6.6.1"
   }
 }
