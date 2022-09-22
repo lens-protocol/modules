@@ -29,6 +29,10 @@ import {
   FreeCollectModule,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
+  MockVault,
+  MockVault__factory,
+  ERC4626FeeCollectModule,
+  ERC4626FeeCollectModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import {
@@ -53,6 +57,8 @@ export const FIRST_PUB_ID = 1;
 export const FIRST_FOLLOW_NFT_ID = 1;
 export const MOCK_URI = 'https://ipfs.io/ipfs/QmY9dUwYu67puaWBMxRKW98LPbXCznPwHUbhX5NeWnCJbX';
 export const OTHER_MOCK_URI = 'https://ipfs.io/ipfs/QmTFLSXdEQ6qsSzaXaCSNtiv6wA56qq87ytXJ182dXDQJS';
+export const MOCK_PROFILE_URI =
+  'https://ipfs.io/ipfs/Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu';
 export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 export const DEFAULT_AMOUNT = parseEther('2');
@@ -73,6 +79,7 @@ export let collector: SignerWithAddress;
 export let lensHubImpl: LensHub;
 export let lensHub: LensHub;
 export let currency: Currency;
+export let currencyTwo: Currency;
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
 export let hubLibs: LensHubLibraryAddresses;
@@ -81,9 +88,11 @@ export let moduleGlobals: ModuleGlobals;
 export let followNFTImpl: FollowNFT;
 export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
+export let mockVault: MockVault;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
+export let erc4626FeeCollectModule: ERC4626FeeCollectModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -136,7 +145,7 @@ before(async function () {
   // nonce + 2 is impl
   // nonce + 3 is hub proxy
 
-  const hubProxyAddress = computeContractAddress(deployer.address, nonce + 3); //'0x' + keccak256(RLP.encode([deployerAddress, hubProxyNonce])).substr(26);
+  const hubProxyAddress = computeContractAddress(deployer.address, nonce + 3); // '0x' + keccak256(RLP.encode([deployerAddress, hubProxyNonce])).substr(26);
 
   followNFTImpl = await new FollowNFT__factory(deployer).deploy(hubProxyAddress);
   collectNFTImpl = await new CollectNFT__factory(deployer).deploy(hubProxyAddress);
@@ -146,12 +155,12 @@ before(async function () {
     collectNFTImpl.address
   );
 
-  let data = lensHubImpl.interface.encodeFunctionData('initialize', [
+  const data = lensHubImpl.interface.encodeFunctionData('initialize', [
     LENS_HUB_NFT_NAME,
     LENS_HUB_NFT_SYMBOL,
     governance.address,
   ]);
-  let proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
+  const proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
     lensHubImpl.address,
     proxyAdmin.address,
     data
@@ -162,6 +171,10 @@ before(async function () {
 
   // Currency
   currency = await new Currency__factory(deployer).deploy();
+  currencyTwo = await new Currency__factory(deployer).deploy();
+
+  // ERC4626 Vault - accepts 'currency' as deposit asset
+  mockVault = await new MockVault__factory(deployer).deploy(currency.address);
 
   // Currency whitelisting
   await expect(
@@ -190,6 +203,14 @@ before(async function () {
     lensHub
       .connect(governance)
       .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  erc4626FeeCollectModule = await new ERC4626FeeCollectModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address
+  );
+  await expect(
+    lensHub.connect(governance).whitelistCollectModule(erc4626FeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
