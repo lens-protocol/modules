@@ -22,6 +22,8 @@ import {
   TransparentUpgradeableProxy__factory,
   Currency__factory,
   Currency,
+  ACurrency,
+  ACurrency__factory,
   NFT__factory,
   NFT,
   ModuleGlobals,
@@ -29,6 +31,12 @@ import {
   AuctionCollectModule__factory,
   FreeCollectModule__factory,
   FreeCollectModule,
+  MockPool,
+  MockPool__factory,
+  MockPoolAddressesProvider,
+  MockPoolAddressesProvider__factory,
+  AaveFeeCollectModule,
+  AaveFeeCollectModule__factory,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
   TokenGatedReferenceModule__factory,
@@ -57,6 +65,8 @@ export const FIRST_PUB_ID = 1;
 export const FIRST_FOLLOW_NFT_ID = 1;
 export const MOCK_URI = 'https://ipfs.io/ipfs/QmY9dUwYu67puaWBMxRKW98LPbXCznPwHUbhX5NeWnCJbX';
 export const OTHER_MOCK_URI = 'https://ipfs.io/ipfs/QmTFLSXdEQ6qsSzaXaCSNtiv6wA56qq87ytXJ182dXDQJS';
+export const MOCK_PROFILE_URI =
+  'https://ipfs.io/ipfs/Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu';
 export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 export const DEFAULT_AMOUNT = parseEther('2');
@@ -77,6 +87,10 @@ export let collector: SignerWithAddress;
 export let lensHubImpl: LensHub;
 export let lensHub: LensHub;
 export let currency: Currency;
+export let aCurrency: ACurrency;
+export let currencyTwo: Currency;
+export let aavePool: MockPool;
+export let aavePoolAddressesProvider: MockPoolAddressesProvider;
 export let nft: NFT;
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
@@ -88,6 +102,7 @@ export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
 
 export let auctionCollectModule: AuctionCollectModule;
+export let aaveFeeCollectModule: AaveFeeCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
 
 export let tokenGatedReferenceModule: TokenGatedReferenceModule;
@@ -104,7 +119,7 @@ export function makeSuiteCleanRoom(name: string, tests: () => void) {
   });
 }
 
-before(async function () {
+beforeEach(async function () {
   chainId = (await ethers.provider.getNetwork()).chainId;
   abiCoder = ethers.utils.defaultAbiCoder;
   accounts = await ethers.getSigners();
@@ -143,7 +158,7 @@ before(async function () {
   // nonce + 2 is impl
   // nonce + 3 is hub proxy
 
-  const hubProxyAddress = computeContractAddress(deployer.address, nonce + 3); //'0x' + keccak256(RLP.encode([deployerAddress, hubProxyNonce])).substr(26);
+  const hubProxyAddress = computeContractAddress(deployer.address, nonce + 3); // '0x' + keccak256(RLP.encode([deployerAddress, hubProxyNonce])).substr(26);
 
   followNFTImpl = await new FollowNFT__factory(deployer).deploy(hubProxyAddress);
   collectNFTImpl = await new CollectNFT__factory(deployer).deploy(hubProxyAddress);
@@ -153,12 +168,12 @@ before(async function () {
     collectNFTImpl.address
   );
 
-  let data = lensHubImpl.interface.encodeFunctionData('initialize', [
+  const data = lensHubImpl.interface.encodeFunctionData('initialize', [
     LENS_HUB_NFT_NAME,
     LENS_HUB_NFT_SYMBOL,
     governance.address,
   ]);
-  let proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
+  const proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
     lensHubImpl.address,
     proxyAdmin.address,
     data
@@ -169,6 +184,14 @@ before(async function () {
 
   // Currency
   currency = await new Currency__factory(deployer).deploy();
+  currencyTwo = await new Currency__factory(deployer).deploy();
+  aCurrency = await new ACurrency__factory(deployer).deploy();
+
+  // Aave Pool - currencyTwo is set as unsupported asset (in Aave, not Lens) for testing
+  aavePool = await new MockPool__factory(deployer).deploy(aCurrency.address, currencyTwo.address);
+  aavePoolAddressesProvider = await new MockPoolAddressesProvider__factory(deployer).deploy(
+    aavePool.address
+  );
 
   // NFT
   nft = await new NFT__factory(deployer).deploy();
@@ -176,6 +199,9 @@ before(async function () {
   // Currency whitelisting
   await expect(
     moduleGlobals.connect(governance).whitelistCurrency(currency.address, true)
+  ).to.not.be.reverted;
+  await expect(
+    moduleGlobals.connect(governance).whitelistCurrency(currencyTwo.address, true)
   ).to.not.be.reverted;
 
   // Modules used for testing purposes
@@ -189,8 +215,18 @@ before(async function () {
     lensHub.address,
     moduleGlobals.address
   );
+  aaveFeeCollectModule = await new AaveFeeCollectModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address,
+    aavePoolAddressesProvider.address
+  );
+
   await expect(
     lensHub.connect(governance).whitelistCollectModule(auctionCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  await expect(
+    lensHub.connect(governance).whitelistCollectModule(aaveFeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   updatableOwnableFeeCollectModule = await new UpdatableOwnableFeeCollectModule__factory(
