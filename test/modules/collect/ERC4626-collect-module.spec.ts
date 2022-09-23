@@ -57,11 +57,13 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
     ).to.not.be.reverted;
   });
 
+  // TODO make badMockVault with currencyTwo (not whitelisted) as asset for tests
+
   context('Negatives', function () {
     context('Publication Creation', function () {
       it('user should fail to post with ERC4626 fee collect module using unwhitelisted currency', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+          ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
@@ -85,14 +87,39 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
         ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
       });
 
+      // it('user should fail to post with ERC4626 fee collect module using unwhitelisted currency', async function () {
+      //   const collectModuleInitData = abiCoder.encode(
+      //     ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
+      //     [
+      //       DEFAULT_COLLECT_LIMIT,
+      //       DEFAULT_COLLECT_PRICE,
+      //       mockVault.address,
+      //       anotherUser.address,
+      //       user.address,
+      //       REFERRAL_FEE_BPS,
+      //       DEFAULT_FOLLOWER_ONLY,
+      //       DEFAULT_END_TIMESTAMP,
+      //     ]
+      //   );
+      //   await expect(
+      //     lensHub.connect(user).post({
+      //       profileId: FIRST_PROFILE_ID,
+      //       contentURI: MOCK_URI,
+      //       collectModule: erc4626FeeCollectModule.address,
+      //       collectModuleInitData: collectModuleInitData,
+      //       referenceModule: ZERO_ADDRESS,
+      //       referenceModuleInitData: [],
+      //     })
+      //   ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
+      // });
+
       it('user should fail to post with ERC4626 fee collect module using zero recipient', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+          ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             mockVault.address,
-            currency.address,
             ZERO_ADDRESS,
             REFERRAL_FEE_BPS,
             DEFAULT_FOLLOWER_ONLY,
@@ -113,12 +140,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
 
       it('user should fail to post with ERC4626 fee collect module using referral fee greater than max BPS', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+          ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             mockVault.address,
-            currency.address,
             user.address,
             10001,
             DEFAULT_FOLLOWER_ONLY,
@@ -139,12 +165,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
 
       it('user should fail to post with ERC4626 fee collect module using end timestamp in the past', async function () {
         const collectModuleInitData = abiCoder.encode(
-          ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+          ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
           [
             DEFAULT_COLLECT_LIMIT,
             9999,
             mockVault.address,
-            currency.address,
             user.address,
             REFERRAL_FEE_BPS,
             DEFAULT_FOLLOWER_ONLY,
@@ -168,12 +193,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
       beforeEach(async function () {
         const currentTimePlus1Day = BigNumber.from(await getTimestamp()).add(ONE_DAY);
         const collectModuleInitData = abiCoder.encode(
-          ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+          ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             mockVault.address,
-            currency.address,
             user.address,
             REFERRAL_FEE_BPS,
             DEFAULT_FOLLOWER_ONLY,
@@ -206,12 +230,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
         // Post new publication with followerOnly == false
         const currentTimePlus1Day = BigNumber.from(await getTimestamp()).add(ONE_DAY);
         const collectModuleInitDataTwo = abiCoder.encode(
-          ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+          ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
             mockVault.address,
-            currency.address,
             user.address,
             REFERRAL_FEE_BPS,
             false, // followerOnly = false
@@ -411,12 +434,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
   context('Scenarios', function () {
     it('User should post with ERC4626 fee collect module as the collect module and data, correct events should be emitted', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currency.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,
@@ -449,12 +471,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
 
     it('User should post with ERC4626 fee collect module as the collect module and data, fetched publication data should be accurate', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currency.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,
@@ -482,12 +503,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
 
     it('User should post with ERC4626 fee collect module as the collect module and data, user two follows, then collects and pays fee with currencyTwo, fee distribution is by currencyTwo', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currencyTwo.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,
@@ -535,12 +555,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
 
     it('User should post with ERC4626 fee collect module as the collect module and data, user two follows, then collects and pays fee, fee distribution is valid', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currency.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,
@@ -588,12 +607,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
 
     it('User should post with ERC4626 fee collect module as the collect module and data, user two follows, then collects twice, fee distribution is valid', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currency.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,
@@ -645,12 +663,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
     it('User should post with ERC4626 fee collect module as the collect module and data, user two mirrors, follows, then collects from their mirror and pays fee, fee distribution is valid', async function () {
       const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currency.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,
@@ -729,12 +746,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
     it('User should post with ERC4626 fee collect module as the collect module and data, with no referral fee, user two mirrors, follows, then collects from their mirror and pays fee, fee distribution is valid', async function () {
       const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currency.address,
           user.address,
           0,
           DEFAULT_FOLLOWER_ONLY,
@@ -804,12 +820,11 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
     it('User should post with ERC4626 fee collect module as the collect module and data, user two mirrors, follows, then collects once from the original, twice from the mirror, and fails to collect a third time from either the mirror or the original', async function () {
       const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currency.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,
@@ -877,14 +892,13 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
       ).to.be.revertedWith(ERRORS.MINT_LIMIT_EXCEEDED);
     });
 
-    it('User should post with ERC4626 fee collect module as the collect module but asset not supported by Aave, user two collects, user gets paid in base currency and not aTokens', async function () {
+    it('User should post with ERC4626 fee collect module as the collect module but asset not supported by Aave, user two collects, user gets paid in base currency not vault shares', async function () {
       const collectModuleInitData = abiCoder.encode(
-        ['uint96', 'uint256', 'address', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
         [
           DEFAULT_COLLECT_LIMIT,
           DEFAULT_COLLECT_PRICE,
           mockVault.address,
-          currencyTwo.address,
           user.address,
           REFERRAL_FEE_BPS,
           DEFAULT_FOLLOWER_ONLY,

@@ -77,12 +77,15 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
             uint96 collectLimit,
             uint256 amount,
             address vault,
-            address currency,
             address recipient,
             uint16 referralFee,
             bool followerOnly,
             uint72 endTimestamp
-        ) = abi.decode(data, (uint96, uint256, address, address, address, uint16, bool, uint72));
+        ) = abi.decode(data, (uint96, uint256, address, address, uint16, bool, uint72));
+
+        // Get fee currency from vault's asset instead of publication params
+        address currency = IERC4626(vault).asset();
+
         if (
             !_currencyWhitelisted(currency) ||
             vault == address(0) ||
