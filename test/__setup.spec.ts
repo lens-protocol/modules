@@ -37,8 +37,12 @@ import {
   AaveFeeCollectModule__factory,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
+  DegreesOfSeparationReferenceModule,
+  DegreesOfSeparationReferenceModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
+import { ProfileFollowModule__factory } from '../typechain/factories/ProfileFollowModule__factory';
+import { ProfileFollowModule } from '../typechain/ProfileFollowModule';
 import {
   computeContractAddress,
   ProtocolState,
@@ -95,10 +99,13 @@ export let moduleGlobals: ModuleGlobals;
 export let followNFTImpl: FollowNFT;
 export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
+export let profileFollowModule: ProfileFollowModule;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let aaveFeeCollectModule: AaveFeeCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
+
+export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -199,6 +206,10 @@ beforeEach(async function () {
   await expect(
     lensHub.connect(governance).whitelistCollectModule(freeCollectModule.address, true)
   ).to.not.be.reverted;
+  profileFollowModule = await new ProfileFollowModule__factory(deployer).deploy(lensHub.address);
+  await expect(
+    lensHub.connect(governance).whitelistFollowModule(profileFollowModule.address, true)
+  ).to.not.be.reverted;
 
   // Collect modules
   auctionCollectModule = await new AuctionCollectModule__factory(deployer).deploy(
@@ -227,6 +238,16 @@ beforeEach(async function () {
     lensHub
       .connect(governance)
       .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  // Reference modules
+  degreesOfSeparationReferenceModule = await new DegreesOfSeparationReferenceModule__factory(
+    deployer
+  ).deploy(lensHub.address);
+  await expect(
+    lensHub
+      .connect(governance)
+      .whitelistReferenceModule(degreesOfSeparationReferenceModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol

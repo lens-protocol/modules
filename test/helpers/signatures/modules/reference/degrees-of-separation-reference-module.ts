@@ -3,26 +3,20 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish } from 'ethers';
 import { ethers } from 'hardhat';
-import { UpdatableOwnableFeeCollectModule__factory } from '../../../../../typechain';
-import { UPDATE_MODULE_PARAMETERS_WITH_SIG_DOMAIN } from '../../../../modules/collect/updatable-ownable-fee-collect-module.spec';
+import { DegreesOfSeparationReferenceModule__factory } from '../../../../../typechain';
 import {
-  currency,
-  DEFAULT_AMOUNT,
-  feeRecipient,
-  FIRST_PROFILE_ID,
-  FIRST_PUB_ID,
-  REFERRAL_FEE_BPS,
-} from '../../../../__setup.spec';
+  DEFAULT_DEGREES_OF_SEPARATION,
+  UPDATE_MODULE_PARAMETERS_WITH_SIG_DOMAIN,
+} from '../../../../modules/reference/degrees-of-separation-reference-module.spec';
+import { FIRST_PROFILE_ID, FIRST_PUB_ID } from '../../../../__setup.spec';
 import { Domain, EIP712Domain, RSV, signData, toStringOrNumber } from '../../utils';
 
 interface UpdateModuleParametersWithSigMessage {
   profileId: number | string;
   pubId: number | string;
-  amount: number | string;
-  currency: string;
-  recipient: string;
-  referralFee: number | string;
-  followerOnly: boolean;
+  commentsRestricted: boolean;
+  mirrorsRestricted: boolean;
+  degreesOfSeparation: number;
   nonce: number | string;
   deadline: number | string;
 }
@@ -34,11 +28,9 @@ const createTypedData = (message: UpdateModuleParametersWithSigMessage, domain: 
       UpdateModuleParametersWithSig: [
         { name: 'profileId', type: 'uint256' },
         { name: 'pubId', type: 'uint256' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'currency', type: 'address' },
-        { name: 'recipient', type: 'address' },
-        { name: 'referralFee', type: 'uint16' },
-        { name: 'followerOnly', type: 'bool' },
+        { name: 'commentsRestricted', type: 'bool' },
+        { name: 'mirrorsRestricted', type: 'bool' },
+        { name: 'degreesOfSeparation', type: 'uint8' },
         { name: 'nonce', type: 'uint256' },
         { name: 'deadline', type: 'uint256' },
       ],
@@ -56,11 +48,9 @@ interface SignUpdateModuleParametersWithSigMessageData {
   domain?: Domain;
   profileId?: BigNumberish;
   pubId?: BigNumberish;
-  amount?: BigNumberish;
-  feeCurrency?: string;
-  recipient?: string;
-  referralFee?: BigNumberish;
-  followerOnly?: boolean;
+  commentsRestricted?: boolean;
+  mirrorsRestricted?: boolean;
+  degreesOfSeparation?: number;
   nonce?: BigNumberish;
   deadline?: BigNumberish;
 }
@@ -70,11 +60,9 @@ export async function signUpdateModuleParametersWithSigMessage({
   domain = UPDATE_MODULE_PARAMETERS_WITH_SIG_DOMAIN,
   profileId = FIRST_PROFILE_ID,
   pubId = FIRST_PUB_ID,
-  amount = DEFAULT_AMOUNT,
-  feeCurrency = currency.address,
-  recipient = feeRecipient.address,
-  referralFee = REFERRAL_FEE_BPS,
-  followerOnly = false,
+  commentsRestricted = true,
+  mirrorsRestricted = true,
+  degreesOfSeparation = DEFAULT_DEGREES_OF_SEPARATION,
   nonce,
   deadline = ethers.constants.MaxUint256,
 }: SignUpdateModuleParametersWithSigMessageData): Promise<
@@ -83,16 +71,14 @@ export async function signUpdateModuleParametersWithSigMessage({
   const message: UpdateModuleParametersWithSigMessage = {
     profileId: toStringOrNumber(profileId),
     pubId: toStringOrNumber(pubId),
-    amount: toStringOrNumber(amount),
-    currency: feeCurrency,
-    recipient: recipient,
-    referralFee: toStringOrNumber(referralFee),
-    followerOnly: followerOnly,
+    commentsRestricted: commentsRestricted,
+    mirrorsRestricted: mirrorsRestricted,
+    degreesOfSeparation: degreesOfSeparation,
     nonce: toStringOrNumber(
       nonce ||
-        (await new UpdatableOwnableFeeCollectModule__factory(signer)
+        (await new DegreesOfSeparationReferenceModule__factory(signer)
           .attach(domain.verifyingContract)
-          .sigNonces(signer.address))
+          .nonces(signer.address))
     ),
     deadline: toStringOrNumber(deadline),
   };
