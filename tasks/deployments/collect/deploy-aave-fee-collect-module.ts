@@ -2,7 +2,7 @@ import '@nomiclabs/hardhat-ethers';
 import { task } from 'hardhat/config';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { deployWithVerify } from '../../helpers/utils';
-import { AaveFeeCollectModule__Factory, LensHub__factory } from '../../../typechain/factories';
+import { AaveFeeCollectModule__factory, LensHub__factory } from '../../../typechain';
 
 export let runtimeHRE: HardhatRuntimeEnvironment;
 
@@ -15,7 +15,7 @@ task(
 )
   .addParam('hub')
   .addParam('globals')
-  .addParam('poolAddressProvider')
+  .addOptionalParam('poolAddressProvider')
   .setAction(async ({ hub, globals, poolAddressProvider }, hre) => {
     runtimeHRE = hre;
     const ethers = hre.ethers;
@@ -32,7 +32,7 @@ task(
 
     console.log('\n\n- - - - - - - - Deploying Aave fee collect module\n\n');
     const aaveFeeCollectModule = await deployWithVerify(
-      new AaveFeeCollectModule__Factory(deployer).deploy(hub, globals, poolAddressProvider),
+      new AaveFeeCollectModule__factory(deployer).deploy(hub, globals, poolAddressProvider),
       [hub, globals, poolAddressProvider],
       'contracts/collect/AaveFeeCollectModule.sol:AaveFeeCollectModule'
     );
