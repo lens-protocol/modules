@@ -3,6 +3,7 @@
   "scripts": {
     "test": "npm run compile && TRACK_GAS=true hardhat test",
     "quick-test": "hardhat test",
+    "test-mod": "hardhat test test/modules/collect/ERC4626-collect-module.spec.ts",
     "coverage": "npm run compile && SKIP_LOAD=true hardhat coverage",
     "compile": "SKIP_LOAD=true hardhat clean && SKIP_LOAD=true hardhat compile"
   },
