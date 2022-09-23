@@ -30,7 +30,7 @@ task(
           ? POOL_ADDRESSES_PROVIDER_ADDRESS_POLYGON
           : POOL_ADDRESSES_PROVIDER_ADDRESS_MUMBAI;
 
-    console.log('\n\n- - - - - - - - Deploying auction collect module\n\n');
+    console.log('\n\n- - - - - - - - Deploying Aave fee collect module\n\n');
     const aaveFeeCollectModule = await deployWithVerify(
       new AaveFeeCollectModule__Factory(deployer).deploy(hub, globals, poolAddressProvider),
       [hub, globals, poolAddressProvider],
