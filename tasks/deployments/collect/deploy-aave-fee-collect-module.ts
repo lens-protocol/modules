@@ -26,7 +26,7 @@ task(
     // Setting pool address provider if left undefined
     if (!poolAddressProvider)
       poolAddressProvider =
-        process.env.HARDHAT_NETWORK == 'polygon'
+        process.env.HARDHAT_NETWORK == 'matic'
           ? POOL_ADDRESSES_PROVIDER_ADDRESS_POLYGON
           : POOL_ADDRESSES_PROVIDER_ADDRESS_MUMBAI;
 
@@ -37,9 +37,11 @@ task(
       'contracts/collect/AaveFeeCollectModule.sol:AaveFeeCollectModule'
     );
 
-    console.log('\n\n- - - - - - - - Whitelisting Aave fee collect module\n\n');
-    // await LensHub__factory.connect(hub, governance).whitelistCollectModule(
-    //   auctionCollectModule.address,
-    //   true
-    // );
+    if (process.env.HARDHAT_NETWORK !== 'matic') {
+      console.log('\n\n- - - - - - - - Whitelisting Aave fee collect module\n\n');
+      await LensHub__factory.connect(hub, governance).whitelistCollectModule(
+        aaveFeeCollectModule.address,
+        true
+      );
+    }
   });
