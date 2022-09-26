@@ -25,6 +25,7 @@ import {
   anotherUser,
   treasury,
   mockVault,
+  mockVaultTwo,
   erc4626FeeCollectModule,
 } from '../../__setup.spec';
 
@@ -52,12 +53,7 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
     await expect(
       moduleGlobals.connect(governance).whitelistCurrency(currency.address, true)
     ).to.not.be.reverted;
-    await expect(
-      moduleGlobals.connect(governance).whitelistCurrency(currencyTwo.address, true)
-    ).to.not.be.reverted;
   });
-
-  // TODO make badMockVault with currencyTwo (not whitelisted) as asset for tests
 
   context('Negatives', function () {
     context('Publication Creation', function () {
@@ -67,8 +63,7 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
           [
             DEFAULT_COLLECT_LIMIT,
             DEFAULT_COLLECT_PRICE,
-            mockVault.address,
-            anotherUser.address,
+            mockVaultTwo.address,
             user.address,
             REFERRAL_FEE_BPS,
             DEFAULT_FOLLOWER_ONLY,

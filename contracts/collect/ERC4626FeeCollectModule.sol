@@ -94,9 +94,6 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
             (endTimestamp < block.timestamp && endTimestamp > 0)
         ) revert Errors.InitParamsInvalid();
 
-        // TODO add check that vault asset == currency of pub
-        // Or skip currency param completely, and get from vault ???
-
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
         _dataByPublicationByProfile[profileId][pubId].vault = vault;
