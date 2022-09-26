@@ -89,6 +89,7 @@ export let followNFTImpl: FollowNFT;
 export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
 export let mockVault: MockVault;
+export let mockVaultTwo: MockVault;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
@@ -175,6 +176,7 @@ before(async function () {
 
   // ERC4626 Vault - accepts 'currency' as deposit asset
   mockVault = await new MockVault__factory(deployer).deploy(currency.address);
+  mockVaultTwo = await new MockVault__factory(deployer).deploy(currencyTwo.address);
 
   // Currency whitelisting
   await expect(
