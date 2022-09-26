@@ -53,6 +53,10 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
     await expect(
       moduleGlobals.connect(governance).whitelistCurrency(currency.address, true)
     ).to.not.be.reverted;
+    // currencyTwo must NOT be on the whitelist
+    await expect(
+      moduleGlobals.connect(governance).whitelistCurrency(currencyTwo.address, false)
+    ).to.not.be.reverted;
   });
 
   context('Negatives', function () {
