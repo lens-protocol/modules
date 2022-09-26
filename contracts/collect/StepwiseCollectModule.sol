@@ -131,7 +131,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
                     !_currencyWhitelisted(currency) ||
                     recipient == address(0) ||
                     referralFee > BPS_MAX ||
-                    endTimestamp <= block.timestamp
+                    (endTimestamp != 0 && endTimestamp <= block.timestamp)
                 ) revert Errors.InitParamsInvalid();
             }
             _dataByPublicationByProfile[profileId][pubId] = ProfilePublicationData(
@@ -174,7 +174,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
             _checkFollowValidity(profileId, collector);
         uint256 endTimestamp = _dataByPublicationByProfile[profileId][pubId].endTimestamp;
-        if (block.timestamp > endTimestamp) revert Errors.CollectExpired();
+        if (endTimestamp != 0 && block.timestamp > endTimestamp) revert Errors.CollectExpired();
 
         if (
             _dataByPublicationByProfile[profileId][pubId].currentCollects >=
