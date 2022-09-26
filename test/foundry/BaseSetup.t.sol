@@ -7,6 +7,7 @@ import 'forge-std/Test.sol';
 import {LensHub} from '@aave/lens-protocol/contracts/core/LensHub.sol';
 import {FollowNFT} from '@aave/lens-protocol/contracts/core/FollowNFT.sol';
 import {CollectNFT} from '@aave/lens-protocol/contracts/core/CollectNFT.sol';
+import {ModuleGlobals} from '@aave/lens-protocol/contracts/core/modules/ModuleGlobals.sol';
 import {FreeCollectModule} from '@aave/lens-protocol/contracts/core/modules/collect/FreeCollectModule.sol';
 import {TransparentUpgradeableProxy} from '@aave/lens-protocol/contracts/upgradeability/TransparentUpgradeableProxy.sol';
 import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
@@ -19,6 +20,7 @@ contract BaseSetup is Test {
     address constant deployer = address(1);
     address constant governance = address(2);
     address constant publisher = address(3);
+    address constant treasury = address(4);
     address immutable me = address(this); // Main test User is this (rather inheriting from this) contract
 
     string constant MOCK_HANDLE = 'handle.lens';
@@ -28,6 +30,8 @@ contract BaseSetup is Test {
     string constant MOCK_FOLLOW_NFT_URI =
         'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 
+    uint16 constant TREASURY_FEE_BPS = 50;
+
     address immutable hubProxyAddr;
     CollectNFT immutable collectNFT;
     FollowNFT immutable followNFT;
@@ -36,9 +40,10 @@ contract BaseSetup is Test {
     LensHub immutable hub;
     FreeCollectModule immutable freeCollectModule;
     Currency immutable currency;
+    ModuleGlobals immutable moduleGlobals;
 
     constructor() {
-        // Start deployments.
+        ///////////////////////////////////////// Start deployments.
         vm.startPrank(deployer);
 
         // Precompute needed addresss.
@@ -66,12 +71,14 @@ contract BaseSetup is Test {
         // Deploy the FreeCollectModule.
         freeCollectModule = new FreeCollectModule(hubProxyAddr);
 
+        moduleGlobals = new ModuleGlobals(governance, treasury, TREASURY_FEE_BPS);
+
         currency = new Currency();
 
-        // End deployments.
         vm.stopPrank();
+        ///////////////////////////////////////// End deployments.
 
-        // Start governance actions.
+        ///////////////////////////////////////// Start governance actions.
         vm.startPrank(governance);
 
         // Set the state to unpaused.
@@ -83,8 +90,11 @@ contract BaseSetup is Test {
         // Whitelist the test contract as a profile creator
         hub.whitelistProfileCreator(me, true);
 
-        // End governance actions.
+        // Whitelist mock currency in ModuleGlobals
+        moduleGlobals.whitelistCurrency(address(currency), true);
+
         vm.stopPrank();
+        ///////////////////////////////////////// End governance actions.
     }
 
     function _toUint256Array(uint256 n) internal pure returns (uint256[] memory) {
