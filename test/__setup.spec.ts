@@ -22,19 +22,31 @@ import {
   TransparentUpgradeableProxy__factory,
   Currency__factory,
   Currency,
+  ACurrency,
+  ACurrency__factory,
   ModuleGlobals,
   AuctionCollectModule,
   AuctionCollectModule__factory,
   FreeCollectModule__factory,
   FreeCollectModule,
+  MockPool,
+  MockPool__factory,
+  MockPoolAddressesProvider,
+  MockPoolAddressesProvider__factory,
+  AaveFeeCollectModule,
+  AaveFeeCollectModule__factory,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
   MockVault,
   MockVault__factory,
   ERC4626FeeCollectModule,
   ERC4626FeeCollectModule__factory,
+  DegreesOfSeparationReferenceModule,
+  DegreesOfSeparationReferenceModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
+import { ProfileFollowModule__factory } from '../typechain/factories/ProfileFollowModule__factory';
+import { ProfileFollowModule } from '../typechain/ProfileFollowModule';
 import {
   computeContractAddress,
   ProtocolState,
@@ -79,7 +91,11 @@ export let collector: SignerWithAddress;
 export let lensHubImpl: LensHub;
 export let lensHub: LensHub;
 export let currency: Currency;
+export let aCurrency: ACurrency;
 export let currencyTwo: Currency;
+export let aavePool: MockPool;
+export let aavePoolAddressesProvider: MockPoolAddressesProvider;
+
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
 export let hubLibs: LensHubLibraryAddresses;
@@ -90,10 +106,15 @@ export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
 export let mockVault: MockVault;
 export let mockVaultTwo: MockVault;
+export let profileFollowModule: ProfileFollowModule;
+
 
 export let auctionCollectModule: AuctionCollectModule;
+export let aaveFeeCollectModule: AaveFeeCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
 export let erc4626FeeCollectModule: ERC4626FeeCollectModule;
+
+export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -107,7 +128,7 @@ export function makeSuiteCleanRoom(name: string, tests: () => void) {
   });
 }
 
-before(async function () {
+beforeEach(async function () {
   chainId = (await ethers.provider.getNetwork()).chainId;
   abiCoder = ethers.utils.defaultAbiCoder;
   accounts = await ethers.getSigners();
@@ -173,14 +194,25 @@ before(async function () {
   // Currency
   currency = await new Currency__factory(deployer).deploy();
   currencyTwo = await new Currency__factory(deployer).deploy();
+  aCurrency = await new ACurrency__factory(deployer).deploy();
 
   // ERC4626 Vault - accepts 'currency' as deposit asset
   mockVault = await new MockVault__factory(deployer).deploy(currency.address);
   mockVaultTwo = await new MockVault__factory(deployer).deploy(currencyTwo.address);
 
+  // Aave Pool - currencyTwo is set as unsupported asset (in Aave, not Lens) for testing
+  aavePool = await new MockPool__factory(deployer).deploy(aCurrency.address, currencyTwo.address);
+  aavePoolAddressesProvider = await new MockPoolAddressesProvider__factory(deployer).deploy(
+    aavePool.address
+  );
+
+
   // Currency whitelisting
   await expect(
     moduleGlobals.connect(governance).whitelistCurrency(currency.address, true)
+  ).to.not.be.reverted;
+  await expect(
+    moduleGlobals.connect(governance).whitelistCurrency(currencyTwo.address, true)
   ).to.not.be.reverted;
 
   // Modules used for testing purposes
@@ -188,14 +220,29 @@ before(async function () {
   await expect(
     lensHub.connect(governance).whitelistCollectModule(freeCollectModule.address, true)
   ).to.not.be.reverted;
+  profileFollowModule = await new ProfileFollowModule__factory(deployer).deploy(lensHub.address);
+  await expect(
+    lensHub.connect(governance).whitelistFollowModule(profileFollowModule.address, true)
+  ).to.not.be.reverted;
 
   // Collect modules
   auctionCollectModule = await new AuctionCollectModule__factory(deployer).deploy(
     lensHub.address,
     moduleGlobals.address
   );
+  aaveFeeCollectModule = await new AaveFeeCollectModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address,
+    aavePoolAddressesProvider.address
+  );
+
   await expect(
     lensHub.connect(governance).whitelistCollectModule(auctionCollectModule.address, true)
+  ).to.not.be.reverted;
+
+
+  await expect(
+    lensHub.connect(governance).whitelistCollectModule(aaveFeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   updatableOwnableFeeCollectModule = await new UpdatableOwnableFeeCollectModule__factory(
@@ -207,12 +254,23 @@ before(async function () {
       .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
   ).to.not.be.reverted;
 
+
   erc4626FeeCollectModule = await new ERC4626FeeCollectModule__factory(deployer).deploy(
     lensHub.address,
     moduleGlobals.address
   );
   await expect(
     lensHub.connect(governance).whitelistCollectModule(erc4626FeeCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  // Reference modules
+  degreesOfSeparationReferenceModule = await new DegreesOfSeparationReferenceModule__factory(
+    deployer
+  ).deploy(lensHub.address);
+  await expect(
+    lensHub
+      .connect(governance)
+      .whitelistReferenceModule(degreesOfSeparationReferenceModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
