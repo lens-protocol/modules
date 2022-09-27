@@ -31,6 +31,7 @@ contract BaseSetup is Test {
         'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 
     uint16 constant TREASURY_FEE_BPS = 50;
+    uint16 constant TREASURY_FEE_MAX_BPS = 10000;
 
     address immutable hubProxyAddr;
     CollectNFT immutable collectNFT;

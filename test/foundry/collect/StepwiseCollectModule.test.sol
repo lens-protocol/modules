@@ -4,13 +4,15 @@ pragma solidity ^0.8.10;
 import '../BaseSetup.t.sol';
 import {StepwiseCollectModuleBase} from './StepwiseCollectModule.base.sol';
 import '../helpers/TestHelpers.sol';
-import {CurveParameters, StepwiseCollectModule} from 'contracts/collect/StepwiseCollectModule.sol';
+import {ProfilePublicationData, StepwiseCollectModuleInitData, StepwiseCollectModule} from 'contracts/collect/StepwiseCollectModule.sol';
 
 /////////
 // Publication Creation with StepwiseCollectModule
 //
 contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
     uint256 immutable userProfileId;
+
+    StepwiseCollectModuleInitData exampleInitData;
 
     constructor() StepwiseCollectModuleBase() {
         vm.recordLogs();
@@ -28,115 +30,62 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
         userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
-    // Negatives
-    function testCannotPostWithZeroCollectLimit() public {
-        vm.expectRevert(Errors.InitParamsInvalid.selector);
+    function setUp() public {
+        exampleInitData = StepwiseCollectModuleInitData({
+            collectLimit: 0,
+            currency: address(currency),
+            recipient: me,
+            referralFee: 0,
+            followerOnly: false,
+            endTimestamp: 0,
+            a: 0,
+            b: 0,
+            c: 1 ether
+        });
+    }
+
+    function hubPostWithRevert(bytes4 expectedError) public {
+        vm.expectRevert(expectedError);
         hub.post(
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
                 collectModule: address(stepwiseCollectModule),
-                collectModuleInitData: abi.encode(
-                    0,
-                    address(currency),
-                    me,
-                    REFERRAL_FEE_BPS,
-                    true,
-                    0,
-                    CurveParameters(0, 0, 10 ether)
-                ),
+                collectModuleInitData: abi.encode(exampleInitData),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
             })
         );
     }
 
-    function testCannotPostWithUnwhitelistedCurrncy() public {
-        vm.expectRevert(Errors.InitParamsInvalid.selector);
-        hub.post(
-            DataTypes.PostData({
-                profileId: userProfileId,
-                contentURI: MOCK_URI,
-                collectModule: address(stepwiseCollectModule),
-                collectModuleInitData: abi.encode(
-                    DEFAULT_COLLECT_LIMIT,
-                    address(treasury),
-                    me,
-                    REFERRAL_FEE_BPS,
-                    true,
-                    0,
-                    CurveParameters(0, 0, 10 ether)
-                ),
-                referenceModule: address(0),
-                referenceModuleInitData: ''
-            })
-        );
+    // Negatives
+    function testCannotPostWithNonWhitelistedCurrncy() public {
+        exampleInitData.currency = address(0);
+        hubPostWithRevert(Errors.InitParamsInvalid.selector);
     }
 
     function testCannotPostWithZeroRecipient() public {
-        vm.expectRevert(Errors.InitParamsInvalid.selector);
-        hub.post(
-            DataTypes.PostData({
-                profileId: userProfileId,
-                contentURI: MOCK_URI,
-                collectModule: address(stepwiseCollectModule),
-                collectModuleInitData: abi.encode(
-                    DEFAULT_COLLECT_LIMIT,
-                    address(currency),
-                    address(0),
-                    REFERRAL_FEE_BPS,
-                    true,
-                    0,
-                    CurveParameters(0, 0, 10 ether)
-                ),
-                referenceModule: address(0),
-                referenceModuleInitData: ''
-            })
-        );
+        exampleInitData.recipient = address(0);
+        hubPostWithRevert(Errors.InitParamsInvalid.selector);
     }
 
     function testCannotPostWithReferralFeeGreaterThanMaxBPS() public {
-        vm.expectRevert(Errors.InitParamsInvalid.selector);
-        hub.post(
-            DataTypes.PostData({
-                profileId: userProfileId,
-                contentURI: MOCK_URI,
-                collectModule: address(stepwiseCollectModule),
-                collectModuleInitData: abi.encode(
-                    DEFAULT_COLLECT_LIMIT,
-                    address(currency),
-                    me,
-                    10001, // TODO: replace with MaxBPS constant
-                    true,
-                    0,
-                    CurveParameters(0, 0, 10 ether)
-                ),
-                referenceModule: address(0),
-                referenceModuleInitData: ''
-            })
-        );
+        exampleInitData.referralFee = TREASURY_FEE_MAX_BPS + 1;
+        hubPostWithRevert(Errors.InitParamsInvalid.selector);
     }
 
     function testCannotPostWithPastNonzeroTimestamp() public {
         vm.warp(1666666666);
-        vm.expectRevert(Errors.InitParamsInvalid.selector);
-        hub.post(
-            DataTypes.PostData({
-                profileId: userProfileId,
-                contentURI: MOCK_URI,
-                collectModule: address(stepwiseCollectModule),
-                collectModuleInitData: abi.encode(
-                    DEFAULT_COLLECT_LIMIT,
-                    address(currency),
-                    me,
-                    REFERRAL_FEE_BPS,
-                    true,
-                    block.timestamp - 1,
-                    CurveParameters(0, 0, 10 ether)
-                ),
-                referenceModule: address(0),
-                referenceModuleInitData: ''
-            })
+        exampleInitData.endTimestamp = uint40(block.timestamp) - 1;
+        hubPostWithRevert(Errors.InitParamsInvalid.selector);
+    }
+
+    function testCannotPostIfCalledFromNonHubAddress() public {
+        vm.expectRevert(Errors.NotHub.selector);
+        stepwiseCollectModule.initializePublicationCollectModule(
+            userProfileId,
+            1,
+            abi.encode(exampleInitData)
         );
     }
 
@@ -154,23 +103,6 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
         );
     }
 
-    function testCannotPostIfCalledFromNonHubAddress() public {
-        vm.expectRevert(Errors.NotHub.selector);
-        stepwiseCollectModule.initializePublicationCollectModule(
-            userProfileId,
-            1,
-            abi.encode(
-                DEFAULT_COLLECT_LIMIT,
-                address(currency),
-                me,
-                REFERRAL_FEE_BPS,
-                true,
-                0,
-                CurveParameters(0, 0, 10 ether)
-            )
-        );
-    }
-
     // Scenarios
     function testCreatePublicationWithCorrectInitData() public {
         hub.post(
@@ -178,15 +110,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
                 collectModule: address(stepwiseCollectModule),
-                collectModuleInitData: abi.encode(
-                    DEFAULT_COLLECT_LIMIT,
-                    address(currency),
-                    me,
-                    REFERRAL_FEE_BPS,
-                    true,
-                    0,
-                    CurveParameters(0, 0, 10 ether)
-                ),
+                collectModuleInitData: abi.encode(exampleInitData),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
             })
@@ -200,15 +124,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
                 collectModule: address(stepwiseCollectModule),
-                collectModuleInitData: abi.encode(
-                    DEFAULT_COLLECT_LIMIT,
-                    address(currency),
-                    me,
-                    REFERRAL_FEE_BPS,
-                    true,
-                    0,
-                    CurveParameters(0, 0, 10 ether)
-                ),
+                collectModuleInitData: abi.encode(exampleInitData),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
             })
@@ -217,57 +133,145 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
         uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
         assertEq(pubId, 1);
     }
-}
 
-/////////
-// Collect with StepwiseCollectModule
-//
-contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
-    uint256 immutable publisherProfileId;
-    uint256 immutable userProfileId;
+    function testFuzzCreatePublicationWithDifferentInitData(
+        uint64 collectLimit,
+        uint16 referralFee,
+        bool followerOnly,
+        uint40 endTimestamp,
+        uint72 a,
+        uint56 b,
+        uint128 c
+    ) public {
+        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
+        vm.assume(endTimestamp > block.timestamp);
 
-    uint256 pubId;
-
-    constructor() StepwiseCollectModuleBase() {
-        vm.recordLogs();
-        hub.createProfile(
-            DataTypes.CreateProfileData({
-                to: publisher,
-                handle: 'publisher.lens',
-                imageURI: OTHER_MOCK_URI,
-                followModule: address(0),
-                followModuleInitData: '',
-                followNFTURI: MOCK_FOLLOW_NFT_URI
-            })
-        );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
-    }
-
-    function setUp() public {
-        bytes referenceModuleInitData = abi.encode(
-            DEFAULT_COLLECT_LIMIT,
-            address(currency),
-            me,
-            REFERRAL_FEE_BPS,
-            true,
-            0,
-            CurveParameters(0, 0, 10 ether)
-        );
-
-        vm.recordLogs();
-        vm.prank(publisher);
+        StepwiseCollectModuleInitData memory fuzzyInitData = StepwiseCollectModuleInitData({
+            collectLimit: collectLimit,
+            currency: address(currency),
+            recipient: me,
+            referralFee: referralFee,
+            followerOnly: followerOnly,
+            endTimestamp: endTimestamp,
+            a: a,
+            b: b,
+            c: c
+        });
         hub.post(
             DataTypes.PostData({
-                profileId: publisherProfileId,
+                profileId: userProfileId,
                 contentURI: MOCK_URI,
-                collectModule: stepwiseCollectModule,
-                collectModuleInitData: abi.encode(false),
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(fuzzyInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+    }
+
+    function testFuzzFetchedPublicationDataShouldBeAccurate(
+        uint64 collectLimit,
+        uint16 referralFee,
+        bool followerOnly,
+        uint40 endTimestamp,
+        uint72 a,
+        uint56 b,
+        uint128 c
+    ) public {
+        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
+        vm.assume(endTimestamp > block.timestamp);
+
+        StepwiseCollectModuleInitData memory fuzzyInitData = StepwiseCollectModuleInitData({
+            collectLimit: collectLimit,
+            currency: address(currency),
+            recipient: me,
+            referralFee: referralFee,
+            followerOnly: followerOnly,
+            endTimestamp: endTimestamp,
+            a: a,
+            b: b,
+            c: c
+        });
+
+        vm.recordLogs();
+        hub.post(
+            DataTypes.PostData({
+                profileId: userProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(fuzzyInitData),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
             })
         );
         Vm.Log[] memory entries = vm.getRecordedLogs();
-        pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+        assert(pubId > 0);
+        ProfilePublicationData memory fetchedData = stepwiseCollectModule.getPublicationData(
+            userProfileId,
+            pubId
+        );
+        assertEq(fetchedData.currency, fuzzyInitData.currency);
+        assertEq(fetchedData.a, fuzzyInitData.a);
+        assertEq(fetchedData.referralFee, fuzzyInitData.referralFee);
+        assertEq(fetchedData.followerOnly, fuzzyInitData.followerOnly);
+        assertEq(fetchedData.recipient, fuzzyInitData.recipient);
+        assertEq(fetchedData.b, fuzzyInitData.b);
+        assertEq(fetchedData.endTimestamp, fuzzyInitData.endTimestamp);
+        assertEq(fetchedData.c, fuzzyInitData.c);
+        assertEq(fetchedData.collectLimit, fuzzyInitData.collectLimit);
     }
 }
+
+/////////
+// Collect with StepwiseCollectModule
+//
+// contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
+//     uint256 immutable publisherProfileId;
+//     uint256 immutable userProfileId;
+
+//     uint256 pubId;
+
+//     constructor() StepwiseCollectModuleBase() {
+//         vm.recordLogs();
+//         hub.createProfile(
+//             DataTypes.CreateProfileData({
+//                 to: publisher,
+//                 handle: 'publisher.lens',
+//                 imageURI: OTHER_MOCK_URI,
+//                 followModule: address(0),
+//                 followModuleInitData: '',
+//                 followNFTURI: MOCK_FOLLOW_NFT_URI
+//             })
+//         );
+//         Vm.Log[] memory entries = vm.getRecordedLogs();
+//         userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
+//     }
+
+//     function setUp() public {
+//         bytes referenceModuleInitData = abi.encode(
+//             DEFAULT_COLLECT_LIMIT,
+//             address(currency),
+//             me,
+//             REFERRAL_FEE_BPS,
+//             true,
+//             0,
+//             CurveParameters(0, 0, 10 ether)
+//         );
+
+//         vm.recordLogs();
+//         vm.prank(publisher);
+//         hub.post(
+//             DataTypes.PostData({
+//                 profileId: publisherProfileId,
+//                 contentURI: MOCK_URI,
+//                 collectModule: stepwiseCollectModule,
+//                 collectModuleInitData: abi.encode(false),
+//                 referenceModule: address(0),
+//                 referenceModuleInitData: ''
+//             })
+//         );
+//         Vm.Log[] memory entries = vm.getRecordedLogs();
+//         pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+//     }
+// }
