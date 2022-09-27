@@ -4,7 +4,7 @@ pragma solidity 0.8.10;
 
 import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectModule.sol';
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
-import {FeeModuleBase} from '@aave/lens-protocol/contracts/core/modules/FeeModuleBase.sol';
+import {FeeModuleBase} from '../FeeModuleBase.sol';
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -12,57 +12,57 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 
 /**
- * @notice A struct containing parameters for the standard curve quadratic equation (ax^2+bx+c).
- * @dev Has to be a separate struct to avoid stack-too-deep
+ * @notice A struct containing the necessary data to execute collect actions on a publication.
+ * @notice a, b, c are coefficients of a standart quadratic equation (ax^2+bx+c) curve.
+ * @dev Variable sizes are optimized to fit in 3 slots.
+ * @param currency The currency associated with this publication.
  * @param a The a multiplier of x^2 in quadratic equation (how quadratic is the curve)
+ * @param referralFee The referral fee associated with this publication.
+ * @param followerOnly Whether only followers should be able to collect.
+ * @param recipient The recipient address associated with this publication.
  * @param b The b multiplier of x in quadratic equation (if a==0, how steep is the line)
+ * @param endTimestamp The end timestamp after which collecting is impossible.
  * @param c The c constant in quadratic equation (aka start price)
+ * @param currentCollects The current number of collects for this publication.
+ * @param collectLimit The maximum number of collects for this publication (0 for unlimited)
  */
-struct CurveParameters {
-    uint256 a;
-    uint256 b;
-    uint256 c;
+struct ProfilePublicationData {
+    address currency; // 1st slot
+    uint72 a;
+    uint16 referralFee;
+    bool followerOnly;
+    address recipient; // 2nd slot
+    uint56 b;
+    uint40 endTimestamp;
+    uint128 c; // 3rd slot
+    uint64 currentCollects;
+    uint64 collectLimit;
 }
 
 /**
- * @notice A struct containing the necessary data to execute collect actions on a publication.
+ * @notice A struct containing the necessary data to initialize Stepwise Collect Module.
  *
- * @param collectLimit The maximum number of collects for this publication.
- * @param currentCollects The current number of collects for this publication.
+ * @param collectLimit The maximum number of collects for this publication (0 for unlimited)
  * @param currency The currency associated with this publication.
  * @param recipient The recipient address associated with this publication.
  * @param referralFee The referral fee associated with this publication.
  * @param followerOnly Whether only followers should be able to collect.
  * @param endTimestamp The end timestamp after which collecting is impossible.
- * @param curveParams Quadratic equation curve parameters.
+ * @param a The a multiplier of x^2 in quadratic equation (how quadratic is the curve) (9 decimals)
+ * @param b The b multiplier of x in quadratic equation (if a==0, how steep is the line) (9 decimals)
+ * @param c The c constant in quadratic equation (aka start price) (18 decimals)
  */
-struct ProfilePublicationData {
-    uint256 currentCollects;
-    uint256 collectLimit;
+struct StepwiseCollectModuleInitData {
+    uint64 collectLimit;
     address currency;
     address recipient;
     uint16 referralFee;
     bool followerOnly;
     uint40 endTimestamp;
-    CurveParameters curveParams;
+    uint72 a;
+    uint56 b;
+    uint128 c;
 }
-
-// TODO: The above can be optimized to take only 3 slots:
-// TODO: But sacrificing value ranges or precision (which in this case doesn't really matter?)
-// struct ProfilePublicationData {
-//     address currency; //////// 160 // 1nd slot
-//     bool followerOnly; /////// 8
-//     uint16 referralFee; ////// 16
-//     uint72 a; //////////////// 72
-
-//     uint56 b; //////////////// 56 // 2st slot
-//     address recipient; /////// 160
-//     uint40 endTimestamp; ///// 40
-
-//     uint128 c; /////////////// 128 // 3rd slot
-//     uint64 collectLimit; ///// 64
-//     uint64 currentCollects; // 64
-// }
 
 /**
  * @title StepwiseCollectModule
@@ -78,10 +78,15 @@ struct ProfilePublicationData {
  *      (where x is how many collects were already performed)
  *
  * a=b=0 makes it a constant-fee collect
- * a=0 makes it a linear-growing fee collect.
+ * a=0 makes it a linear-growing fee collect
  */
 contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
+
+    // As there is hard optimisation of a,b,c parameters, the following decimals convention is assumed for fixed-point calculations:
+    uint256 constant A_DECIMALS = 1e9; // leaves 30 bits for fractional part, 42 bits for integer part
+    uint256 constant B_DECIMALS = 1e9; // leaves 30 bits for fractional part, 26 bits for integer part
+    // For C the decimals will be equal to currency decimals
 
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
@@ -93,18 +98,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
      *
      * @param profileId The profile ID of the publication to initialize this module for's publishing profile.
      * @param pubId The publication ID of the publication to initialize this module for.
-     * @param data The arbitrary data parameter, decoded into:
-     *      uint256 collectLimit: The maximum amount of collects.
-     *      uint256 amount: The currency total amount to levy.
-     *      address currency: The currency address, must be internally whitelisted.
-     *      address recipient: The custom recipient address to direct earnings to.
-     *      uint16 referralFee: The referral fee to set.
-     *      bool followerOnly: Whether only followers should be able to collect.
-     *      uint40 endTimestamp: The end timestamp after which collecting is impossible.
-     *      uint256 a: The a multiplier of x^2 in quadratic equation (how quadratic is the curve)
-     *      uint256 b: The b multiplier of x in quadratic equation (if a==0, how steep is the line)
-     *      uint256 c: The c constant in quadratic equation (aka start price)
-     *
+     * @param data The arbitrary data parameter, decoded into: StepwiseCollectModuleInitData struct
      * @return bytes An abi encoded bytes parameter, containing (in order): collectLimit, amount, currency, recipient, referral fee & end timestamp.
      */
     function initializePublicationCollectModule(
@@ -113,47 +107,31 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         unchecked {
-            (
-                uint256 collectLimit,
-                address currency,
-                address recipient,
-                uint16 referralFee,
-                bool followerOnly,
-                uint40 endTimestamp,
-                CurveParameters memory curveParams
-            ) = abi.decode(
-                    data,
-                    (uint256, address, address, uint16, bool, uint40, CurveParameters)
-                );
+            StepwiseCollectModuleInitData memory initData = abi.decode(
+                data,
+                (StepwiseCollectModuleInitData)
+            );
             {
                 if (
-                    collectLimit == 0 ||
-                    !_currencyWhitelisted(currency) ||
-                    recipient == address(0) ||
-                    referralFee > BPS_MAX ||
-                    (endTimestamp != 0 && endTimestamp <= block.timestamp)
+                    !_currencyWhitelisted(initData.currency) ||
+                    initData.recipient == address(0) ||
+                    initData.referralFee > BPS_MAX ||
+                    (initData.endTimestamp != 0 && initData.endTimestamp <= block.timestamp)
                 ) revert Errors.InitParamsInvalid();
             }
-            _dataByPublicationByProfile[profileId][pubId] = ProfilePublicationData(
-                collectLimit,
-                0,
-                currency,
-                recipient,
-                referralFee,
-                followerOnly,
-                endTimestamp,
-                curveParams
-            );
-            return
-                abi.encode(
-                    collectLimit,
-                    currency,
-                    recipient,
-                    referralFee,
-                    followerOnly,
-                    endTimestamp,
-                    curveParams
-                );
+            _dataByPublicationByProfile[profileId][pubId] = ProfilePublicationData({
+                currency: initData.currency,
+                a: initData.a,
+                referralFee: initData.referralFee,
+                followerOnly: initData.followerOnly,
+                recipient: initData.recipient,
+                b: initData.b,
+                endTimestamp: initData.endTimestamp,
+                c: initData.c,
+                currentCollects: 0,
+                collectLimit: initData.collectLimit
+            });
+            return abi.encode(initData);
         }
     }
 
@@ -177,6 +155,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         if (endTimestamp != 0 && block.timestamp > endTimestamp) revert Errors.CollectExpired();
 
         if (
+            _dataByPublicationByProfile[profileId][pubId].collectLimit != 0 &&
             _dataByPublicationByProfile[profileId][pubId].currentCollects >=
             _dataByPublicationByProfile[profileId][pubId].collectLimit
         ) {
@@ -208,16 +187,17 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         return _dataByPublicationByProfile[profileId][pubId];
     }
 
-    // TODO: Decide if we want to expose it publicly (for easier frontend calculation/verification of how much you need to pay?)
+    // TODO: Decide if we want keep it "public" or downgrade to "internal"?
+    // Pro-public: Easier frontend calculation/verification of how much you need to pay
+    // Cons-public: extra function call - more gas
     function calculateFee(ProfilePublicationData memory data) public pure returns (uint256) {
         // TODO: Probably unnecessary optimization - verify if it's necessary:
-        if (data.curveParams.a == 0 && data.curveParams.b == 0) return data.curveParams.c;
-        if (data.curveParams.a == 0)
-            return (data.curveParams.b * data.currentCollects) / 1e18 + data.curveParams.c; // TODO: Decide on decimals of 1.0 and move 1e18 to constants
+        if (data.a == 0 && data.b == 0) return data.c;
+        if (data.a == 0) return (data.b * data.currentCollects) / B_DECIMALS + data.c;
         return
-            ((data.curveParams.a * data.currentCollects * data.currentCollects) / 1e18) +
-            ((data.curveParams.b * data.currentCollects) / 1e18) +
-            data.curveParams.c;
+            ((data.a * data.currentCollects * data.currentCollects) / A_DECIMALS) +
+            ((data.b * data.currentCollects) / B_DECIMALS) +
+            data.c;
     }
 
     function _processCollect(
@@ -228,7 +208,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
     ) internal {
         uint256 amount = calculateFee(_dataByPublicationByProfile[profileId][pubId]);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
-        // _validateDataIsExpected(data, currency, amount); // TODO: Decide what to do with that verification - it will not work here. Probably just override?
+        _validateDataIsExpected(data, currency, amount);
 
         (address treasury, uint16 treasuryFee) = _treasuryData();
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
@@ -249,7 +229,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
     ) internal {
         uint256 amount = calculateFee(_dataByPublicationByProfile[profileId][pubId]);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
-        // _validateDataIsExpected(data, currency, amount); // TODO: Decide what to do with that verification - it will not work here. Probably just override?
+        _validateDataIsExpected(data, currency, amount);
 
         uint256 referralFee = _dataByPublicationByProfile[profileId][pubId].referralFee;
         address treasury;
@@ -279,5 +259,15 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         IERC20(currency).safeTransferFrom(collector, recipient, adjustedAmount);
         if (treasuryAmount > 0)
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+    }
+
+    function _validateDataIsExpected(
+        bytes calldata data,
+        address currency,
+        uint256 amount
+    ) internal pure override {
+        (address decodedCurrency, uint256 decodedMaxAmount) = abi.decode(data, (address, uint256));
+        if (decodedMaxAmount < amount || decodedCurrency != currency)
+            revert Errors.ModuleDataMismatch();
     }
 }
