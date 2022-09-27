@@ -20,6 +20,7 @@ module.exports = {
     'spaced-comment': 'warn',
     'node/no-unpublished-import': 'warn',
     'node/no-unpublished-require': 'warn',
+    'eol-last': 'error',
   },
   overrides: [
     {
