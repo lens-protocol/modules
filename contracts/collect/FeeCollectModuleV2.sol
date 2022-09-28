@@ -8,10 +8,6 @@ import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectM
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 
-import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {IPoolDataProvider} from '../interfaces/IPoolDataProvider.sol';
-import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
-
 import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
@@ -20,7 +16,7 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 /**
  * @notice A struct containing the necessary data to execute collect actions on a publication.
  *
- * @param amount The collecting cost associated with this publication.
+ * @param amount The collecting cost associated with this publication. 0 for free collect.
  * @param currency The currency associated with this publication.
  * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
  * @param currentCollects The current number of collects for this publication.
@@ -30,14 +26,20 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
  */
 struct ProfilePublicationData {
-    uint256 amount;
-    address currency;
+    uint160 amount;
     uint96 collectLimit;
+    address currency;
     uint96 currentCollects;
-    address recipient;
     uint16 referralFee;
     bool followerOnly;
     uint72 endTimestamp;
+    RecipientData[] recipients;
+}
+
+// TODO remove - 80 bits left to pack
+struct RecipientData {
+    address recipient;
+    uint16 amountCutPercentage; // fraction of BPS_MAX (10 000)
 }
 
 /**
@@ -49,33 +51,10 @@ struct ProfilePublicationData {
 contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
-    // Pool Address Provider on Polygon for Aave v3 - set in constructor
-    IPoolAddressesProvider public immutable POOL_ADDRESSES_PROVIDER;
-
-    address public aavePool;
-
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
 
-    address[] public reserves;
-
-    constructor(
-        address hub,
-        address moduleGlobals,
-        IPoolAddressesProvider poolAddressesProvider
-    ) ModuleBase(hub) FeeModuleBase(moduleGlobals) {
-        POOL_ADDRESSES_PROVIDER = poolAddressesProvider;
-
-        // Retrieve Aave pool address on module deployment
-        aavePool = POOL_ADDRESSES_PROVIDER.getPool();
-    }
-
-    /**
-     * @dev Anyone can call this function to update Aave v3 addresses.
-     */
-    function updateAavePoolAddress() public {
-        aavePool = POOL_ADDRESSES_PROVIDER.getPool();
-    }
+    constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
@@ -97,14 +76,14 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         (
-            uint96 collectLimit,
-            uint256 amount,
+            uint96 collectLimit, // TODO rearrange to natspec
+            uint160 amount,
             address currency,
             address recipient,
             uint16 referralFee,
             bool followerOnly,
             uint72 endTimestamp
-        ) = abi.decode(data, (uint96, uint256, address, address, uint16, bool, uint72));
+        ) = abi.decode(data, (uint96, uint160, address, address, uint16, bool, uint72));
         if (
             !_currencyWhitelisted(currency) ||
             recipient == address(0) ||
@@ -115,7 +94,7 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
         _dataByPublicationByProfile[profileId][pubId].currency = currency;
-        _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
+        // _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
         _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
         _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
         _dataByPublicationByProfile[profileId][pubId].endTimestamp = endTimestamp;
@@ -186,13 +165,13 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         _validateDataIsExpected(data, currency, amount);
 
         (address treasury, uint16 treasuryFee) = _treasuryData();
-        address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
+        // address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
         uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
 
         _transferFromAndDepositToAaveIfApplicable(
             currency,
             collector,
-            recipient,
+            // recipient,
             amount - treasuryAmount
         );
 
@@ -204,18 +183,18 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
     function _transferFromAndDepositToAaveIfApplicable(
         address currency,
         address from,
-        address beneficiary,
+        // address beneficiary,
         uint256 amount
     ) internal {
         // First, transfer funds to this contract
         IERC20(currency).safeTransferFrom(from, address(this), amount);
-        IERC20(currency).approve(aavePool, amount);
+        // IERC20(currency).approve(aavePool, amount);
 
         // Then, attempt to supply funds in Aave v3, sending aTokens to beneficiary
-        try IPool(aavePool).supply(currency, amount, beneficiary, 0) {} catch {
-            // If supply() above fails, send funds directly to beneficiary
-            IERC20(currency).safeTransfer(beneficiary, amount);
-        }
+        // try IPool(aavePool).supply(currency, amount, beneficiary, 0) {} catch {
+        //     // If supply() above fails, send funds directly to beneficiary
+        //     IERC20(currency).safeTransfer(beneficiary, amount);
+        // }
     }
 
     function _processCollectWithReferral(
@@ -253,9 +232,14 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
             // Send referral fee in normal ERC20 tokens
             IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
         }
-        address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
+        // address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
-        _transferFromAndDepositToAaveIfApplicable(currency, collector, recipient, adjustedAmount);
+        _transferFromAndDepositToAaveIfApplicable(
+            currency,
+            collector,
+            //  recipient,
+            adjustedAmount
+        );
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
