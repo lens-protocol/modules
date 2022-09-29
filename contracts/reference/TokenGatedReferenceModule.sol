@@ -32,6 +32,8 @@ struct GateParams {
  * @notice A reference module that validates that the user who tries to reference has a required minimum balance of ERC20/ERC721 token.
  */
 contract TokenGatedReferenceModule is ModuleBase, IReferenceModule {
+    uint256 internal constant UINT256_BYTES = 32;
+
     event TokenGatedReferencePublicationCreated(
         uint256 indexed profileId,
         uint256 indexed pubId,
@@ -62,7 +64,7 @@ contract TokenGatedReferenceModule is ModuleBase, IReferenceModule {
             abi.encodeWithSignature('balanceOf(address)', address(this))
         );
         // We don't check if the contract exists cause we expect the return data anyway
-        if (gateParams.minThreshold == 0 || !success || result.length == 0 || result.length > 32)
+        if (gateParams.minThreshold == 0 || !success || result.length != UINT256_BYTES)
             revert Errors.InitParamsInvalid();
 
         _gateParamsByPublicationByProfile[profileId][pubId] = gateParams;
