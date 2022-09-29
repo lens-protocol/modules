@@ -24,6 +24,8 @@ import {
   Currency,
   ACurrency,
   ACurrency__factory,
+  NFT__factory,
+  NFT,
   ModuleGlobals,
   AuctionCollectModule,
   AuctionCollectModule__factory,
@@ -37,6 +39,8 @@ import {
   AaveFeeCollectModule__factory,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
+  TokenGatedReferenceModule__factory,
+  TokenGatedReferenceModule,
   DegreesOfSeparationReferenceModule,
   DegreesOfSeparationReferenceModule__factory,
 } from '../typechain';
@@ -91,6 +95,7 @@ export let aCurrency: ACurrency;
 export let currencyTwo: Currency;
 export let aavePool: MockPool;
 export let aavePoolAddressesProvider: MockPoolAddressesProvider;
+export let nft: NFT;
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
 export let hubLibs: LensHubLibraryAddresses;
@@ -106,6 +111,8 @@ export let aaveFeeCollectModule: AaveFeeCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
 
 export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
+
+export let tokenGatedReferenceModule: TokenGatedReferenceModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -193,6 +200,9 @@ beforeEach(async function () {
     aavePool.address
   );
 
+  // NFT
+  nft = await new NFT__factory(deployer).deploy();
+
   // Currency whitelisting
   await expect(
     moduleGlobals.connect(governance).whitelistCurrency(currency.address, true)
@@ -226,7 +236,6 @@ beforeEach(async function () {
     lensHub.connect(governance).whitelistCollectModule(auctionCollectModule.address, true)
   ).to.not.be.reverted;
 
-
   await expect(
     lensHub.connect(governance).whitelistCollectModule(aaveFeeCollectModule.address, true)
   ).to.not.be.reverted;
@@ -248,6 +257,14 @@ beforeEach(async function () {
     lensHub
       .connect(governance)
       .whitelistReferenceModule(degreesOfSeparationReferenceModule.address, true)
+  ).to.not.be.reverted;
+
+  // Reference modules
+  tokenGatedReferenceModule = await new TokenGatedReferenceModule__factory(deployer).deploy(
+    lensHub.address
+  );
+  await expect(
+    lensHub.connect(governance).whitelistReferenceModule(tokenGatedReferenceModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
