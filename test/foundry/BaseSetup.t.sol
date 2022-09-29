@@ -19,8 +19,9 @@ contract BaseSetup is Test {
     uint256 constant firstProfileId = 1;
     address constant deployer = address(1);
     address constant governance = address(2);
-    address constant publisher = address(3);
-    address constant treasury = address(4);
+    address constant treasury = address(3);
+    address constant publisher = address(4);
+    address constant user = address(5);
     address immutable me = address(this); // Main test User is this (rather inheriting from this) contract
 
     string constant MOCK_HANDLE = 'handle.lens';
