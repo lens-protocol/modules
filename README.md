@@ -30,6 +30,7 @@ This repository contains both - Hardhat and Foundry tests. Foundry will be used 
 
 ## Collect modules
 
+- [**Aave Fee Collect Module**](./contracts/collect/AaveFeeCollectModule.sol): Extend the LimitedFeeCollectModule to deposit all received fees into the Aave Polygon Market (if applicable for the asset) and send the resulting aTokens to the beneficiary.
 - [**Auction Collect Module**](./contracts/collect/AuctionCollectModule.sol): This module works by creating an English auction for the underlying publication. After the auction ends, only the auction winner is allowed to collect the publication.
 - [**Updatable Ownable Fee Collect Module**](./contracts/collect/UpdatableOwnableFeeCollectModule.sol): A fee collect module that, for each publication that uses it, mints an ERC-721 ownership-NFT to its author. Whoever owns the ownership-NFT has the rights to update the parameters required to do a successful collect operation over its underlying publication.
 
@@ -37,4 +38,5 @@ This repository contains both - Hardhat and Foundry tests. Foundry will be used 
 
 ## Reference modules
 
+- [**Degrees Of Separation Reference Module**](./contracts/reference/DegreesOfSeparationReferenceModule.sol): This reference module allows to set a degree of separation `n`, and then allows to comment/mirror only to profiles that are at most at `n` degrees of separation from the author of the root publication. 
 - [**Token Gated Reference Module**](./contracts/reference/TokenGatedReferenceModule.sol): A reference module that validates that the user who tries to reference has a required minimum balance of ERC20/ERC721 token.
