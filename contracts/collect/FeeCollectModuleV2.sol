@@ -8,7 +8,6 @@ import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectM
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 
-import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -43,10 +42,12 @@ struct RecipientData {
 }
 
 /**
- * @title AaveFeeCollectModule
+ * @title FeeCollectModuleV2
  * @author Lens Protocol
  *
- * @notice Extend the LimitedFeeCollectModule to deposit all received fees into the Aave Polygon Market (if applicable for the asset) and send the resulting aTokens to the beneficiary.
+ * @notice This is a simple Lens CollectModule implementation, allowing customization of time to collect, number of collects,
+ * splitting collect fee across multiple recipients, and whether only followers can collect.
+ *
  */
 contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
@@ -61,7 +62,7 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
      *
      * @param data The arbitrary data parameter, decoded into:
      *      uint96 collectLimit: The maximum amount of collects.
-     *      uint256 amount: The currency total amount to levy.
+     *      uint160 amount: The currency total amount to levy.
      *      address currency: The currency address, must be internally whitelisted.
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
