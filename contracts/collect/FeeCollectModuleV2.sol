@@ -23,6 +23,7 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param referralFee The referral fee associated with this publication.
  * @param followerOnly True if only followers of publisher may collect the post.
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
+ * @param recipients Array of RecipientData items to split collect fees across multiple recipients.
  */
 struct ProfilePublicationData {
     uint160 amount;
@@ -34,12 +35,10 @@ struct ProfilePublicationData {
     uint72 endTimestamp;
     RecipientData[] recipients;
 }
-// TODO decision on order of params in natspec - follow struct order (packed) or more natural order?
 
-// TODO remove - 80 bits left to pack
 struct RecipientData {
     address recipient;
-    uint16 amountCutPercentage; // fraction of BPS_MAX (10 000)
+    uint16 split; // fraction of BPS_MAX (10 000)
 }
 
 /**
@@ -53,8 +52,13 @@ struct RecipientData {
 contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
+    uint256 internal constant MAX_RECIPIENTS = 5;
+
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
+
+    error TooManyRecipients();
+    error InvalidRecipientSplits();
 
     constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
 
@@ -62,13 +66,13 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
      *
      * @param data The arbitrary data parameter, decoded into:
-     *      uint96 collectLimit: The maximum amount of collects.
      *      uint160 amount: The currency total amount to levy.
+     *      uint96 collectLimit: The maximum amount of collects.
      *      address currency: The currency address, must be internally whitelisted.
-     *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
      *      bool followerOnly: Whether only followers should be able to collect.
      *      uint72 endTimestamp: The end timestamp after which collecting is impossible.
+     *      RecipientData[] recipients: Array of RecipientData items to split collect fees across multiple recipients.
      *
      * @return An abi encoded bytes parameter, which is the same as the passed data parameter.
      */
@@ -78,32 +82,31 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
         (
-            uint96 collectLimit, // TODO rearrange to natspec
             uint160 amount,
+            uint96 collectLimit,
             address currency,
-            address recipient,
             uint16 referralFee,
             bool followerOnly,
             uint72 endTimestamp,
             RecipientData[] memory recipients
-        ) = abi.decode(
-                data,
-                (uint96, uint160, address, address, uint16, bool, uint72, RecipientData[])
-            );
+        ) = abi.decode(data, (uint160, uint96, address, uint16, bool, uint72, RecipientData[]));
         if (
             !_currencyWhitelisted(currency) ||
-            recipient == address(0) ||
             referralFee > BPS_MAX ||
             (endTimestamp < block.timestamp && endTimestamp > 0)
         ) revert Errors.InitParamsInvalid();
 
-        _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
+        _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
         _dataByPublicationByProfile[profileId][pubId].currency = currency;
-        // _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
         _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
         _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
         _dataByPublicationByProfile[profileId][pubId].endTimestamp = endTimestamp;
+
+        // Validate recipient array is formed properly
+        // and store recipients in mapping.
+        // Both operations done in function below to save gas on unnecessary loop
+        _validateAndStoreRecipients(recipients, profileId, pubId);
 
         return data;
     }
@@ -158,6 +161,37 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         returns (ProfilePublicationData memory)
     {
         return _dataByPublicationByProfile[profileId][pubId];
+    }
+
+    function _validateAndStoreRecipients(
+        RecipientData[] memory recipients,
+        uint256 profileId,
+        uint256 pubId
+    ) internal {
+        (uint256 i, uint256 len) = (0, recipients.length);
+
+        // Check number of recipients is supported
+        if (len > MAX_RECIPIENTS) revert TooManyRecipients();
+
+        // Skip loop check if only 1 recipient in the array
+        if (len == 1) {
+            if (recipients[0].split != BPS_MAX) revert InvalidRecipientSplits();
+
+            // If single recipient passes check above, store and return
+            _dataByPublicationByProfile[profileId][pubId].recipients[0] = recipients[0];
+        } else {
+            // Check recipient splits sum to 10 000 BPS (100%)
+            uint256 totalSplits;
+            for (i; i < len; ++i) {
+                totalSplits += recipients[i].split;
+                // TODO add no zero address recipients check?
+
+                // Store each recipient while looping - avoids extra gas costs in successful cases
+                _dataByPublicationByProfile[profileId][pubId].recipients[i] = recipients[i];
+            }
+
+            if (totalSplits != BPS_MAX) revert InvalidRecipientSplits();
+        }
     }
 
     function _processCollect(
