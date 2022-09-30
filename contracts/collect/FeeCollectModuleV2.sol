@@ -34,6 +34,7 @@ struct ProfilePublicationData {
     uint72 endTimestamp;
     RecipientData[] recipients;
 }
+// TODO decision on order of params in natspec - follow struct order (packed) or more natural order?
 
 // TODO remove - 80 bits left to pack
 struct RecipientData {
@@ -83,8 +84,12 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
             address recipient,
             uint16 referralFee,
             bool followerOnly,
-            uint72 endTimestamp
-        ) = abi.decode(data, (uint96, uint160, address, address, uint16, bool, uint72));
+            uint72 endTimestamp,
+            RecipientData[] memory recipients
+        ) = abi.decode(
+                data,
+                (uint96, uint160, address, address, uint16, bool, uint72, RecipientData[])
+            );
         if (
             !_currencyWhitelisted(currency) ||
             recipient == address(0) ||
