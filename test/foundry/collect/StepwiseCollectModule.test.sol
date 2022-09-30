@@ -888,3 +888,250 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
         verifyFeesWithMirror(treasuryFee, referralFee, amount);
     }
 }
+
+contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase {
+    uint256 immutable publisherProfileId;
+    uint256 immutable userProfileId;
+
+    StepwiseCollectModuleInitData exampleInitData;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    constructor() StepwiseCollectModuleBase() {
+        vm.recordLogs();
+        hub.createProfile(
+            DataTypes.CreateProfileData({
+                to: publisher,
+                handle: 'publisher.lens',
+                imageURI: OTHER_MOCK_URI,
+                followModule: address(0),
+                followModuleInitData: '',
+                followNFTURI: MOCK_FOLLOW_NFT_URI
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        publisherProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
+
+        vm.recordLogs();
+        hub.createProfile(
+            DataTypes.CreateProfileData({
+                to: user,
+                handle: 'user.lens',
+                imageURI: OTHER_MOCK_URI,
+                followModule: address(0),
+                followModuleInitData: '',
+                followNFTURI: MOCK_FOLLOW_NFT_URI
+            })
+        );
+        entries = vm.getRecordedLogs();
+        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
+
+        vm.prank(governance);
+        moduleGlobals.setTreasuryFee(0);
+    }
+
+    function setUp() public virtual {
+        exampleInitData = StepwiseCollectModuleInitData({
+            collectLimit: 0,
+            currency: address(currency),
+            recipient: address(publisher),
+            referralFee: 0,
+            followerOnly: false,
+            endTimestamp: 0,
+            a: 0,
+            b: 0,
+            c: 1 ether
+        });
+
+        currency.mint(user, type(uint256).max);
+        vm.prank(user);
+        currency.approve(address(stepwiseCollectModule), type(uint256).max);
+    }
+
+    function expectedStepwiseAmount(
+        uint256 a,
+        uint256 b,
+        uint256 c,
+        uint256 currentCollects
+    ) public returns (uint256) {
+        return
+            ((uint256(a) * (uint256(currentCollects) * uint256(currentCollects))) /
+                stepwiseCollectModule.A_DECIMALS()) +
+            ((uint256(b) * uint256(currentCollects)) / stepwiseCollectModule.B_DECIMALS()) +
+            uint256(c);
+    }
+
+    function testCalculateFeeMax() public {
+        ProfilePublicationData memory testData;
+        testData.a = type(uint72).max;
+        testData.b = type(uint56).max;
+        testData.c = type(uint128).max;
+        testData.currentCollects = type(uint64).max;
+
+        uint256 amount = stepwiseCollectModule.calculateFee(testData);
+
+        uint256 expectedAmount = expectedStepwiseAmount(
+            testData.a,
+            testData.b,
+            testData.c,
+            testData.currentCollects - 1
+        );
+
+        assertEq(amount, expectedAmount);
+    }
+
+    function testCalculateFeeFuzz(
+        uint72 a,
+        uint56 b,
+        uint128 c,
+        uint64 currentCollects
+    ) public {
+        vm.assume(currentCollects > 0);
+        ProfilePublicationData memory testData;
+        testData.a = a;
+        testData.b = b;
+        testData.c = c;
+        testData.currentCollects = currentCollects;
+
+        uint256 amount = stepwiseCollectModule.calculateFee(testData);
+
+        uint256 expectedAmount = expectedStepwiseAmount(a, b, c, currentCollects - 1);
+
+        assertEq(amount, expectedAmount);
+    }
+
+    function testStepwiseCollectConstant() public {
+        exampleInitData.a = 0;
+        exampleInitData.b = 0;
+        exampleInitData.c = 1;
+
+        vm.recordLogs();
+        vm.prank(publisher);
+        hub.post(
+            DataTypes.PostData({
+                profileId: publisherProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(exampleInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+
+        for (uint256 i = 0; i < 10; i++) {
+            uint256 expectedAmount = 1;
+            vm.prank(user);
+            vm.expectEmit(true, true, true, true, address(currency));
+            emit Transfer(user, publisher, expectedAmount);
+            hub.collect(publisherProfileId, pubId, abi.encode(address(currency), expectedAmount));
+        }
+    }
+
+    function testStepwiseCollectLinear() public {
+        exampleInitData.a = 0;
+        exampleInitData.b = uint56(2 * stepwiseCollectModule.B_DECIMALS());
+        exampleInitData.c = 2;
+
+        vm.recordLogs();
+        vm.prank(publisher);
+        hub.post(
+            DataTypes.PostData({
+                profileId: publisherProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(exampleInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+
+        console.log('Linear increase test (2, 4, 6, ...):');
+        for (uint256 i = 0; i < 10; i++) {
+            uint256 expectedAmount = 2 + 2 * i;
+            vm.prank(user);
+            vm.expectEmit(true, true, true, true, address(currency));
+            emit Transfer(user, publisher, expectedAmount);
+            hub.collect(publisherProfileId, pubId, abi.encode(address(currency), expectedAmount));
+            console.log('  ', expectedAmount);
+        }
+    }
+
+    function testStepwiseCollectSquared() public {
+        exampleInitData.a = uint72(stepwiseCollectModule.A_DECIMALS());
+        exampleInitData.b = 0;
+        exampleInitData.c = 0;
+
+        vm.recordLogs();
+        vm.prank(publisher);
+        hub.post(
+            DataTypes.PostData({
+                profileId: publisherProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(exampleInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+
+        console.log('Squared curve test (0, 1, 4, 9, ...):');
+        for (uint256 i = 0; i < 10; i++) {
+            uint256 expectedAmount = i * i;
+            vm.prank(user);
+            if (expectedAmount != 0) {
+                vm.expectEmit(true, false, false, false);
+                emit Transfer(user, publisher, expectedAmount);
+            }
+            hub.collect(publisherProfileId, pubId, abi.encode(address(currency), expectedAmount));
+            console.log('  ', expectedAmount);
+        }
+    }
+
+    function testStepwiseCollectFuzz(
+        uint72 a,
+        uint56 b,
+        uint128 c,
+        uint64 numberOfCollects
+    ) public {
+        console.log('Testing %s collects:', numberOfCollects);
+        vm.assume(numberOfCollects < 100 && numberOfCollects > 1);
+
+        exampleInitData.a = a;
+        exampleInitData.b = b;
+        exampleInitData.c = c;
+
+        vm.recordLogs();
+        vm.prank(publisher);
+        hub.post(
+            DataTypes.PostData({
+                profileId: publisherProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(exampleInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+
+        for (uint256 i = 0; i < numberOfCollects; i++) {
+            uint256 currentCollects = stepwiseCollectModule
+                .getPublicationData(publisherProfileId, pubId)
+                .currentCollects;
+            assertEq(currentCollects, i, 'Number of collects doesnt match');
+            uint256 expectedAmount = expectedStepwiseAmount(a, b, c, currentCollects);
+            console.log('  ', expectedAmount);
+            vm.prank(user);
+            if (expectedAmount > 0) vm.expectEmit(true, true, true, true, address(currency));
+            emit Transfer(user, publisher, expectedAmount);
+            hub.collect(publisherProfileId, pubId, abi.encode(address(currency), expectedAmount));
+        }
+    }
+}
