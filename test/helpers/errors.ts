@@ -1,4 +1,7 @@
 export const ERRORS = {
+  // TokenGatedReferenceModule
+  NOT_ENOUGH_BALANCE: 'NotEnoughBalance()',
+
   // AuctionCollectModule
   ONGOING_AUCTION: 'OngoingAuction()',
   UNAVAILABLE_AUCTION: 'UnavailableAuction()',
@@ -9,6 +12,12 @@ export const ERRORS = {
   // UpdatableOwnableFeeCollectModule
   ONLY_OWNER: 'OnlyOwner()',
   INVALID_PARAMETERS: 'InvalidParameters()',
+
+  // DegreesOfSeparationReferenceModule
+  INVALID_DEGREES_OF_SEPARATION: 'InvalidDegreesOfSeparation()',
+  OPERATION_DISABLED: 'OperationDisabled()',
+  PROFILE_PATH_EXCEEDS_DEGREES_OF_SEPARATION: 'ProfilePathExceedsDegreesOfSeparation()',
+  PUBLICATION_NOT_SET_UP: 'PublicationNotSetUp()',
 
   // Core
   CANNOT_INIT_IMPL: 'CannotInitImplementation()',

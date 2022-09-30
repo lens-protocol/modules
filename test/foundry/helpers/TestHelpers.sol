@@ -33,7 +33,7 @@ library TestHelpers {
                 return uint256(entries[i].topics[2]); // 0 is always event topic
             }
         }
-        revert('No Pub creation event found');
+        revert('No Publication creation event found');
     }
 
     function getCreatedMirrorIdFromEvents(Vm.Log[] memory entries) public pure returns (uint256) {

@@ -14,6 +14,7 @@ import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
 
 import {Currency} from '@aave/lens-protocol/contracts/mocks/Currency.sol';
+import {NFT} from 'contracts/mocks/NFT.sol';
 
 contract BaseSetup is Test {
     uint256 constant firstProfileId = 1;
@@ -44,6 +45,7 @@ contract BaseSetup is Test {
     FreeCollectModule immutable freeCollectModule;
     Currency immutable currency;
     ModuleGlobals immutable moduleGlobals;
+    NFT immutable nft;
 
     constructor() {
         ///////////////////////////////////////// Start deployments.
@@ -77,6 +79,7 @@ contract BaseSetup is Test {
         moduleGlobals = new ModuleGlobals(governance, treasury, TREASURY_FEE_BPS);
 
         currency = new Currency();
+        nft = new NFT();
 
         vm.stopPrank();
         ///////////////////////////////////////// End deployments.
