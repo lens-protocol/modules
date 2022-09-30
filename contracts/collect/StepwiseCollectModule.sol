@@ -210,14 +210,16 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
-        (address treasury, uint16 treasuryFee) = _treasuryData();
-        address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
-        uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
-        uint256 adjustedAmount = amount - treasuryAmount;
+        if (amount != 0) {
+            (address treasury, uint16 treasuryFee) = _treasuryData();
+            address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
+            uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
+            uint256 adjustedAmount = amount - treasuryAmount;
 
-        IERC20(currency).safeTransferFrom(collector, recipient, adjustedAmount);
-        if (treasuryAmount > 0)
-            IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+            IERC20(currency).safeTransferFrom(collector, recipient, adjustedAmount);
+            if (treasuryAmount > 0)
+                IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
     }
 
     function _processCollectWithReferral(
@@ -231,34 +233,39 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
-        uint256 referralFee = _dataByPublicationByProfile[profileId][pubId].referralFee;
-        address treasury;
-        uint256 treasuryAmount;
+        if (amount != 0) {
+            uint256 referralFee = _dataByPublicationByProfile[profileId][pubId].referralFee;
+            address treasury;
+            uint256 treasuryAmount;
 
-        // Avoids stack too deep
-        {
-            uint16 treasuryFee;
-            (treasury, treasuryFee) = _treasuryData();
-            treasuryAmount = (amount * treasuryFee) / BPS_MAX;
+            // Avoids stack too deep
+            {
+                uint16 treasuryFee;
+                (treasury, treasuryFee) = _treasuryData();
+                treasuryAmount = (amount * treasuryFee) / BPS_MAX;
+            }
+
+            uint256 adjustedAmount = amount - treasuryAmount;
+
+            if (referralFee != 0) {
+                // The reason we levy the referral fee on the adjusted amount is so that referral fees
+                // don't bypass the treasury fee, in essence referrals pay their fair share to the treasury.
+                uint256 referralAmount = (adjustedAmount * referralFee) / BPS_MAX;
+
+                if (referralAmount != 0) {
+                    adjustedAmount = adjustedAmount - referralAmount;
+
+                    address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
+
+                    IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
+                }
+            }
+            address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
+
+            IERC20(currency).safeTransferFrom(collector, recipient, adjustedAmount);
+            if (treasuryAmount > 0)
+                IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
         }
-
-        uint256 adjustedAmount = amount - treasuryAmount;
-
-        if (referralFee != 0) {
-            // The reason we levy the referral fee on the adjusted amount is so that referral fees
-            // don't bypass the treasury fee, in essence referrals pay their fair share to the treasury.
-            uint256 referralAmount = (adjustedAmount * referralFee) / BPS_MAX;
-            adjustedAmount = adjustedAmount - referralAmount;
-
-            address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
-
-            IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
-        }
-        address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
-
-        IERC20(currency).safeTransferFrom(collector, recipient, adjustedAmount);
-        if (treasuryAmount > 0)
-            IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
     }
 
     function _validateDataIsExpected(
