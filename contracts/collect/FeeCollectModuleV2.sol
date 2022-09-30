@@ -59,6 +59,7 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
 
     error TooManyRecipients();
     error InvalidRecipientSplits();
+    error RecipientSplitCannotBeZero();
 
     constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
 
@@ -163,37 +164,6 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         return _dataByPublicationByProfile[profileId][pubId];
     }
 
-    function _validateAndStoreRecipients(
-        RecipientData[] memory recipients,
-        uint256 profileId,
-        uint256 pubId
-    ) internal {
-        (uint256 i, uint256 len) = (0, recipients.length);
-
-        // Check number of recipients is supported
-        if (len > MAX_RECIPIENTS) revert TooManyRecipients();
-
-        // Skip loop check if only 1 recipient in the array
-        if (len == 1) {
-            if (recipients[0].split != BPS_MAX) revert InvalidRecipientSplits();
-
-            // If single recipient passes check above, store and return
-            _dataByPublicationByProfile[profileId][pubId].recipients[0] = recipients[0];
-        } else {
-            // Check recipient splits sum to 10 000 BPS (100%)
-            uint256 totalSplits;
-            for (i; i < len; ++i) {
-                totalSplits += recipients[i].split;
-                // TODO add no zero address recipients check?
-
-                // Store each recipient while looping - avoids extra gas costs in successful cases
-                _dataByPublicationByProfile[profileId][pubId].recipients[i] = recipients[i];
-            }
-
-            if (totalSplits != BPS_MAX) revert InvalidRecipientSplits();
-        }
-    }
-
     function _processCollect(
         address collector,
         uint256 profileId,
@@ -205,36 +175,16 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         _validateDataIsExpected(data, currency, amount);
 
         (address treasury, uint16 treasuryFee) = _treasuryData();
-        // address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
         uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
 
-        _transferFromAndDepositToAaveIfApplicable(
-            currency,
-            collector,
-            // recipient,
-            amount - treasuryAmount
-        );
+        // Send amount after treasury cut, to all recipients
+        RecipientData[] memory recipients = _dataByPublicationByProfile[profileId][pubId]
+            .recipients;
+        _transferToRecipients(currency, collector, amount - treasuryAmount, recipients);
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
         }
-    }
-
-    function _transferFromAndDepositToAaveIfApplicable(
-        address currency,
-        address from,
-        // address beneficiary,
-        uint256 amount
-    ) internal {
-        // First, transfer funds to this contract
-        IERC20(currency).safeTransferFrom(from, address(this), amount);
-        // IERC20(currency).approve(aavePool, amount);
-
-        // Then, attempt to supply funds in Aave v3, sending aTokens to beneficiary
-        // try IPool(aavePool).supply(currency, amount, beneficiary, 0) {} catch {
-        //     // If supply() above fails, send funds directly to beneficiary
-        //     IERC20(currency).safeTransfer(beneficiary, amount);
-        // }
     }
 
     function _processCollectWithReferral(
@@ -272,17 +222,65 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
             // Send referral fee in normal ERC20 tokens
             IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
         }
-        // address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
-        _transferFromAndDepositToAaveIfApplicable(
-            currency,
-            collector,
-            //  recipient,
-            adjustedAmount
-        );
+        // Send amount after treasury and referral fee, to all recipients
+        RecipientData[] memory recipients = _dataByPublicationByProfile[profileId][pubId]
+            .recipients;
+        _transferToRecipients(currency, collector, adjustedAmount, recipients);
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
+    }
+
+    function _validateAndStoreRecipients(
+        RecipientData[] memory recipients,
+        uint256 profileId,
+        uint256 pubId
+    ) internal {
+        (uint256 i, uint256 len) = (0, recipients.length);
+
+        // Check number of recipients is supported
+        if (len > MAX_RECIPIENTS) revert TooManyRecipients();
+
+        // Skip loop check if only 1 recipient in the array
+        if (len == 1) {
+            if (recipients[0].split != BPS_MAX) revert InvalidRecipientSplits();
+
+            // If single recipient passes check above, store and return
+            _dataByPublicationByProfile[profileId][pubId].recipients[0] = recipients[0];
+        } else {
+            // Check recipient splits sum to 10 000 BPS (100%)
+            uint256 totalSplits;
+            for (i; i < len; ++i) {
+                if (recipients[i].split == 0) revert RecipientSplitCannotBeZero();
+                totalSplits += recipients[i].split;
+
+                // Store each recipient while looping - avoids extra gas costs in successful cases
+                _dataByPublicationByProfile[profileId][pubId].recipients[i] = recipients[i];
+            }
+
+            if (totalSplits != BPS_MAX) revert InvalidRecipientSplits();
+        }
+    }
+
+    function _transferToRecipients(
+        address currency,
+        address from,
+        uint256 amount,
+        RecipientData[] memory recipients
+    ) internal {
+        (uint256 i, uint256 len) = (0, recipients.length);
+
+        // If only 1 recipient, transfer full amount and skip split calculations
+        if (len == 1) {
+            IERC20(currency).safeTransferFrom(from, recipients[0].recipient, amount);
+        } else {
+            uint256 splitAmount;
+            for (i; i < len; ++i) {
+                splitAmount = (amount * recipients[i].split) / BPS_MAX;
+                IERC20(currency).safeTransferFrom(from, recipients[i].recipient, splitAmount);
+            }
         }
     }
 }
