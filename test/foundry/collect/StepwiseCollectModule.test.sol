@@ -227,7 +227,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
 /////////////
 // Collect with StepwiseCollectModule
 
-contract StepwiseCollectModule_Collect_Orig is StepwiseCollectModuleBase {
+contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
     uint256 immutable publisherProfileId;
     uint256 immutable userProfileId;
 
@@ -265,7 +265,7 @@ contract StepwiseCollectModule_Collect_Orig is StepwiseCollectModuleBase {
         userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
-    function setUp() public {
+    function setUp() public virtual {
         exampleInitData = StepwiseCollectModuleInitData({
             collectLimit: 0,
             currency: address(currency),
@@ -348,7 +348,11 @@ contract StepwiseCollectModule_Collect_Orig is StepwiseCollectModuleBase {
         vm.stopPrank();
     }
 
-    function hubPost(StepwiseCollectModuleInitData memory initData) public returns (uint256) {
+    function hubPost(StepwiseCollectModuleInitData memory initData)
+        public
+        virtual
+        returns (uint256)
+    {
         vm.recordLogs();
         vm.prank(publisher);
         hub.post(
@@ -427,7 +431,7 @@ contract StepwiseCollectModule_Collect_Orig is StepwiseCollectModuleBase {
         vm.stopPrank();
     }
 
-    function testCurrentCollectsIncreaseProperlyWhenCollecting() public {
+    function testCurrentCollectsIncreaseProperlyWhenCollecting() public virtual {
         uint256 secondPubId = hubPost(exampleInitData);
         vm.startPrank(user);
 
@@ -443,5 +447,444 @@ contract StepwiseCollectModule_Collect_Orig is StepwiseCollectModuleBase {
             assertEq(fetchedData.currentCollects, collects);
         }
         vm.stopPrank();
+    }
+}
+
+contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseCollectModule_Collect {
+    uint256 immutable userTwoProfileId;
+    uint256 origPubId;
+
+    constructor() StepwiseCollectModule_Collect() {
+        vm.recordLogs();
+        hub.createProfile(
+            DataTypes.CreateProfileData({
+                to: userTwo,
+                handle: 'usertwo.lens',
+                imageURI: OTHER_MOCK_URI,
+                followModule: address(0),
+                followModuleInitData: '',
+                followNFTURI: MOCK_FOLLOW_NFT_URI
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        userTwoProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
+    }
+
+    function setUp() public override {
+        exampleInitData = StepwiseCollectModuleInitData({
+            collectLimit: 0,
+            currency: address(currency),
+            recipient: me,
+            referralFee: 0,
+            followerOnly: false,
+            endTimestamp: 0,
+            a: 0,
+            b: 0,
+            c: 1 ether
+        });
+
+        vm.recordLogs();
+        vm.prank(userTwo);
+        hub.post(
+            DataTypes.PostData({
+                profileId: userTwoProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(exampleInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        origPubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+
+        vm.recordLogs();
+        vm.prank(publisher);
+        hub.mirror(
+            DataTypes.MirrorData({
+                profileId: publisherProfileId,
+                profileIdPointed: userTwoProfileId,
+                pubIdPointed: origPubId,
+                referenceModule: address(0),
+                referenceModuleInitData: '',
+                referenceModuleData: ''
+            })
+        );
+        entries = vm.getRecordedLogs();
+        pubId = TestHelpers.getCreatedMirrorIdFromEvents(entries);
+
+        currency.mint(user, type(uint256).max);
+        vm.prank(user);
+        currency.approve(address(stepwiseCollectModule), type(uint256).max);
+    }
+
+    function hubPost(StepwiseCollectModuleInitData memory initData)
+        public
+        override
+        returns (uint256)
+    {
+        vm.recordLogs();
+        vm.prank(userTwo);
+        hub.post(
+            DataTypes.PostData({
+                profileId: userTwoProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(exampleInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        origPubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+
+        vm.recordLogs();
+        vm.prank(publisher);
+        hub.mirror(
+            DataTypes.MirrorData({
+                profileId: publisherProfileId,
+                profileIdPointed: userTwoProfileId,
+                pubIdPointed: origPubId,
+                referenceModule: address(0),
+                referenceModuleInitData: '',
+                referenceModuleData: ''
+            })
+        );
+        entries = vm.getRecordedLogs();
+        return TestHelpers.getCreatedMirrorIdFromEvents(entries);
+    }
+
+    function testCurrentCollectsIncreaseProperlyWhenCollecting() public override {
+        uint256 secondPubId = hubPost(exampleInitData);
+        vm.startPrank(user);
+
+        ProfilePublicationData memory fetchedData = stepwiseCollectModule.getPublicationData(
+            userTwoProfileId,
+            origPubId
+        );
+        assertEq(fetchedData.currentCollects, 0);
+
+        for (uint256 collects = 1; collects < 5; collects++) {
+            hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
+            fetchedData = stepwiseCollectModule.getPublicationData(userTwoProfileId, origPubId);
+            assertEq(fetchedData.currentCollects, collects);
+        }
+        vm.stopPrank();
+    }
+}
+
+contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
+    struct Balances {
+        uint256 treasury;
+        uint256 referral;
+        uint256 publisher;
+        uint256 user;
+    }
+
+    uint16 internal constant BPS_MAX = 10000;
+
+    uint256 immutable publisherProfileId;
+    uint256 immutable userProfileId;
+    uint256 immutable mirrorerProfileId;
+
+    StepwiseCollectModuleInitData exampleInitData;
+
+    constructor() StepwiseCollectModuleBase() {
+        vm.recordLogs();
+        hub.createProfile(
+            DataTypes.CreateProfileData({
+                to: publisher,
+                handle: 'publisher.lens',
+                imageURI: OTHER_MOCK_URI,
+                followModule: address(0),
+                followModuleInitData: '',
+                followNFTURI: MOCK_FOLLOW_NFT_URI
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        publisherProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
+
+        vm.recordLogs();
+        hub.createProfile(
+            DataTypes.CreateProfileData({
+                to: user,
+                handle: 'user.lens',
+                imageURI: OTHER_MOCK_URI,
+                followModule: address(0),
+                followModuleInitData: '',
+                followNFTURI: MOCK_FOLLOW_NFT_URI
+            })
+        );
+        entries = vm.getRecordedLogs();
+        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
+
+        vm.recordLogs();
+        hub.createProfile(
+            DataTypes.CreateProfileData({
+                to: userTwo,
+                handle: 'usertwo.lens',
+                imageURI: OTHER_MOCK_URI,
+                followModule: address(0),
+                followModuleInitData: '',
+                followNFTURI: MOCK_FOLLOW_NFT_URI
+            })
+        );
+        entries = vm.getRecordedLogs();
+        mirrorerProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
+    }
+
+    function setUp() public virtual {
+        exampleInitData = StepwiseCollectModuleInitData({
+            collectLimit: 0,
+            currency: address(currency),
+            recipient: address(publisher),
+            referralFee: 0,
+            followerOnly: false,
+            endTimestamp: 0,
+            a: 0,
+            b: 0,
+            c: 1 ether
+        });
+
+        currency.mint(user, type(uint256).max);
+        vm.prank(user);
+        currency.approve(address(stepwiseCollectModule), type(uint256).max);
+    }
+
+    function hubPostAndMirror(
+        StepwiseCollectModuleInitData memory initData,
+        uint16 referralFee,
+        uint128 amount
+    ) public returns (uint256, uint256) {
+        exampleInitData.referralFee = referralFee;
+        exampleInitData.c = amount;
+        vm.recordLogs();
+        vm.prank(publisher);
+        hub.post(
+            DataTypes.PostData({
+                profileId: publisherProfileId,
+                contentURI: MOCK_URI,
+                collectModule: address(stepwiseCollectModule),
+                collectModuleInitData: abi.encode(exampleInitData),
+                referenceModule: address(0),
+                referenceModuleInitData: ''
+            })
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+
+        vm.recordLogs();
+        vm.prank(userTwo);
+        hub.mirror(
+            DataTypes.MirrorData({
+                profileId: mirrorerProfileId,
+                profileIdPointed: publisherProfileId,
+                pubIdPointed: pubId,
+                referenceModule: address(0),
+                referenceModuleInitData: '',
+                referenceModuleData: ''
+            })
+        );
+        entries = vm.getRecordedLogs();
+        uint256 mirrorId = TestHelpers.getCreatedMirrorIdFromEvents(entries);
+        return (pubId, mirrorId);
+    }
+
+    function verifyFeesWithoutMirror(uint16 treasuryFee, uint128 amount) public {
+        vm.prank(governance);
+        moduleGlobals.setTreasuryFee(treasuryFee);
+        (uint256 pubId, ) = hubPostAndMirror(exampleInitData, 0, amount);
+
+        Balances memory balancesBefore;
+        Balances memory balancesAfter;
+        Balances memory balancesChange;
+
+        balancesBefore.treasury = currency.balanceOf(treasury);
+        balancesBefore.publisher = currency.balanceOf(publisher);
+        balancesBefore.user = currency.balanceOf(user);
+
+        vm.prank(user);
+        vm.recordLogs();
+        hub.collect(publisherProfileId, pubId, abi.encode(address(currency), amount));
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        balancesAfter.treasury = currency.balanceOf(treasury);
+        balancesAfter.publisher = currency.balanceOf(publisher);
+        balancesAfter.user = currency.balanceOf(user);
+
+        balancesChange.treasury = balancesAfter.treasury - balancesBefore.treasury;
+        balancesChange.publisher = balancesAfter.publisher - balancesBefore.publisher;
+        balancesChange.user = balancesBefore.user - balancesAfter.user;
+
+        assertEq(balancesChange.treasury + balancesChange.publisher, balancesChange.user);
+
+        uint256 treasuryAmount = (uint256(amount) * treasuryFee) / BPS_MAX;
+        uint256 adjustedAmount = amount - treasuryAmount;
+
+        assertEq(balancesChange.treasury, treasuryAmount);
+        assertEq(balancesChange.publisher, adjustedAmount);
+        assertEq(balancesChange.user, amount);
+
+        if (amount == 0 || adjustedAmount == 0) {
+            vm.expectRevert('No Transfer event found');
+            TestHelpers.getTransferFromEvents(entries, user, publisher);
+            assertEq(balancesChange.treasury, 0);
+            assertEq(balancesChange.publisher, 0);
+            assertEq(balancesChange.user, 0);
+        } else {
+            uint256 ownerFeeTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                publisher
+            );
+            assertEq(ownerFeeTransferEventAmount, adjustedAmount);
+        }
+        if (treasuryFee == 0 || treasuryAmount == 0) {
+            vm.expectRevert('No Transfer event found');
+            TestHelpers.getTransferFromEvents(entries, user, treasury);
+            assertEq(balancesChange.treasury, 0);
+        } else {
+            uint256 treasuryTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                treasury
+            );
+            assertEq(treasuryTransferEventAmount, treasuryAmount);
+        }
+    }
+
+    function verifyFeesWithMirror(
+        uint16 treasuryFee,
+        uint16 referralFee,
+        uint128 amount
+    ) public {
+        vm.prank(governance);
+        moduleGlobals.setTreasuryFee(treasuryFee);
+        (uint256 pubId, uint256 mirrorId) = hubPostAndMirror(exampleInitData, referralFee, amount);
+
+        Vm.Log[] memory entries;
+
+        Balances memory balancesBefore;
+        Balances memory balancesAfter;
+        Balances memory balancesChange;
+
+        balancesBefore.treasury = currency.balanceOf(treasury);
+        balancesBefore.referral = currency.balanceOf(userTwo);
+        balancesBefore.publisher = currency.balanceOf(publisher);
+        balancesBefore.user = currency.balanceOf(user);
+
+        vm.recordLogs();
+        vm.prank(user);
+        hub.collect(mirrorerProfileId, mirrorId, abi.encode(address(currency), amount));
+        entries = vm.getRecordedLogs();
+
+        balancesAfter.treasury = currency.balanceOf(treasury);
+        balancesAfter.referral = currency.balanceOf(userTwo);
+        balancesAfter.publisher = currency.balanceOf(publisher);
+        balancesAfter.user = currency.balanceOf(user);
+
+        balancesChange.treasury = balancesAfter.treasury - balancesBefore.treasury;
+        balancesChange.referral = balancesAfter.referral - balancesBefore.referral;
+        balancesChange.publisher = balancesAfter.publisher - balancesBefore.publisher;
+        balancesChange.user = balancesBefore.user - balancesAfter.user;
+
+        assertEq(
+            balancesChange.treasury + balancesChange.referral + balancesChange.publisher,
+            balancesChange.user
+        );
+
+        uint256 treasuryAmount = (uint256(amount) * treasuryFee) / BPS_MAX;
+        uint256 adjustedAmount = uint256(amount) - treasuryAmount;
+        uint256 referralAmount = (adjustedAmount * referralFee) / BPS_MAX;
+
+        if (referralFee != 0) adjustedAmount = adjustedAmount - referralAmount;
+
+        assertEq(balancesChange.treasury, treasuryAmount);
+        assertEq(balancesChange.referral, referralAmount);
+        assertEq(balancesChange.publisher, adjustedAmount);
+        assertEq(balancesChange.user, amount);
+
+        if (amount == 0 || adjustedAmount == 0) {
+            vm.expectRevert('No Transfer event found');
+            TestHelpers.getTransferFromEvents(entries, user, publisher);
+            assertEq(balancesChange.treasury, 0);
+            assertEq(balancesChange.referral, 0);
+            assertEq(balancesChange.publisher, 0);
+            assertEq(balancesChange.user, 0);
+        } else {
+            uint256 ownerFeeTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                publisher
+            );
+            assertEq(ownerFeeTransferEventAmount, adjustedAmount);
+        }
+
+        if (treasuryFee == 0 || treasuryAmount == 0) {
+            vm.expectRevert('No Transfer event found');
+            TestHelpers.getTransferFromEvents(entries, user, treasury);
+            assertEq(balancesChange.treasury, 0);
+        } else {
+            uint256 treasuryTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                treasury
+            );
+            assertEq(treasuryTransferEventAmount, treasuryAmount);
+        }
+
+        if (referralFee == 0 || referralAmount == 0) {
+            vm.expectRevert('No Transfer event found');
+            TestHelpers.getTransferFromEvents(entries, user, userTwo);
+            assertEq(balancesChange.referral, referralAmount);
+        } else {
+            uint256 referralTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                userTwo
+            );
+            assertEq(referralTransferEventAmount, referralAmount);
+        }
+    }
+
+    function testFeesDistributionEdgeCasesWithoutMirror() public {
+        verifyFeesWithoutMirror(0, 0);
+        verifyFeesWithoutMirror(0, 1 ether);
+        verifyFeesWithoutMirror(0, type(uint128).max);
+        verifyFeesWithoutMirror(BPS_MAX / 2 - 1, 0);
+        verifyFeesWithoutMirror(BPS_MAX / 2 - 1, 1 ether);
+        verifyFeesWithoutMirror(BPS_MAX / 2 - 1, type(uint128).max);
+    }
+
+    function testFeesDistributionWithoutMirrorFuzzing(uint16 treasuryFee, uint128 amount) public {
+        vm.assume(treasuryFee < BPS_MAX / 2 - 1);
+        verifyFeesWithoutMirror(treasuryFee, amount);
+    }
+
+    function testFeesDistributionEdgeCasesWithMirror() public {
+        verifyFeesWithMirror(0, 0, 0);
+        verifyFeesWithMirror(0, 0, type(uint128).max);
+        verifyFeesWithMirror(0, BPS_MAX / 2 - 1, 0);
+        verifyFeesWithMirror(0, BPS_MAX / 2 - 1, type(uint128).max);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, 0, 0);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, 0, type(uint128).max);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, BPS_MAX / 2 - 1, 0);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, BPS_MAX / 2 - 1, type(uint128).max);
+        verifyFeesWithMirror(0, 0, 1);
+        verifyFeesWithMirror(0, 1, 0);
+        verifyFeesWithMirror(0, 1, 1);
+        verifyFeesWithMirror(1, 0, 1);
+        verifyFeesWithMirror(1, 1, 0);
+        verifyFeesWithMirror(1, 1, 1);
+    }
+
+    function testFeesDistributionWithMirrorFuzzing(
+        uint16 treasuryFee,
+        uint16 referralFee,
+        uint128 amount
+    ) public {
+        vm.assume(treasuryFee < BPS_MAX / 2 - 1);
+        vm.assume(referralFee < BPS_MAX / 2 - 1);
+        verifyFeesWithMirror(treasuryFee, referralFee, amount);
     }
 }
