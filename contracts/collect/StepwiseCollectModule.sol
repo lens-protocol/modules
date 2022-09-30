@@ -84,8 +84,8 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
     using SafeERC20 for IERC20;
 
     // As there is hard optimisation of a,b,c parameters, the following decimals convention is assumed for fixed-point calculations:
-    uint256 constant A_DECIMALS = 1e9; // leaves 30 bits for fractional part, 42 bits for integer part
-    uint256 constant B_DECIMALS = 1e9; // leaves 30 bits for fractional part, 26 bits for integer part
+    uint256 public constant A_DECIMALS = 1e9; // leaves 30 bits for fractional part, 42 bits for integer part
+    uint256 public constant B_DECIMALS = 1e9; // leaves 30 bits for fractional part, 26 bits for integer part
     // For C the decimals will be equal to currency decimals
 
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
@@ -191,12 +191,15 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
     // Pro-public: Easier frontend calculation/verification of how much you need to pay
     // Cons-public: extra function call - more gas
     function calculateFee(ProfilePublicationData memory data) public pure returns (uint256) {
+        // Because we already incremented the current collects in storage - we need to adjust it here.
+        // This is done to allow the first collect price to be equal to c parameter (better UX)
+        uint256 collects = data.currentCollects - 1;
         // TODO: Probably unnecessary optimization - verify if it's necessary:
         if (data.a == 0 && data.b == 0) return data.c;
-        if (data.a == 0) return (data.b * data.currentCollects) / B_DECIMALS + data.c;
+        if (data.a == 0) return (uint256(data.b) * collects) / B_DECIMALS + data.c;
         return
-            ((data.a * data.currentCollects * data.currentCollects) / A_DECIMALS) +
-            ((data.b * data.currentCollects) / B_DECIMALS) +
+            ((uint256(data.a) * collects * collects) / A_DECIMALS) +
+            ((uint256(data.b) * collects) / B_DECIMALS) +
             data.c;
     }
 
@@ -274,7 +277,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         uint256 amount
     ) internal pure override {
         (address decodedCurrency, uint256 decodedMaxAmount) = abi.decode(data, (address, uint256));
-        if (decodedMaxAmount < amount || decodedCurrency != currency)
+        if (amount > decodedMaxAmount || decodedCurrency != currency)
             revert Errors.ModuleDataMismatch();
     }
 }
