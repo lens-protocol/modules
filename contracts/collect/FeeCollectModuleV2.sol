@@ -16,10 +16,9 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @notice A struct containing the necessary data to execute collect actions on a publication.
  *
  * @param amount The collecting cost associated with this publication. 0 for free collect.
- * @param currency The currency associated with this publication.
  * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
+ * @param currency The currency associated with this publication.
  * @param currentCollects The current number of collects for this publication.
- * @param recipient The recipient address associated with this publication.
  * @param referralFee The referral fee associated with this publication.
  * @param followerOnly True if only followers of publisher may collect the post.
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
@@ -39,6 +38,27 @@ struct ProfilePublicationData {
 struct RecipientData {
     address recipient;
     uint16 split; // fraction of BPS_MAX (10 000)
+}
+
+/**
+ * @notice A struct containing the necessary data to initialize FeeCollect Module V2.
+ *
+ * @param amount The collecting cost associated with this publication. 0 for free collect.
+ * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
+ * @param currency The currency associated with this publication.
+ * @param referralFee The referral fee associated with this publication.
+ * @param followerOnly True if only followers of publisher may collect the post.
+ * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
+ * @param recipients Array of RecipientData items to split collect fees across multiple recipients.
+ */
+struct FeeCollectModuleV2InitData {
+    uint160 amount;
+    uint96 collectLimit;
+    address currency;
+    uint16 referralFee;
+    bool followerOnly;
+    uint72 endTimestamp;
+    RecipientData[] recipients;
 }
 
 /**
@@ -82,32 +102,24 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         uint256 pubId,
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
-        (
-            uint160 amount,
-            uint96 collectLimit,
-            address currency,
-            uint16 referralFee,
-            bool followerOnly,
-            uint72 endTimestamp,
-            RecipientData[] memory recipients
-        ) = abi.decode(data, (uint160, uint96, address, uint16, bool, uint72, RecipientData[]));
+        FeeCollectModuleV2InitData memory initData = abi.decode(data, (FeeCollectModuleV2InitData));
         if (
-            !_currencyWhitelisted(currency) ||
-            referralFee > BPS_MAX ||
-            (endTimestamp < block.timestamp && endTimestamp > 0)
+            !_currencyWhitelisted(initData.currency) ||
+            initData.referralFee > BPS_MAX ||
+            (initData.endTimestamp < block.timestamp && initData.endTimestamp > 0)
         ) revert Errors.InitParamsInvalid();
 
-        _dataByPublicationByProfile[profileId][pubId].amount = amount;
-        _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
-        _dataByPublicationByProfile[profileId][pubId].currency = currency;
-        _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
-        _dataByPublicationByProfile[profileId][pubId].followerOnly = followerOnly;
-        _dataByPublicationByProfile[profileId][pubId].endTimestamp = endTimestamp;
+        _dataByPublicationByProfile[profileId][pubId].amount = initData.amount;
+        _dataByPublicationByProfile[profileId][pubId].collectLimit = initData.collectLimit;
+        _dataByPublicationByProfile[profileId][pubId].currency = initData.currency;
+        _dataByPublicationByProfile[profileId][pubId].referralFee = initData.referralFee;
+        _dataByPublicationByProfile[profileId][pubId].followerOnly = initData.followerOnly;
+        _dataByPublicationByProfile[profileId][pubId].endTimestamp = initData.endTimestamp;
 
         // Validate recipient array is formed properly
         // and store recipients in mapping.
         // Both operations done in function below to save gas on unnecessary loop
-        _validateAndStoreRecipients(recipients, profileId, pubId);
+        _validateAndStoreRecipients(initData.recipients, profileId, pubId);
 
         return data;
     }
@@ -215,12 +227,14 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
             // The reason we levy the referral fee on the adjusted amount is so that referral fees
             // don't bypass the treasury fee, in essence referrals pay their fair share to the treasury.
             uint256 referralAmount = (adjustedAmount * referralFee) / BPS_MAX;
-            adjustedAmount = adjustedAmount - referralAmount;
+            if (referralAmount != 0) {
+                adjustedAmount = adjustedAmount - referralAmount;
 
-            address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
+                address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
 
-            // Send referral fee in normal ERC20 tokens
-            IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
+                // Send referral fee in normal ERC20 tokens
+                IERC20(currency).safeTransferFrom(collector, referralRecipient, referralAmount);
+            }
         }
 
         // Send amount after treasury and referral fee, to all recipients
@@ -228,7 +242,7 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
             .recipients;
         _transferToRecipients(currency, collector, adjustedAmount, recipients);
 
-        if (treasuryAmount > 0) {
+        if (treasuryAmount != 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
         }
     }
@@ -242,22 +256,25 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
 
         // Check number of recipients is supported
         if (len > MAX_RECIPIENTS) revert TooManyRecipients();
+        if (len == 0) revert Errors.InitParamsInvalid();
 
         // Skip loop check if only 1 recipient in the array
         if (len == 1) {
+            if (recipients[0].recipient == address(0)) revert Errors.InitParamsInvalid();
             if (recipients[0].split != BPS_MAX) revert InvalidRecipientSplits();
 
             // If single recipient passes check above, store and return
-            _dataByPublicationByProfile[profileId][pubId].recipients[0] = recipients[0];
+            _dataByPublicationByProfile[profileId][pubId].recipients.push(recipients[0]);
         } else {
             // Check recipient splits sum to 10 000 BPS (100%)
             uint256 totalSplits;
             for (i; i < len; ++i) {
+                if (recipients[0].recipient == address(0)) revert Errors.InitParamsInvalid();
                 if (recipients[i].split == 0) revert RecipientSplitCannotBeZero();
                 totalSplits += recipients[i].split;
 
                 // Store each recipient while looping - avoids extra gas costs in successful cases
-                _dataByPublicationByProfile[profileId][pubId].recipients[i] = recipients[i];
+                _dataByPublicationByProfile[profileId][pubId].recipients.push(recipients[i]);
             }
 
             if (totalSplits != BPS_MAX) revert InvalidRecipientSplits();
@@ -273,13 +290,14 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         (uint256 i, uint256 len) = (0, recipients.length);
 
         // If only 1 recipient, transfer full amount and skip split calculations
-        if (len == 1) {
+        if (len == 1 && amount != 0) {
             IERC20(currency).safeTransferFrom(from, recipients[0].recipient, amount);
         } else {
             uint256 splitAmount;
             for (i; i < len; ++i) {
                 splitAmount = (amount * recipients[i].split) / BPS_MAX;
-                IERC20(currency).safeTransferFrom(from, recipients[i].recipient, splitAmount);
+                if (splitAmount != 0)
+                    IERC20(currency).safeTransferFrom(from, recipients[i].recipient, splitAmount);
             }
         }
     }
