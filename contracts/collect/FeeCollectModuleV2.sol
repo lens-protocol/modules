@@ -268,13 +268,17 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         } else {
             // Check recipient splits sum to 10 000 BPS (100%)
             uint256 totalSplits;
-            for (i; i < len; ++i) {
+            for (i; i < len; ) {
                 if (recipients[0].recipient == address(0)) revert Errors.InitParamsInvalid();
                 if (recipients[i].split == 0) revert RecipientSplitCannotBeZero();
                 totalSplits += recipients[i].split;
 
                 // Store each recipient while looping - avoids extra gas costs in successful cases
                 _dataByPublicationByProfile[profileId][pubId].recipients.push(recipients[i]);
+
+                unchecked {
+                    ++i;
+                }
             }
 
             if (totalSplits != BPS_MAX) revert InvalidRecipientSplits();
@@ -294,10 +298,14 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
             IERC20(currency).safeTransferFrom(from, recipients[0].recipient, amount);
         } else {
             uint256 splitAmount;
-            for (i; i < len; ++i) {
+            for (i; i < len; ) {
                 splitAmount = (amount * recipients[i].split) / BPS_MAX;
                 if (splitAmount != 0)
                     IERC20(currency).safeTransferFrom(from, recipients[i].recipient, splitAmount);
+
+                unchecked {
+                    ++i;
+                }
             }
         }
     }
