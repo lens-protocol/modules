@@ -18,8 +18,7 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
     FeeCollectModuleV2InitData exampleInitData;
 
     constructor() FeeCollectModuleV2Base() {
-        vm.recordLogs();
-        hub.createProfile(
+        userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
                 handle: 'user.lens',
@@ -29,8 +28,6 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public {
@@ -122,8 +119,7 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
     }
 
     function testCreatePublicationEmitsExpectedEvents() public {
-        vm.recordLogs();
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
@@ -133,8 +129,6 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
         assertEq(pubId, 1);
     }
 
@@ -212,8 +206,7 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
             recipients: recipients
         });
 
-        vm.recordLogs();
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
@@ -223,8 +216,6 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
         assert(pubId > 0);
         ProfilePublicationData memory fetchedData = feeCollectModuleV2.getPublicationData(
             userProfileId,
@@ -255,8 +246,7 @@ contract FeeCollectModuleV2_Collect is FeeCollectModuleV2Base {
     FeeCollectModuleV2InitData exampleInitData;
 
     constructor() FeeCollectModuleV2Base() {
-        vm.recordLogs();
-        hub.createProfile(
+        publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
                 handle: 'publisher.lens',
@@ -266,11 +256,8 @@ contract FeeCollectModuleV2_Collect is FeeCollectModuleV2Base {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        publisherProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
-        vm.recordLogs();
-        hub.createProfile(
+        userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
                 handle: 'user.lens',
@@ -280,8 +267,6 @@ contract FeeCollectModuleV2_Collect is FeeCollectModuleV2Base {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public virtual {
@@ -293,9 +278,8 @@ contract FeeCollectModuleV2_Collect is FeeCollectModuleV2Base {
         exampleInitData.endTimestamp = 0;
         exampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX}));
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -305,8 +289,6 @@ contract FeeCollectModuleV2_Collect is FeeCollectModuleV2Base {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
         currency.mint(user, type(uint256).max);
         vm.prank(user);
@@ -364,9 +346,8 @@ contract FeeCollectModuleV2_Collect is FeeCollectModuleV2Base {
     }
 
     function hubPost(FeeCollectModuleV2InitData memory initData) public virtual returns (uint256) {
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 newPubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -376,8 +357,7 @@ contract FeeCollectModuleV2_Collect is FeeCollectModuleV2Base {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        return TestHelpers.getCreatedPubIdFromEvents(entries);
+        return newPubId;
     }
 
     function testCannotCollectIfNotAFollower() public {
@@ -466,8 +446,7 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
     uint256 origPubId;
 
     constructor() FeeCollectModuleV2_Collect() {
-        vm.recordLogs();
-        hub.createProfile(
+        userTwoProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: userTwo,
                 handle: 'usertwo.lens',
@@ -477,8 +456,6 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        userTwoProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public override {
@@ -490,9 +467,8 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
         exampleInitData.endTimestamp = 0;
         exampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX}));
 
-        vm.recordLogs();
         vm.prank(userTwo);
-        hub.post(
+        origPubId = hub.post(
             DataTypes.PostData({
                 profileId: userTwoProfileId,
                 contentURI: MOCK_URI,
@@ -502,12 +478,9 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        origPubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.mirror(
+        pubId = hub.mirror(
             DataTypes.MirrorData({
                 profileId: publisherProfileId,
                 profileIdPointed: userTwoProfileId,
@@ -517,8 +490,6 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
                 referenceModuleData: ''
             })
         );
-        entries = vm.getRecordedLogs();
-        pubId = TestHelpers.getCreatedMirrorIdFromEvents(entries);
 
         currency.mint(user, type(uint256).max);
         vm.prank(user);
@@ -526,9 +497,8 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
     }
 
     function hubPost(FeeCollectModuleV2InitData memory initData) public override returns (uint256) {
-        vm.recordLogs();
         vm.prank(userTwo);
-        hub.post(
+        origPubId = hub.post(
             DataTypes.PostData({
                 profileId: userTwoProfileId,
                 contentURI: MOCK_URI,
@@ -538,12 +508,9 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        origPubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.mirror(
+        uint256 mirrorId = hub.mirror(
             DataTypes.MirrorData({
                 profileId: publisherProfileId,
                 profileIdPointed: userTwoProfileId,
@@ -553,8 +520,7 @@ contract FeeCollectModuleV2_Mirror is FeeCollectModuleV2Base, FeeCollectModuleV2
                 referenceModuleData: ''
             })
         );
-        entries = vm.getRecordedLogs();
-        return TestHelpers.getCreatedMirrorIdFromEvents(entries);
+        return mirrorId;
     }
 
     function testCurrentCollectsIncreaseProperlyWhenCollecting() public override {
@@ -584,8 +550,6 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
         uint256 user;
     }
 
-    uint16 internal constant BPS_MAX = 10000;
-
     uint256 immutable publisherProfileId;
     uint256 immutable userProfileId;
     uint256 immutable mirrorerProfileId;
@@ -593,8 +557,7 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
     FeeCollectModuleV2InitData exampleInitData;
 
     constructor() FeeCollectModuleV2Base() {
-        vm.recordLogs();
-        hub.createProfile(
+        publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
                 handle: 'publisher.lens',
@@ -604,11 +567,8 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        publisherProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
-        vm.recordLogs();
-        hub.createProfile(
+        userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
                 handle: 'user.lens',
@@ -618,11 +578,8 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
-        vm.recordLogs();
-        hub.createProfile(
+        mirrorerProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: userTwo,
                 handle: 'usertwo.lens',
@@ -632,8 +589,6 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        entries = vm.getRecordedLogs();
-        mirrorerProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public virtual {
@@ -657,9 +612,8 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
     ) public returns (uint256, uint256) {
         exampleInitData.referralFee = referralFee;
         exampleInitData.amount = amount;
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -669,12 +623,9 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
-        vm.recordLogs();
         vm.prank(userTwo);
-        hub.mirror(
+        uint256 mirrorId = hub.mirror(
             DataTypes.MirrorData({
                 profileId: mirrorerProfileId,
                 profileIdPointed: publisherProfileId,
@@ -684,8 +635,6 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
                 referenceModuleData: ''
             })
         );
-        entries = vm.getRecordedLogs();
-        uint256 mirrorId = TestHelpers.getCreatedMirrorIdFromEvents(entries);
         return (pubId, mirrorId);
     }
 
