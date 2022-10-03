@@ -548,6 +548,10 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
         uint256 referral;
         uint256 publisher;
         uint256 user;
+        uint256 userTwo;
+        uint256 userThree;
+        uint256 userFour;
+        uint256 userFive;
     }
 
     uint256 immutable publisherProfileId;
@@ -834,5 +838,140 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
         vm.assume(treasuryFee < BPS_MAX / 2 - 1);
         vm.assume(referralFee < BPS_MAX / 2 - 1);
         verifyFeesWithMirror(treasuryFee, referralFee, amount);
+    }
+
+    function testFeeSplitEquallyWithFiveRecipients(uint128 totalCollectFee) public {
+        uint256 treasuryAmount = (uint256(totalCollectFee) * TREASURY_FEE_BPS) / BPS_MAX;
+        uint256 adjustedAmount = totalCollectFee - treasuryAmount;
+
+        uint16 splitPerUser = BPS_MAX / 5;
+        uint256 expectedUserFeeCut = adjustedAmount / 5;
+
+        Balances memory balancesBefore;
+        Balances memory balancesAfter;
+
+        // Set users in initData to publisher, u2, u3, u4, userFive with equal split of fee
+        exampleInitData.recipients[0] = RecipientData({recipient: publisher, split: splitPerUser});
+        exampleInitData.recipients.push(RecipientData({recipient: userTwo, split: splitPerUser}));
+        exampleInitData.recipients.push(RecipientData({recipient: userThree, split: splitPerUser}));
+        exampleInitData.recipients.push(RecipientData({recipient: userFour, split: splitPerUser}));
+        exampleInitData.recipients.push(RecipientData({recipient: userFive, split: splitPerUser}));
+
+        (uint256 pubId, ) = hubPostAndMirror(exampleInitData, 0, totalCollectFee);
+
+        balancesBefore.treasury = currency.balanceOf(treasury);
+        balancesBefore.publisher = currency.balanceOf(publisher);
+        balancesBefore.userTwo = currency.balanceOf(userTwo);
+        balancesBefore.userThree = currency.balanceOf(userThree);
+        balancesBefore.userFour = currency.balanceOf(userFour);
+        balancesBefore.userFive = currency.balanceOf(userFive);
+
+        vm.prank(user);
+        hub.collect(publisherProfileId, pubId, abi.encode(address(currency), totalCollectFee));
+
+        balancesAfter.treasury = currency.balanceOf(treasury);
+        balancesAfter.publisher = currency.balanceOf(publisher);
+        balancesAfter.userTwo = currency.balanceOf(userTwo);
+        balancesAfter.userThree = currency.balanceOf(userThree);
+        balancesAfter.userFour = currency.balanceOf(userFour);
+        balancesAfter.userFive = currency.balanceOf(userFive);
+
+        assertEq(balancesAfter.treasury - balancesBefore.treasury, treasuryAmount);
+        assertEq(balancesAfter.publisher - balancesBefore.publisher, expectedUserFeeCut);
+        assertEq(balancesAfter.userTwo - balancesBefore.userTwo, expectedUserFeeCut);
+        assertEq(balancesAfter.userThree - balancesBefore.userThree, expectedUserFeeCut);
+        assertEq(balancesAfter.userFour - balancesBefore.userFour, expectedUserFeeCut);
+        assertEq(balancesAfter.userFive - balancesBefore.userFive, expectedUserFeeCut);
+    }
+
+    function testFuzzedSplitCutsWithFiveRecipients(
+        uint128 totalCollectFee,
+        uint16 userTwoSplit,
+        uint16 extraSplit
+    ) public {
+        // vm.assume(numRecipients >= 2 && numRecipients <= 5);
+        vm.assume(userTwoSplit < BPS_MAX / 2 && userTwoSplit != 0);
+        vm.assume(extraSplit < BPS_MAX / 2 && extraSplit > 1);
+
+        uint256 treasuryAmount = (uint256(totalCollectFee) * TREASURY_FEE_BPS) / BPS_MAX;
+
+        // Some fuzzy randomness in the splits and num of recipients
+        uint16 publisherSplit = (BPS_MAX / 2) - userTwoSplit;
+        uint16 userThreeSplit = (BPS_MAX / 2) - extraSplit;
+        uint16 userFourSplit = extraSplit / 2;
+        uint16 userFiveSplit = extraSplit - userFourSplit;
+
+        assertEq(
+            publisherSplit + userTwoSplit + userThreeSplit + userFourSplit + userFiveSplit,
+            BPS_MAX
+        );
+
+        Balances memory balancesBefore;
+        Balances memory balancesAfter;
+
+        // Set users in initData to fuzzed num of recipients, with fuzzed splits
+        exampleInitData.recipients[0] = RecipientData({
+            recipient: publisher,
+            split: publisherSplit
+        });
+        exampleInitData.recipients.push(RecipientData({recipient: userTwo, split: userTwoSplit}));
+
+        exampleInitData.recipients.push(
+            RecipientData({recipient: userThree, split: userThreeSplit})
+        );
+
+        exampleInitData.recipients.push(RecipientData({recipient: userFour, split: userFourSplit}));
+
+        exampleInitData.recipients.push(RecipientData({recipient: userFive, split: userFiveSplit}));
+
+        (uint256 pubId, ) = hubPostAndMirror(exampleInitData, 0, totalCollectFee);
+
+        balancesBefore.treasury = currency.balanceOf(treasury);
+        balancesBefore.publisher = currency.balanceOf(publisher);
+        balancesBefore.userTwo = currency.balanceOf(userTwo);
+        balancesBefore.userThree = currency.balanceOf(userThree);
+        balancesBefore.userFour = currency.balanceOf(userFour);
+        balancesBefore.userFive = currency.balanceOf(userFive);
+
+        vm.prank(user);
+        hub.collect(publisherProfileId, pubId, abi.encode(address(currency), totalCollectFee));
+
+        balancesAfter.treasury = currency.balanceOf(treasury);
+        balancesAfter.publisher = currency.balanceOf(publisher);
+        balancesAfter.userTwo = currency.balanceOf(userTwo);
+        balancesAfter.userThree = currency.balanceOf(userThree);
+        balancesAfter.userFour = currency.balanceOf(userFour);
+        balancesAfter.userFive = currency.balanceOf(userFive);
+
+        assertEq(balancesAfter.treasury - balancesBefore.treasury, treasuryAmount);
+        assertEq(
+            balancesAfter.publisher - balancesBefore.publisher,
+            predictCutAmount(totalCollectFee - treasuryAmount, publisherSplit)
+        );
+
+        assertEq(
+            balancesAfter.userTwo - balancesBefore.userTwo,
+            predictCutAmount(totalCollectFee - treasuryAmount, userTwoSplit)
+        );
+        assertEq(
+            balancesAfter.userThree - balancesBefore.userThree,
+            predictCutAmount(totalCollectFee - treasuryAmount, userThreeSplit)
+        );
+        assertEq(
+            balancesAfter.userFour - balancesBefore.userFour,
+            predictCutAmount(totalCollectFee - treasuryAmount, userFourSplit)
+        );
+        assertEq(
+            balancesAfter.userFive - balancesBefore.userFive,
+            predictCutAmount(totalCollectFee - treasuryAmount, userFiveSplit)
+        );
+    }
+
+    function predictCutAmount(uint256 totalAfterTreasuryCut, uint16 cutBPS)
+        internal
+        view
+        returns (uint256)
+    {
+        return (totalAfterTreasuryCut * cutBPS) / BPS_MAX;
     }
 }
