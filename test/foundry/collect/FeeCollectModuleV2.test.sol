@@ -889,13 +889,12 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
         uint16 userTwoSplit,
         uint16 extraSplit
     ) public {
-        // vm.assume(numRecipients >= 2 && numRecipients <= 5);
         vm.assume(userTwoSplit < BPS_MAX / 2 && userTwoSplit != 0);
         vm.assume(extraSplit < BPS_MAX / 2 && extraSplit > 1);
 
         uint256 treasuryAmount = (uint256(totalCollectFee) * TREASURY_FEE_BPS) / BPS_MAX;
 
-        // Some fuzzy randomness in the splits and num of recipients
+        // Some fuzzy randomness in the splits
         uint16 publisherSplit = (BPS_MAX / 2) - userTwoSplit;
         uint16 userThreeSplit = (BPS_MAX / 2) - extraSplit;
         uint16 userFourSplit = extraSplit / 2;
@@ -909,19 +908,16 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
         Balances memory balancesBefore;
         Balances memory balancesAfter;
 
-        // Set users in initData to fuzzed num of recipients, with fuzzed splits
+        // Set users in initData to five recipients with fuzzed splits
         exampleInitData.recipients[0] = RecipientData({
             recipient: publisher,
             split: publisherSplit
         });
         exampleInitData.recipients.push(RecipientData({recipient: userTwo, split: userTwoSplit}));
-
         exampleInitData.recipients.push(
             RecipientData({recipient: userThree, split: userThreeSplit})
         );
-
         exampleInitData.recipients.push(RecipientData({recipient: userFour, split: userFourSplit}));
-
         exampleInitData.recipients.push(RecipientData({recipient: userFive, split: userFiveSplit}));
 
         (uint256 pubId, ) = hubPostAndMirror(exampleInitData, 0, totalCollectFee);
@@ -948,7 +944,6 @@ contract FeeCollectModuleV2_FeeDistribution is FeeCollectModuleV2Base {
             balancesAfter.publisher - balancesBefore.publisher,
             predictCutAmount(totalCollectFee - treasuryAmount, publisherSplit)
         );
-
         assertEq(
             balancesAfter.userTwo - balancesBefore.userTwo,
             predictCutAmount(totalCollectFee - treasuryAmount, userTwoSplit)
