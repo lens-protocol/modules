@@ -16,8 +16,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
     StepwiseCollectModuleInitData exampleInitData;
 
     constructor() StepwiseCollectModuleBase() {
-        vm.recordLogs();
-        hub.createProfile(
+        userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
                 handle: 'user.lens',
@@ -27,8 +26,6 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public {
@@ -119,8 +116,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
     }
 
     function testCreatePublicationEmitsExpectedEvents() public {
-        vm.recordLogs();
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
@@ -130,8 +126,6 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
         assertEq(pubId, 1);
     }
 
@@ -194,8 +188,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
             c: c
         });
 
-        vm.recordLogs();
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
@@ -205,8 +198,6 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
         assert(pubId > 0);
         ProfilePublicationData memory fetchedData = stepwiseCollectModule.getPublicationData(
             userProfileId,
@@ -236,8 +227,7 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
     StepwiseCollectModuleInitData exampleInitData;
 
     constructor() StepwiseCollectModuleBase() {
-        vm.recordLogs();
-        hub.createProfile(
+        publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
                 handle: 'publisher.lens',
@@ -247,11 +237,8 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        publisherProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
-        vm.recordLogs();
-        hub.createProfile(
+        userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
                 handle: 'user.lens',
@@ -261,8 +248,6 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public virtual {
@@ -278,9 +263,8 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
             c: 1 ether
         });
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -290,8 +274,6 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
         currency.mint(user, type(uint256).max);
         vm.prank(user);
@@ -353,9 +335,8 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
         virtual
         returns (uint256)
     {
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -365,8 +346,7 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        return TestHelpers.getCreatedPubIdFromEvents(entries);
+        return pubId;
     }
 
     function testCannotCollectIfNotAFollower() public {
@@ -455,8 +435,7 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
     uint256 origPubId;
 
     constructor() StepwiseCollectModule_Collect() {
-        vm.recordLogs();
-        hub.createProfile(
+        userTwoProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: userTwo,
                 handle: 'usertwo.lens',
@@ -466,8 +445,6 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        userTwoProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public override {
@@ -483,9 +460,8 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
             c: 1 ether
         });
 
-        vm.recordLogs();
         vm.prank(userTwo);
-        hub.post(
+        origPubId = hub.post(
             DataTypes.PostData({
                 profileId: userTwoProfileId,
                 contentURI: MOCK_URI,
@@ -495,12 +471,9 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        origPubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.mirror(
+        pubId = hub.mirror(
             DataTypes.MirrorData({
                 profileId: publisherProfileId,
                 profileIdPointed: userTwoProfileId,
@@ -510,8 +483,6 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
                 referenceModuleData: ''
             })
         );
-        entries = vm.getRecordedLogs();
-        pubId = TestHelpers.getCreatedMirrorIdFromEvents(entries);
 
         currency.mint(user, type(uint256).max);
         vm.prank(user);
@@ -523,9 +494,8 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
         override
         returns (uint256)
     {
-        vm.recordLogs();
         vm.prank(userTwo);
-        hub.post(
+        origPubId = hub.post(
             DataTypes.PostData({
                 profileId: userTwoProfileId,
                 contentURI: MOCK_URI,
@@ -535,12 +505,9 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        origPubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.mirror(
+        uint256 mirrorId = hub.mirror(
             DataTypes.MirrorData({
                 profileId: publisherProfileId,
                 profileIdPointed: userTwoProfileId,
@@ -550,8 +517,7 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
                 referenceModuleData: ''
             })
         );
-        entries = vm.getRecordedLogs();
-        return TestHelpers.getCreatedMirrorIdFromEvents(entries);
+        return mirrorId;
     }
 
     function testCurrentCollectsIncreaseProperlyWhenCollecting() public override {
@@ -590,8 +556,7 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
     StepwiseCollectModuleInitData exampleInitData;
 
     constructor() StepwiseCollectModuleBase() {
-        vm.recordLogs();
-        hub.createProfile(
+        publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
                 handle: 'publisher.lens',
@@ -601,11 +566,8 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        publisherProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
-        vm.recordLogs();
-        hub.createProfile(
+        userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
                 handle: 'user.lens',
@@ -615,11 +577,8 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
-        vm.recordLogs();
-        hub.createProfile(
+        mirrorerProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: userTwo,
                 handle: 'usertwo.lens',
@@ -629,8 +588,6 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        entries = vm.getRecordedLogs();
-        mirrorerProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
     }
 
     function setUp() public virtual {
@@ -658,9 +615,8 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
     ) public returns (uint256, uint256) {
         exampleInitData.referralFee = referralFee;
         exampleInitData.c = amount;
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -670,12 +626,9 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
-        vm.recordLogs();
         vm.prank(userTwo);
-        hub.mirror(
+        uint256 mirrorId = hub.mirror(
             DataTypes.MirrorData({
                 profileId: mirrorerProfileId,
                 profileIdPointed: publisherProfileId,
@@ -685,8 +638,6 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
                 referenceModuleData: ''
             })
         );
-        entries = vm.getRecordedLogs();
-        uint256 mirrorId = TestHelpers.getCreatedMirrorIdFromEvents(entries);
         return (pubId, mirrorId);
     }
 
@@ -898,8 +849,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     constructor() StepwiseCollectModuleBase() {
-        vm.recordLogs();
-        hub.createProfile(
+        publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
                 handle: 'publisher.lens',
@@ -909,11 +859,8 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        publisherProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
-        vm.recordLogs();
-        hub.createProfile(
+        userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
                 handle: 'user.lens',
@@ -923,8 +870,6 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
                 followNFTURI: MOCK_FOLLOW_NFT_URI
             })
         );
-        entries = vm.getRecordedLogs();
-        userProfileId = TestHelpers.getCreatedProfileIdFromEvents(entries);
 
         vm.prank(governance);
         moduleGlobals.setTreasuryFee(0);
@@ -1005,9 +950,8 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         exampleInitData.b = 0;
         exampleInitData.c = 1;
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -1017,8 +961,6 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
         for (uint256 i = 0; i < 10; i++) {
             uint256 expectedAmount = 1;
@@ -1034,9 +976,8 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         exampleInitData.b = uint56(2 * stepwiseCollectModule.B_DECIMALS());
         exampleInitData.c = 2;
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -1046,8 +987,6 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
         console.log('Linear increase test (2, 4, 6, ...):');
         for (uint256 i = 0; i < 10; i++) {
@@ -1065,9 +1004,8 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         exampleInitData.b = 0;
         exampleInitData.c = 0;
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -1077,8 +1015,6 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
         console.log('Squared curve test (0, 1, 4, 9, ...):');
         for (uint256 i = 0; i < 10; i++) {
@@ -1106,9 +1042,8 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         exampleInitData.b = b;
         exampleInitData.c = c;
 
-        vm.recordLogs();
         vm.prank(publisher);
-        hub.post(
+        uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
@@ -1118,8 +1053,6 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
                 referenceModuleInitData: ''
             })
         );
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint256 pubId = TestHelpers.getCreatedPubIdFromEvents(entries);
 
         for (uint256 i = 0; i < numberOfCollects; i++) {
             uint256 currentCollects = stepwiseCollectModule
