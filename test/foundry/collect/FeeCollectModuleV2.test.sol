@@ -141,7 +141,7 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
         uint8 recipientsNumber
     ) public {
         vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
-        vm.assume(endTimestamp > block.timestamp);
+        vm.assume(endTimestamp > block.timestamp || endTimestamp == 0);
         vm.assume(recipientsNumber > 0 && recipientsNumber <= 5);
 
         RecipientData[] memory recipients = new RecipientData[](recipientsNumber);
