@@ -269,7 +269,7 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
             // Check recipient splits sum to 10 000 BPS (100%)
             uint256 totalSplits;
             for (i; i < len; ) {
-                if (recipients[0].recipient == address(0)) revert Errors.InitParamsInvalid();
+                if (recipients[i].recipient == address(0)) revert Errors.InitParamsInvalid();
                 if (recipients[i].split == 0) revert RecipientSplitCannotBeZero();
                 totalSplits += recipients[i].split;
 
