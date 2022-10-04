@@ -15,6 +15,8 @@ uint16 constant BPS_MAX = 10000;
 contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
     uint256 immutable userProfileId;
 
+    uint256 internal constant MAX_RECIPIENTS = 5;
+
     FeeCollectModuleV2InitData exampleInitData;
 
     constructor() FeeCollectModuleV2Base() {
@@ -68,6 +70,62 @@ contract FeeCollectModuleV2_Publication is FeeCollectModuleV2Base {
     function testCannotPostWithZeroAddressRecipient() public {
         exampleInitData.recipients[0] = RecipientData({recipient: address(0), split: BPS_MAX});
         hubPostWithRevert(Errors.InitParamsInvalid.selector);
+    }
+
+    function testCannotPostWithOneOfRecipientsAddressIsZero() public {
+        delete exampleInitData.recipients;
+        exampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX / 4}));
+        exampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX / 4}));
+        exampleInitData.recipients.push(RecipientData({recipient: address(0), split: BPS_MAX / 4}));
+        exampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX / 4}));
+        hubPostWithRevert(Errors.InitParamsInvalid.selector);
+    }
+
+    function testCannotPostWithMoreThanMaxRecipients() public {
+        delete exampleInitData.recipients;
+        assertEq(exampleInitData.recipients.length, 0);
+        uint16 splitUsed;
+        for (uint256 i = 0; i < MAX_RECIPIENTS; i++) {
+            exampleInitData.recipients.push(RecipientData({recipient: me, split: 1000}));
+            splitUsed += 1000;
+        }
+        exampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX - splitUsed}));
+        assert(exampleInitData.recipients.length > MAX_RECIPIENTS);
+        hubPostWithRevert(FeeCollectModuleV2.TooManyRecipients.selector);
+    }
+
+    function testCannotPostWithRecipientSplitsSumNotEqualToBPS_MAX() public {
+        delete exampleInitData.recipients;
+        assertEq(exampleInitData.recipients.length, 0);
+        uint16 splitUsed;
+        for (uint256 i = 0; i < MAX_RECIPIENTS; i++) {
+            exampleInitData.recipients.push(RecipientData({recipient: me, split: 1000}));
+            splitUsed += 1000;
+        }
+        assert(splitUsed != BPS_MAX);
+        hubPostWithRevert(FeeCollectModuleV2.InvalidRecipientSplits.selector);
+    }
+
+    function testCannotPostWithOneRecipientAndSplitNotEqualToBPS_MAX() public {
+        delete exampleInitData.recipients;
+        exampleInitData.recipients.push(RecipientData({recipient: me, split: 9000}));
+        hubPostWithRevert(FeeCollectModuleV2.InvalidRecipientSplits.selector);
+    }
+
+    function testCannotPostWithZeroRecipientSplit() public {
+        delete exampleInitData.recipients;
+        assertEq(exampleInitData.recipients.length, 0);
+        uint16 splitUsed;
+        for (uint256 i = 0; i < MAX_RECIPIENTS; i++) {
+            if (i != 3) {
+                exampleInitData.recipients.push(RecipientData({recipient: me, split: 2500}));
+                splitUsed += 2500;
+            } else {
+                exampleInitData.recipients.push(RecipientData({recipient: me, split: 0}));
+            }
+        }
+        assert(splitUsed == BPS_MAX);
+        hubPostWithRevert(FeeCollectModuleV2.RecipientSplitCannotBeZero.selector);
     }
 
     function testCannotPostWithReferralFeeGreaterThanMaxBPS() public {
