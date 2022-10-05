@@ -13,7 +13,7 @@ import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 
 /**
  * @notice A struct containing the necessary data to execute collect actions on a publication.
- * @notice a, b, c are coefficients of a standart quadratic equation (ax^2+bx+c) curve.
+ * @notice a, b, c are coefficients of a standard quadratic equation (ax^2+bx+c) curve.
  * @dev Variable sizes are optimized to fit in 3 slots.
  * @param currency The currency associated with this publication.
  * @param a The a multiplier of x^2 in quadratic equation (how quadratic is the curve)
@@ -116,7 +116,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
                     !_currencyWhitelisted(initData.currency) ||
                     initData.recipient == address(0) ||
                     initData.referralFee > BPS_MAX ||
-                    (initData.endTimestamp != 0 && initData.endTimestamp <= block.timestamp)
+                    (initData.endTimestamp != 0 && initData.endTimestamp < block.timestamp)
                 ) revert Errors.InitParamsInvalid();
             }
             _dataByPublicationByProfile[profileId][pubId] = ProfilePublicationData({
@@ -213,7 +213,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
-        if (amount != 0) {
+        if (amount > 0) {
             (address treasury, uint16 treasuryFee) = _treasuryData();
             address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
             uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
@@ -236,7 +236,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
-        if (amount != 0) {
+        if (amount > 0) {
             uint256 referralFee = _dataByPublicationByProfile[profileId][pubId].referralFee;
             address treasury;
             uint256 treasuryAmount;
@@ -255,7 +255,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
                 // don't bypass the treasury fee, in essence referrals pay their fair share to the treasury.
                 uint256 referralAmount = (adjustedAmount * referralFee) / BPS_MAX;
 
-                if (referralAmount != 0) {
+                if (referralAmount > 0) {
                     adjustedAmount = adjustedAmount - referralAmount;
 
                     address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
