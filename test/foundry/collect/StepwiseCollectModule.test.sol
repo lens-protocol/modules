@@ -217,7 +217,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
 
 /////////////
 // Collect with StepwiseCollectModule
-
+//
 contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
     uint256 immutable publisherProfileId;
     uint256 immutable userProfileId;
@@ -430,6 +430,9 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
     }
 }
 
+/////////////
+// Collect with StepwiseCollectModule from a Mirror
+//
 contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseCollectModule_Collect {
     uint256 immutable userTwoProfileId;
     uint256 origPubId;
@@ -539,6 +542,9 @@ contract StepwiseCollectModule_Mirror is StepwiseCollectModuleBase, StepwiseColl
     }
 }
 
+/////////////
+// Fee Distribution
+//
 contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
     struct Balances {
         uint256 treasury;
@@ -840,6 +846,28 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
     }
 }
 
+/////////////
+// Quadratic formula calculation
+//
+library Calculations {
+    function expectedStepwiseAmount(
+        StepwiseCollectModule stepwiseCollectModule,
+        uint256 a,
+        uint256 b,
+        uint256 c,
+        uint256 currentCollects
+    ) internal returns (uint256) {
+        return
+            ((uint256(a) * (uint256(currentCollects) * uint256(currentCollects))) /
+                stepwiseCollectModule.A_DECIMALS()) +
+            ((uint256(b) * uint256(currentCollects)) / stepwiseCollectModule.B_DECIMALS()) +
+            uint256(c);
+    }
+}
+
+/////////////
+// Stepwise curve formula
+//
 contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase {
     uint256 immutable publisherProfileId;
     uint256 immutable userProfileId;
@@ -893,58 +921,6 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         currency.approve(address(stepwiseCollectModule), type(uint256).max);
     }
 
-    function expectedStepwiseAmount(
-        uint256 a,
-        uint256 b,
-        uint256 c,
-        uint256 currentCollects
-    ) public returns (uint256) {
-        return
-            ((uint256(a) * (uint256(currentCollects) * uint256(currentCollects))) /
-                stepwiseCollectModule.A_DECIMALS()) +
-            ((uint256(b) * uint256(currentCollects)) / stepwiseCollectModule.B_DECIMALS()) +
-            uint256(c);
-    }
-
-    function testCalculateFeeMax() public {
-        ProfilePublicationData memory testData;
-        testData.a = type(uint72).max;
-        testData.b = type(uint56).max;
-        testData.c = type(uint128).max;
-        testData.currentCollects = type(uint64).max;
-
-        uint256 amount = stepwiseCollectModule.calculateFee(testData);
-
-        uint256 expectedAmount = expectedStepwiseAmount(
-            testData.a,
-            testData.b,
-            testData.c,
-            testData.currentCollects - 1
-        );
-
-        assertEq(amount, expectedAmount);
-    }
-
-    function testCalculateFeeFuzz(
-        uint72 a,
-        uint56 b,
-        uint128 c,
-        uint64 currentCollects
-    ) public {
-        vm.assume(currentCollects > 0);
-        ProfilePublicationData memory testData;
-        testData.a = a;
-        testData.b = b;
-        testData.c = c;
-        testData.currentCollects = currentCollects;
-
-        uint256 amount = stepwiseCollectModule.calculateFee(testData);
-
-        uint256 expectedAmount = expectedStepwiseAmount(a, b, c, currentCollects - 1);
-
-        assertEq(amount, expectedAmount);
-    }
-
     function testStepwiseCollectConstant() public {
         exampleInitData.a = 0;
         exampleInitData.b = 0;
@@ -964,6 +940,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
 
         for (uint256 i = 0; i < 10; i++) {
             uint256 expectedAmount = 1;
+            assertEq(stepwiseCollectModule.previewFee(publisherProfileId, pubId), expectedAmount);
             vm.prank(user);
             vm.expectEmit(true, true, true, true, address(currency));
             emit Transfer(user, publisher, expectedAmount);
@@ -991,6 +968,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         console.log('Linear increase test (2, 4, 6, ...):');
         for (uint256 i = 0; i < 10; i++) {
             uint256 expectedAmount = 2 + 2 * i;
+            assertEq(stepwiseCollectModule.previewFee(publisherProfileId, pubId), expectedAmount);
             vm.prank(user);
             vm.expectEmit(true, true, true, true, address(currency));
             emit Transfer(user, publisher, expectedAmount);
@@ -1019,6 +997,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         console.log('Squared curve test (0, 1, 4, 9, ...):');
         for (uint256 i = 0; i < 10; i++) {
             uint256 expectedAmount = i * i;
+            assertEq(stepwiseCollectModule.previewFee(publisherProfileId, pubId), expectedAmount);
             vm.prank(user);
             if (expectedAmount != 0) {
                 vm.expectEmit(true, false, false, false);
@@ -1059,12 +1038,72 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
                 .getPublicationData(publisherProfileId, pubId)
                 .currentCollects;
             assertEq(currentCollects, i, 'Number of collects doesnt match');
-            uint256 expectedAmount = expectedStepwiseAmount(a, b, c, currentCollects);
+            uint256 expectedAmount = Calculations.expectedStepwiseAmount(
+                stepwiseCollectModule,
+                a,
+                b,
+                c,
+                currentCollects
+            );
+            assertEq(stepwiseCollectModule.previewFee(publisherProfileId, pubId), expectedAmount);
             console.log('  ', expectedAmount);
             vm.prank(user);
             if (expectedAmount > 0) vm.expectEmit(true, true, true, true, address(currency));
             emit Transfer(user, publisher, expectedAmount);
             hub.collect(publisherProfileId, pubId, abi.encode(address(currency), expectedAmount));
         }
+    }
+}
+
+/////////////
+// CalculateFee function
+//
+contract StepwiseCollectModule_StepwiseCalculateFeeInternal is StepwiseCollectModule, Test {
+    constructor() StepwiseCollectModule(address(1), address(2)) {}
+
+    function testCalculateFeeMax() public {
+        ProfilePublicationData memory testData;
+        testData.a = type(uint72).max;
+        testData.b = type(uint56).max;
+        testData.c = type(uint128).max;
+        testData.currentCollects = type(uint64).max;
+
+        uint256 amount = StepwiseCollectModule._calculateFee(testData);
+
+        uint256 expectedAmount = Calculations.expectedStepwiseAmount(
+            this,
+            testData.a,
+            testData.b,
+            testData.c,
+            testData.currentCollects - 1
+        );
+
+        assertEq(amount, expectedAmount);
+    }
+
+    function testCalculateFeeFuzz(
+        uint72 a,
+        uint56 b,
+        uint128 c,
+        uint64 currentCollects
+    ) public {
+        vm.assume(currentCollects > 0);
+        ProfilePublicationData memory testData;
+        testData.a = a;
+        testData.b = b;
+        testData.c = c;
+        testData.currentCollects = currentCollects;
+
+        uint256 amount = StepwiseCollectModule._calculateFee(testData);
+
+        uint256 expectedAmount = Calculations.expectedStepwiseAmount(
+            this,
+            a,
+            b,
+            c,
+            currentCollects - 1
+        );
+
+        assertEq(amount, expectedAmount);
     }
 }
