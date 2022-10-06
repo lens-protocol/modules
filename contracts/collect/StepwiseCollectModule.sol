@@ -83,7 +83,7 @@ struct StepwiseCollectModuleInitData {
 contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
-    // As there is hard optimisation of a,b,c parameters, the following decimals convention is assumed for fixed-point calculations:
+    // As there is hard storage optimisation of a,b,c parameters, the following decimals convention is assumed for fixed-point calculations:
     uint256 public constant A_DECIMALS = 1e9; // leaves 30 bits for fractional part, 42 bits for integer part
     uint256 public constant B_DECIMALS = 1e9; // leaves 30 bits for fractional part, 26 bits for integer part
     // For C the decimals will be equal to currency decimals
@@ -96,10 +96,10 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
      *
-     * @param profileId The profile ID of the publication to initialize this module for's publishing profile.
-     * @param pubId The publication ID of the publication to initialize this module for.
+     * @param profileId The profile ID of the publication to initialize this module for.
+     * @param pubId The publication ID to initialize this module for.
      * @param data The arbitrary data parameter, decoded into: StepwiseCollectModuleInitData struct
-     * @return bytes An abi encoded bytes parameter, containing (in order): collectLimit, amount, currency, recipient, referral fee & end timestamp.
+     * @return bytes An abi encoded bytes parameter, containing a struct with module initialization data.
      */
     function initializePublicationCollectModule(
         uint256 profileId,
@@ -131,7 +131,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
                 currentCollects: 0,
                 collectLimit: initData.collectLimit
             });
-            return abi.encode(initData);
+            return data;
         }
     }
 
@@ -141,6 +141,8 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
      *  2. Ensuring the current timestamp is less than or equal to the collect end timestamp
      *  3. Ensuring the collect does not pass the collect limit
      *  4. Charging a fee
+     *
+     * @inheritdoc ICollectModule
      */
     function processCollect(
         uint256 referrerProfileId,
@@ -177,7 +179,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
      * @param profileId The token ID of the profile mapped to the publication to query.
      * @param pubId The publication ID of the publication to query.
      *
-     * @return ProfilepublicationData The ProfilePublicationData struct mapped to that publication.
+     * @return ProfilePublicationData The ProfilePublicationData struct mapped to that publication.
      */
     function getPublicationData(uint256 profileId, uint256 pubId)
         external
@@ -187,14 +189,34 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         return _dataByPublicationByProfile[profileId][pubId];
     }
 
-    // TODO: Decide if we want keep it "public" or downgrade to "internal"?
-    // Pro-public: Easier frontend calculation/verification of how much you need to pay
-    // Cons-public: extra function call - more gas
-    function calculateFee(ProfilePublicationData memory data) public pure returns (uint256) {
+    // TODO: Decide if we need a view function at all
+    /**
+     * @notice Estimates the amount next collect will cost for a given publication.
+     * @notice Subject to front-running, thus some slippage should be added.
+     *
+     * @param profileId The token ID of the profile mapped to the publication to query.
+     * @param pubId The publication ID of the publication to query.
+     *
+     * @return fee Collect fee
+     */
+    function previewFee(uint256 profileId, uint256 pubId) public view returns (uint256) {
+        ProfilePublicationData memory data = _dataByPublicationByProfile[profileId][pubId];
+        data.currentCollects++;
+        return _calculateFee(data);
+    }
+
+    /**
+     * @dev Calculates the collect fee using quadratic formula.
+     *
+     * @param data ProfilePublicationData from storage containing the publication parameters.
+     *
+     * @return fee Collect fee.
+     */
+    function _calculateFee(ProfilePublicationData memory data) internal pure returns (uint256) {
         // Because we already incremented the current collects in storage - we need to adjust it here.
         // This is done to allow the first collect price to be equal to c parameter (better UX)
         uint256 collects = data.currentCollects - 1;
-        // TODO: Probably unnecessary optimization - verify if it's necessary:
+        // This looks ugly but saves some gas:
         if (data.a == 0 && data.b == 0) return data.c;
         if (data.a == 0) return (uint256(data.b) * collects) / B_DECIMALS + data.c;
         return
@@ -203,13 +225,21 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
             data.c;
     }
 
+    /**
+     * @dev Calculates and processes the collect action.
+     *
+     * @param collector The address that collects the publicaton.
+     * @param profileId The token ID of the profile mapped to the publication to query.
+     * @param pubId The publication ID of the publication to query.
+     * @param data Abi encoded bytes parameter, containing currency address and fee amount
+     */
     function _processCollect(
         address collector,
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
     ) internal {
-        uint256 amount = calculateFee(_dataByPublicationByProfile[profileId][pubId]);
+        uint256 amount = _calculateFee(_dataByPublicationByProfile[profileId][pubId]);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
@@ -225,6 +255,15 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         }
     }
 
+    /**
+     * @dev Calculates and processes the collect action with referral.
+     *
+     * @param referrerProfileId The profile receiving referral fees.
+     * @param collector The address that collects the publicaton.
+     * @param profileId The token ID of the profile mapped to the publication to query.
+     * @param pubId The publication ID of the publication to query.
+     * @param data Abi encoded bytes parameter, containing currency address and fee amount
+     */
     function _processCollectWithReferral(
         uint256 referrerProfileId,
         address collector,
@@ -232,7 +271,7 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         uint256 pubId,
         bytes calldata data
     ) internal {
-        uint256 amount = calculateFee(_dataByPublicationByProfile[profileId][pubId]);
+        uint256 amount = _calculateFee(_dataByPublicationByProfile[profileId][pubId]);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
@@ -271,6 +310,13 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         }
     }
 
+    /**
+     * @dev Validates if the desired data provided (currency and maximum amount) corresponds to actual values of the tx.
+     *
+     * @param data Abi encoded bytes parameter, containing currency address and fee amount
+     * @param currency Currency of the fee.
+     * @param amount Fee amount.
+     */
     function _validateDataIsExpected(
         bytes calldata data,
         address currency,
