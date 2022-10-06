@@ -176,6 +176,23 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         return _dataByPublicationByProfile[profileId][pubId];
     }
 
+    /**
+     * @notice Calculates and returns the collect fee of a publication.
+     *
+     * @param profileId The token ID of the profile mapped to the publication to query.
+     * @param pubId The publication ID of the publication to query.
+     * @param data Any additional params needed to calculate the fee.
+     *
+     * @return The collect fee of the specified publication.
+     */
+    function calculateFee(
+        uint256 profileId,
+        uint256 pubId,
+        bytes calldata data
+    ) public view virtual returns (uint160) {
+        return _dataByPublicationByProfile[profileId][pubId].amount;
+    }
+
     function _processCollect(
         address collector,
         uint256 profileId,
