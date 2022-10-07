@@ -60,7 +60,6 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
      *      uint96 collectLimit: The maximum amount of collects. 0 for no limit.
      *      uint256 amount: The currency total amount to levy.
      *      address vault: The ERC4626 compatible vault in which fees are deposited.
-     *      address currency: The currency address, must be internally whitelisted.
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
      *      bool followerOnly: Whether only followers should be able to collect.
