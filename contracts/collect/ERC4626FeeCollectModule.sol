@@ -28,8 +28,8 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 struct ProfilePublicationData {
     uint256 amount;
     address vault; // ERC4626 Vault in which fees are deposited
-    address currency;
     uint96 collectLimit;
+    address currency;
     uint96 currentCollects;
     address recipient;
     uint16 referralFee;
