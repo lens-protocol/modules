@@ -109,6 +109,8 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
      *  2. Ensuring the current timestamp is less than or equal to the collect end timestamp
      *  2. Ensuring the collect does not pass the collect limit
      *  3. Charging a fee
+     *
+     * @inheritdoc ICollectModule
      */
     function processCollect(
         uint256 referrerProfileId,
