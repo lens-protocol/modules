@@ -49,8 +49,6 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
 
-    address[] public reserves;
-
     constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
 
     /**

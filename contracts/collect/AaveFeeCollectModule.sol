@@ -57,8 +57,6 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
 
-    address[] public reserves;
-
     constructor(
         address hub,
         address moduleGlobals,
