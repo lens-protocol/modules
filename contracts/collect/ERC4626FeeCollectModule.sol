@@ -124,7 +124,7 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
         uint96 currentCollects = _dataByPublicationByProfile[profileId][pubId].currentCollects;
 
-        if (collectLimit != 0 && currentCollects == collectLimit) {
+        if (collectLimit != 0 && currentCollects >= collectLimit) {
             revert Errors.MintLimitExceeded();
         } else if (block.timestamp > endTimestamp && endTimestamp != 0) {
             revert Errors.CollectExpired();
