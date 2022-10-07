@@ -199,7 +199,7 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         uint256 pubId,
         bytes calldata data
     ) internal {
-        uint256 amount = _dataByPublicationByProfile[profileId][pubId].amount;
+        uint256 amount = calculateFee(profileId, pubId, data);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
@@ -223,7 +223,7 @@ contract FeeCollectModuleV2 is FeeModuleBase, FollowValidationModuleBase, IColle
         uint256 pubId,
         bytes calldata data
     ) internal {
-        uint256 amount = _dataByPublicationByProfile[profileId][pubId].amount;
+        uint256 amount = calculateFee(profileId, pubId, data);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
