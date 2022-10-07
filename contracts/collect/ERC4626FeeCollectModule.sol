@@ -197,7 +197,7 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
 
         // Then, attempt to deposit funds in vault, sending shares to beneficiary
         try IERC4626(vault).deposit(amount, beneficiary) {} catch {
-            // If supply() above fails, send funds directly to beneficiary
+            // If deposit() above fails, send funds directly to beneficiary
             IERC20(currency).safeTransfer(beneficiary, amount);
         }
     }
