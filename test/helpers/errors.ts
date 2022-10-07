@@ -1,4 +1,7 @@
 export const ERRORS = {
+  // TokenGatedReferenceModule
+  NOT_ENOUGH_BALANCE: 'NotEnoughBalance()',
+
   // AuctionCollectModule
   ONGOING_AUCTION: 'OngoingAuction()',
   UNAVAILABLE_AUCTION: 'UnavailableAuction()',

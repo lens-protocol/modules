@@ -24,6 +24,8 @@ import {
   Currency,
   ACurrency,
   ACurrency__factory,
+  NFT__factory,
+  NFT,
   ModuleGlobals,
   AuctionCollectModule,
   AuctionCollectModule__factory,
@@ -41,6 +43,8 @@ import {
   MockVault__factory,
   ERC4626FeeCollectModule,
   ERC4626FeeCollectModule__factory,
+  TokenGatedReferenceModule__factory,
+  TokenGatedReferenceModule,
   DegreesOfSeparationReferenceModule,
   DegreesOfSeparationReferenceModule__factory,
 } from '../typechain';
@@ -95,7 +99,7 @@ export let aCurrency: ACurrency;
 export let currencyTwo: Currency;
 export let aavePool: MockPool;
 export let aavePoolAddressesProvider: MockPoolAddressesProvider;
-
+export let nft: NFT;
 export let abiCoder: AbiCoder;
 export let mockModuleData: BytesLike;
 export let hubLibs: LensHubLibraryAddresses;
@@ -108,13 +112,14 @@ export let mockVault: MockVault;
 export let mockVaultTwo: MockVault;
 export let profileFollowModule: ProfileFollowModule;
 
-
 export let auctionCollectModule: AuctionCollectModule;
 export let aaveFeeCollectModule: AaveFeeCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
 export let erc4626FeeCollectModule: ERC4626FeeCollectModule;
 
 export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
+
+export let tokenGatedReferenceModule: TokenGatedReferenceModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -206,6 +211,8 @@ beforeEach(async function () {
     aavePool.address
   );
 
+  // NFT
+  nft = await new NFT__factory(deployer).deploy();
 
   // Currency whitelisting
   await expect(
@@ -240,7 +247,6 @@ beforeEach(async function () {
     lensHub.connect(governance).whitelistCollectModule(auctionCollectModule.address, true)
   ).to.not.be.reverted;
 
-
   await expect(
     lensHub.connect(governance).whitelistCollectModule(aaveFeeCollectModule.address, true)
   ).to.not.be.reverted;
@@ -253,7 +259,6 @@ beforeEach(async function () {
       .connect(governance)
       .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
   ).to.not.be.reverted;
-
 
   erc4626FeeCollectModule = await new ERC4626FeeCollectModule__factory(deployer).deploy(
     lensHub.address,
@@ -271,6 +276,14 @@ beforeEach(async function () {
     lensHub
       .connect(governance)
       .whitelistReferenceModule(degreesOfSeparationReferenceModule.address, true)
+  ).to.not.be.reverted;
+
+  // Reference modules
+  tokenGatedReferenceModule = await new TokenGatedReferenceModule__factory(deployer).deploy(
+    lensHub.address
+  );
+  await expect(
+    lensHub.connect(governance).whitelistReferenceModule(tokenGatedReferenceModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
