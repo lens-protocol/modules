@@ -86,6 +86,26 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
         ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
       });
 
+      it('user should fail to post with ERC4626 fee collect module if not called via the Hub', async function () {
+        const collectModuleInitData = abiCoder.encode(
+          ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
+          [
+            DEFAULT_COLLECT_LIMIT,
+            DEFAULT_COLLECT_PRICE,
+            mockVaultTwo.address,
+            user.address,
+            REFERRAL_FEE_BPS,
+            DEFAULT_FOLLOWER_ONLY,
+            DEFAULT_END_TIMESTAMP,
+          ]
+        );
+        await expect(
+          erc4626FeeCollectModule
+            .connect(user)
+            .initializePublicationCollectModule(FIRST_PROFILE_ID, 1, collectModuleInitData)
+        ).to.be.revertedWith(ERRORS.NOT_HUB);
+      });
+
       it('user should fail to post with ERC4626 fee collect module using zero recipient', async function () {
         const collectModuleInitData = abiCoder.encode(
           ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
