@@ -544,7 +544,9 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
       expect(await currency.balanceOf(anotherUser.address)).to.eq(
         BigNumber.from(MAX_UINT256).sub(DEFAULT_COLLECT_PRICE)
       );
-      // expect(await aCurrency.balanceOf(user.address)).to.eq(expectedRecipientAmount);
+      // Exchange rate is 1:1 assets:shares so same amount used
+      expect(await mockVault.balanceOf(user.address)).to.eq(expectedRecipientAmount);
+      expect(await currency.balanceOf(user.address)).to.eq(0); // no currency amount received
       expect(await currency.balanceOf(treasury.address)).to.eq(expectedTreasuryAmount);
     });
 
