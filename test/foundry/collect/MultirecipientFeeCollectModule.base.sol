@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 import 'forge-std/Test.sol';
 import '../BaseSetup.t.sol';
-import 'contracts/collect/FeeCollectModuleV2.sol';
+import 'contracts/collect/MultirecipientFeeCollectModule.sol';
 
 contract FeeCollectModuleV2Base is BaseSetup {
     FeeCollectModuleV2 immutable feeCollectModuleV2;
