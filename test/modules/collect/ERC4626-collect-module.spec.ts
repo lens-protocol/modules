@@ -492,6 +492,8 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
       expect(fetchedData.recipient).to.eq(user.address);
       expect(fetchedData.currency).to.eq(currency.address);
       expect(fetchedData.referralFee).to.eq(REFERRAL_FEE_BPS);
+      expect(fetchedData.vault).to.eq(mockVault.address);
+      expect(fetchedData.followerOnly).to.eq(DEFAULT_FOLLOWER_ONLY);
     });
 
     it('User should post with ERC4626 fee collect module as the collect module and data, user two follows, then collects and pays fee, fee distribution is valid', async function () {
