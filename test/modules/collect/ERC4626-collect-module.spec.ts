@@ -550,6 +550,64 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
       expect(await currency.balanceOf(treasury.address)).to.eq(expectedTreasuryAmount);
     });
 
+    it('User should post with ERC4626 fee collect module as the collect module and data, user two follows, then collects and pays fee, treasury fee is 0%', async function () {
+      // Set treasury fee to 0% (0 bps)
+      const NEW_TREASURY_FEE_BPS = 0;
+      await moduleGlobals.connect(governance).setTreasuryFee(NEW_TREASURY_FEE_BPS);
+
+      const collectModuleInitData = abiCoder.encode(
+        ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
+        [
+          DEFAULT_COLLECT_LIMIT,
+          DEFAULT_COLLECT_PRICE,
+          mockVault.address,
+          user.address,
+          REFERRAL_FEE_BPS,
+          DEFAULT_FOLLOWER_ONLY,
+          DEFAULT_END_TIMESTAMP,
+        ]
+      );
+      await expect(
+        lensHub.connect(user).post({
+          profileId: FIRST_PROFILE_ID,
+          contentURI: MOCK_URI,
+          collectModule: erc4626FeeCollectModule.address,
+          collectModuleInitData: collectModuleInitData,
+          referenceModule: ZERO_ADDRESS,
+          referenceModuleInitData: [],
+        })
+      ).to.not.be.reverted;
+
+      await expect(currency.mint(anotherUser.address, MAX_UINT256)).to.not.be.reverted;
+      await expect(
+        currency.connect(anotherUser).approve(erc4626FeeCollectModule.address, MAX_UINT256)
+      ).to.not.be.reverted;
+      await expect(
+        lensHub.connect(anotherUser).follow([FIRST_PROFILE_ID], [[]])
+      ).to.not.be.reverted;
+      const data = abiCoder.encode(
+        ['address', 'uint256'],
+        [currency.address, DEFAULT_COLLECT_PRICE]
+      );
+      await expect(
+        lensHub.connect(anotherUser).collect(FIRST_PROFILE_ID, 1, data)
+      ).to.not.be.reverted;
+
+      const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
+        .mul(NEW_TREASURY_FEE_BPS)
+        .div(BPS_MAX);
+      const expectedRecipientAmount =
+        BigNumber.from(DEFAULT_COLLECT_PRICE).sub(expectedTreasuryAmount);
+
+      expect(await currency.balanceOf(anotherUser.address)).to.eq(
+        BigNumber.from(MAX_UINT256).sub(DEFAULT_COLLECT_PRICE)
+      );
+      // Exchange rate is 1:1 assets:shares so same amount used
+      expect(await mockVault.balanceOf(user.address)).to.eq(expectedRecipientAmount);
+      expect(await currency.balanceOf(user.address)).to.eq(0); // no currency amount received
+      expect(await currency.balanceOf(treasury.address)).to.eq(expectedTreasuryAmount);
+    });
+
     it('User should post with ERC4626 fee collect module as the collect module and data, user two follows, then collects twice, fee distribution is valid', async function () {
       const collectModuleInitData = abiCoder.encode(
         ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
@@ -608,6 +666,10 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
     });
 
     it('User should post with ERC4626 fee collect module as the collect module and data, user two mirrors, follows, then collects from their mirror and pays fee, fee distribution is valid', async function () {
+      // Set treasury fee to 0% (0 bps)
+      const NEW_TREASURY_FEE_BPS = 0;
+      await moduleGlobals.connect(governance).setTreasuryFee(NEW_TREASURY_FEE_BPS);
+
       const secondProfileId = FIRST_PROFILE_ID + 1;
       const collectModuleInitData = abiCoder.encode(
         ['uint96', 'uint256', 'address', 'address', 'uint16', 'bool', 'uint72'],
@@ -671,7 +733,7 @@ makeSuiteCleanRoom('ERC4626 Collect Module', function () {
       ).to.not.be.reverted;
 
       const expectedTreasuryAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
-        .mul(TREASURY_FEE_BPS)
+        .mul(NEW_TREASURY_FEE_BPS)
         .div(BPS_MAX);
       const expectedReferralAmount = BigNumber.from(DEFAULT_COLLECT_PRICE)
         .sub(expectedTreasuryAmount)
