@@ -186,24 +186,6 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
         }
     }
 
-    function _transferFromAndDepositInVaultIfApplicable(
-        address currency,
-        address vault,
-        address from,
-        address beneficiary,
-        uint256 amount
-    ) internal {
-        // First, transfer funds to this contract
-        IERC20(currency).safeTransferFrom(from, address(this), amount);
-        IERC20(currency).approve(vault, amount);
-
-        // Then, attempt to deposit funds in vault, sending shares to beneficiary
-        try IERC4626(vault).deposit(amount, beneficiary) {} catch {
-            // If deposit() above fails, send funds directly to beneficiary
-            IERC20(currency).safeTransfer(beneficiary, amount);
-        }
-    }
-
     function _processCollectWithReferral(
         uint256 referrerProfileId,
         address collector,
@@ -251,6 +233,24 @@ contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, I
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
+    }
+
+    function _transferFromAndDepositInVaultIfApplicable(
+        address currency,
+        address vault,
+        address from,
+        address beneficiary,
+        uint256 amount
+    ) internal {
+        // First, transfer funds to this contract
+        IERC20(currency).safeTransferFrom(from, address(this), amount);
+        IERC20(currency).approve(vault, amount);
+
+        // Then, attempt to deposit funds in vault, sending shares to beneficiary
+        try IERC4626(vault).deposit(amount, beneficiary) {} catch {
+            // If deposit() above fails, send funds directly to beneficiary
+            IERC20(currency).safeTransfer(beneficiary, amount);
         }
     }
 }
