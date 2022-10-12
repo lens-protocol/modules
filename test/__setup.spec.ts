@@ -39,6 +39,10 @@ import {
   AaveFeeCollectModule__factory,
   UpdatableOwnableFeeCollectModule,
   UpdatableOwnableFeeCollectModule__factory,
+  MockVault,
+  MockVault__factory,
+  ERC4626FeeCollectModule,
+  ERC4626FeeCollectModule__factory,
   TokenGatedReferenceModule__factory,
   TokenGatedReferenceModule,
   DegreesOfSeparationReferenceModule,
@@ -104,11 +108,14 @@ export let moduleGlobals: ModuleGlobals;
 export let followNFTImpl: FollowNFT;
 export let collectNFTImpl: CollectNFT;
 export let freeCollectModule: FreeCollectModule;
+export let mockVault: MockVault;
+export let mockVaultTwo: MockVault;
 export let profileFollowModule: ProfileFollowModule;
 
 export let auctionCollectModule: AuctionCollectModule;
 export let aaveFeeCollectModule: AaveFeeCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
+export let erc4626FeeCollectModule: ERC4626FeeCollectModule;
 
 export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
 
@@ -194,6 +201,10 @@ beforeEach(async function () {
   currencyTwo = await new Currency__factory(deployer).deploy();
   aCurrency = await new ACurrency__factory(deployer).deploy();
 
+  // ERC4626 Vault - accepts 'currency' as deposit asset
+  mockVault = await new MockVault__factory(deployer).deploy(currency.address);
+  mockVaultTwo = await new MockVault__factory(deployer).deploy(currencyTwo.address);
+
   // Aave Pool - currencyTwo is set as unsupported asset (in Aave, not Lens) for testing
   aavePool = await new MockPool__factory(deployer).deploy(aCurrency.address, currencyTwo.address);
   aavePoolAddressesProvider = await new MockPoolAddressesProvider__factory(deployer).deploy(
@@ -247,6 +258,14 @@ beforeEach(async function () {
     lensHub
       .connect(governance)
       .whitelistCollectModule(updatableOwnableFeeCollectModule.address, true)
+  ).to.not.be.reverted;
+
+  erc4626FeeCollectModule = await new ERC4626FeeCollectModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address
+  );
+  await expect(
+    lensHub.connect(governance).whitelistCollectModule(erc4626FeeCollectModule.address, true)
   ).to.not.be.reverted;
 
   // Reference modules

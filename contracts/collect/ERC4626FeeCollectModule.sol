@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.10;
 
@@ -8,11 +8,7 @@ import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectM
 import {ModuleBase} from '@aave/lens-protocol/contracts/core/modules/ModuleBase.sol';
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 
-import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
-import {IPoolDataProvider} from '../interfaces/IPoolDataProvider.sol';
-import {IPool} from '@aave/core-v3/contracts/interfaces/IPool.sol';
-
-import {EIP712} from '@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -20,19 +16,20 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 /**
  * @notice A struct containing the necessary data to execute collect actions on a publication.
  *
- * @param amount The collecting cost associated with this publication.
- * @param currency The currency associated with this publication.
- * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
+ * @param collectLimit The maximum number of collects for this publication.
  * @param currentCollects The current number of collects for this publication.
+ * @param amount The collecting cost associated with this publication.
+ * @param vault The ERC4626 compatible vault in which fees are deposited.
+ * @param currency The currency associated with this publication.
  * @param recipient The recipient address associated with this publication.
  * @param referralFee The referral fee associated with this publication.
- * @param followerOnly True if only followers of publisher may collect the post.
- * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
+ * @param endTimestamp The end timestamp after which collecting is impossible.
  */
 struct ProfilePublicationData {
     uint256 amount;
-    address currency;
+    address vault; // ERC4626 Vault in which fees are deposited
     uint96 collectLimit;
+    address currency;
     uint96 currentCollects;
     address recipient;
     uint16 referralFee;
@@ -41,51 +38,30 @@ struct ProfilePublicationData {
 }
 
 /**
- * @title AaveFeeCollectModule
+ * @title ERC4626FeeCollectModule
  * @author Lens Protocol
  *
- * @notice Extend the LimitedFeeCollectModule to deposit all received fees into the Aave Polygon Market (if applicable for the asset) and send the resulting aTokens to the beneficiary.
+ * @notice Extend the LimitedFeeCollectModule to deposit all received fees into an ERC-4626 compatible vault and send the resulting shares to the beneficiary.
  */
-contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
+contract ERC4626FeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
-
-    // Pool Address Provider on Polygon for Aave v3 - set in constructor
-    IPoolAddressesProvider public immutable POOL_ADDRESSES_PROVIDER;
-
-    address public aavePool;
 
     mapping(uint256 => mapping(uint256 => ProfilePublicationData))
         internal _dataByPublicationByProfile;
 
-    constructor(
-        address hub,
-        address moduleGlobals,
-        IPoolAddressesProvider poolAddressesProvider
-    ) ModuleBase(hub) FeeModuleBase(moduleGlobals) {
-        POOL_ADDRESSES_PROVIDER = poolAddressesProvider;
-
-        // Retrieve Aave pool address on module deployment
-        aavePool = POOL_ADDRESSES_PROVIDER.getPool();
-    }
-
-    /**
-     * @dev Anyone can call this function to update Aave v3 addresses.
-     */
-    function updateAavePoolAddress() public {
-        aavePool = POOL_ADDRESSES_PROVIDER.getPool();
-    }
+    constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
      *
      * @param data The arbitrary data parameter, decoded into:
-     *      uint96 collectLimit: The maximum amount of collects.
+     *      uint96 collectLimit: The maximum amount of collects. 0 for no limit.
      *      uint256 amount: The currency total amount to levy.
-     *      address currency: The currency address, must be internally whitelisted.
+     *      address vault: The ERC4626 compatible vault in which fees are deposited.
      *      address recipient: The custom recipient address to direct earnings to.
      *      uint16 referralFee: The referral fee to set.
      *      bool followerOnly: Whether only followers should be able to collect.
-     *      uint72 endTimestamp: The end timestamp after which collecting is impossible.
+     *      uint72 endTimestamp: The end timestamp after which collecting is impossible. 0 for no expiry.
      *
      * @return An abi encoded bytes parameter, which is the same as the passed data parameter.
      */
@@ -97,14 +73,19 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         (
             uint96 collectLimit,
             uint256 amount,
-            address currency,
+            address vault,
             address recipient,
             uint16 referralFee,
             bool followerOnly,
             uint72 endTimestamp
         ) = abi.decode(data, (uint96, uint256, address, address, uint16, bool, uint72));
+
+        // Get fee currency from vault's asset instead of publication params
+        address currency = IERC4626(vault).asset();
+
         if (
             !_currencyWhitelisted(currency) ||
+            vault == address(0) ||
             recipient == address(0) ||
             referralFee > BPS_MAX ||
             (endTimestamp < block.timestamp && endTimestamp > 0)
@@ -112,6 +93,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
         _dataByPublicationByProfile[profileId][pubId].collectLimit = collectLimit;
         _dataByPublicationByProfile[profileId][pubId].amount = amount;
+        _dataByPublicationByProfile[profileId][pubId].vault = vault;
         _dataByPublicationByProfile[profileId][pubId].currency = currency;
         _dataByPublicationByProfile[profileId][pubId].recipient = recipient;
         _dataByPublicationByProfile[profileId][pubId].referralFee = referralFee;
@@ -127,6 +109,8 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
      *  2. Ensuring the current timestamp is less than or equal to the collect end timestamp
      *  2. Ensuring the collect does not pass the collect limit
      *  3. Charging a fee
+     *
+     * @inheritdoc ICollectModule
      */
     function processCollect(
         uint256 referrerProfileId,
@@ -142,7 +126,7 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
         uint96 currentCollects = _dataByPublicationByProfile[profileId][pubId].currentCollects;
 
-        if (collectLimit != 0 && currentCollects == collectLimit) {
+        if (collectLimit != 0 && currentCollects >= collectLimit) {
             revert Errors.MintLimitExceeded();
         } else if (block.timestamp > endTimestamp && endTimestamp != 0) {
             revert Errors.CollectExpired();
@@ -183,12 +167,15 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
 
+        address vault = _dataByPublicationByProfile[profileId][pubId].vault;
+
         (address treasury, uint16 treasuryFee) = _treasuryData();
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
         uint256 treasuryAmount = (amount * treasuryFee) / BPS_MAX;
 
-        _transferFromAndDepositToAaveIfApplicable(
+        _transferFromAndDepositInVaultIfApplicable(
             currency,
+            vault,
             collector,
             recipient,
             amount - treasuryAmount
@@ -196,23 +183,6 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
-        }
-    }
-
-    function _transferFromAndDepositToAaveIfApplicable(
-        address currency,
-        address from,
-        address beneficiary,
-        uint256 amount
-    ) internal {
-        // First, transfer funds to this contract
-        IERC20(currency).safeTransferFrom(from, address(this), amount);
-        IERC20(currency).approve(aavePool, amount);
-
-        // Then, attempt to supply funds in Aave v3, sending aTokens to beneficiary
-        try IPool(aavePool).supply(currency, amount, beneficiary, 0) {} catch {
-            // If supply() above fails, send funds directly to beneficiary
-            IERC20(currency).safeTransfer(beneficiary, amount);
         }
     }
 
@@ -253,10 +223,34 @@ contract AaveFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         }
         address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
 
-        _transferFromAndDepositToAaveIfApplicable(currency, collector, recipient, adjustedAmount);
+        _transferFromAndDepositInVaultIfApplicable(
+            currency,
+            _dataByPublicationByProfile[profileId][pubId].vault,
+            collector,
+            recipient,
+            adjustedAmount
+        );
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
+    }
+
+    function _transferFromAndDepositInVaultIfApplicable(
+        address currency,
+        address vault,
+        address from,
+        address beneficiary,
+        uint256 amount
+    ) internal {
+        // First, transfer funds to this contract
+        IERC20(currency).safeTransferFrom(from, address(this), amount);
+        IERC20(currency).approve(vault, amount);
+
+        // Then, attempt to deposit funds in vault, sending shares to beneficiary
+        try IERC4626(vault).deposit(amount, beneficiary) {} catch {
+            // If deposit() above fails, send funds directly to beneficiary
+            IERC20(currency).safeTransfer(beneficiary, amount);
         }
     }
 }
