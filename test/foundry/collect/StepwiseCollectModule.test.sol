@@ -116,6 +116,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
     }
 
     function testCreatePublicationEmitsExpectedEvents() public {
+        vm.recordLogs();
         uint256 pubId = hub.post(
             DataTypes.PostData({
                 profileId: userProfileId,
@@ -126,7 +127,9 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
                 referenceModuleInitData: ''
             })
         );
-        assertEq(pubId, 1);
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        uint256 eventPubId = TestHelpers.getCreatedPubIdFromEvents(entries);
+        assertEq(pubId, eventPubId);
     }
 
     function testFuzzCreatePublicationWithDifferentInitData(
