@@ -138,17 +138,13 @@ contract BaseFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
     ) internal virtual {
         CollectModuleInitData memory initData = _decodeStandardInitParameters(data);
 
-        // Saving the whole thing in one write operation as a struct saves 221 gas:
-        _dataByPublicationByProfile[profileId][pubId] = ProfilePublicationData({
-            amount: initData.amount,
-            collectLimit: initData.collectLimit,
-            currency: initData.currency,
-            currentCollects: 0,
-            recipient: initData.recipient,
-            referralFee: initData.referralFee,
-            followerOnly: initData.followerOnly,
-            endTimestamp: initData.endTimestamp
-        });
+        _dataByPublicationByProfile[profileId][pubId].amount = initData.amount;
+        _dataByPublicationByProfile[profileId][pubId].collectLimit = initData.collectLimit;
+        _dataByPublicationByProfile[profileId][pubId].currency = initData.currency;
+        _dataByPublicationByProfile[profileId][pubId].recipient = initData.recipient;
+        _dataByPublicationByProfile[profileId][pubId].referralFee = initData.referralFee;
+        _dataByPublicationByProfile[profileId][pubId].followerOnly = initData.followerOnly;
+        _dataByPublicationByProfile[profileId][pubId].endTimestamp = initData.endTimestamp;
     }
 
     /**
