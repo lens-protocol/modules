@@ -3,10 +3,11 @@ pragma solidity ^0.8.10;
 
 import 'forge-std/Test.sol';
 import '../BaseSetup.t.sol';
-import 'contracts/collect/BaseFeeCollectModule.sol';
+import {BaseFeeCollectModule} from 'contracts/collect/BaseFeeCollectModule.sol';
+import {BaseCollectModuleInitData} from 'contracts/collect/AbstractCollectModule.sol';
 
 contract BaseFeeCollectModuleBase is BaseSetup {
-    BaseFeeCollectModule baseFeeCollectModule;
+    address baseFeeCollectModule;
 
     BaseCollectModuleInitData exampleInitData;
 
@@ -16,7 +17,9 @@ contract BaseFeeCollectModuleBase is BaseSetup {
     // Deploy & Whitelist BaseFeeCollectModule
     constructor() BaseSetup() {
         vm.prank(deployer);
-        baseFeeCollectModule = new BaseFeeCollectModule(hubProxyAddr, address(moduleGlobals));
+        baseFeeCollectModule = address(
+            new BaseFeeCollectModule(hubProxyAddr, address(moduleGlobals))
+        );
         vm.prank(governance);
         hub.whitelistCollectModule(address(baseFeeCollectModule), true);
     }

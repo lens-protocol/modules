@@ -3,7 +3,8 @@ pragma solidity ^0.8.10;
 
 import '../BaseSetup.t.sol';
 import {BaseFeeCollectModuleBase} from './BaseFeeCollectModule.base.sol';
-import {BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/BaseFeeCollectModule.sol';
+import {BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/AbstractCollectModule.sol';
+import {BaseFeeCollectModule} from 'contracts/collect/BaseFeeCollectModule.sol';
 
 import '../helpers/TestHelpers.sol';
 import '@aave/lens-protocol/contracts/libraries/Events.sol';
@@ -47,7 +48,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -83,7 +84,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
 
     function testCannotPostIfCalledFromNonHubAddress() public {
         vm.expectRevert(Errors.NotHub.selector);
-        baseFeeCollectModule.initializePublicationCollectModule(
+        BaseFeeCollectModule(baseFeeCollectModule).initializePublicationCollectModule(
             userProfileId,
             1,
             getEncodedInitData()
@@ -96,7 +97,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: abi.encode(DEFAULT_COLLECT_LIMIT, REFERRAL_FEE_BPS, true),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -110,7 +111,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -123,7 +124,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -156,7 +157,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: abi.encode(fuzzyInitData),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -188,17 +189,15 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: userProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: abi.encode(fuzzyInitData),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
             })
         );
         assert(pubId > 0);
-        BaseProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
-            userProfileId,
-            pubId
-        );
+        BaseProfilePublicationData memory fetchedData = BaseFeeCollectModule(baseFeeCollectModule)
+            .getPublicationData(userProfileId, pubId);
         assertEq(fetchedData.currency, fuzzyInitData.currency);
         assertEq(fetchedData.amount, fuzzyInitData.amount);
         assertEq(fetchedData.referralFee, fuzzyInitData.referralFee);
@@ -256,7 +255,7 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -265,14 +264,14 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
 
         currency.mint(user, type(uint256).max);
         vm.prank(user);
-        currency.approve(address(baseFeeCollectModule), type(uint256).max);
+        currency.approve(baseFeeCollectModule, type(uint256).max);
     }
 
     // Negatives
 
     function testCannotCollectIfCalledFromNonHubAddress() public {
         vm.expectRevert(Errors.NotHub.selector);
-        baseFeeCollectModule.processCollect(
+        BaseFeeCollectModule(baseFeeCollectModule).processCollect(
             publisherProfileId,
             me,
             publisherProfileId,
@@ -301,8 +300,8 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
 
     function testCannotCollectWithoutEnoughApproval() public {
         vm.startPrank(user);
-        currency.approve(address(baseFeeCollectModule), 0);
-        assert(currency.allowance(user, address(baseFeeCollectModule)) < 1 ether);
+        currency.approve(baseFeeCollectModule, 0);
+        assert(currency.allowance(user, baseFeeCollectModule) < 1 ether);
         vm.expectRevert('ERC20: insufficient allowance');
         hub.collect(publisherProfileId, pubId, abi.encode(address(currency), 1 ether));
         vm.stopPrank();
@@ -312,7 +311,7 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         vm.startPrank(user);
         currency.transfer(address(1), currency.balanceOf(user));
         assertEq(currency.balanceOf(user), 0);
-        assert(currency.allowance(user, address(baseFeeCollectModule)) >= 1 ether);
+        assert(currency.allowance(user, baseFeeCollectModule) >= 1 ether);
         vm.expectRevert('ERC20: transfer amount exceeds balance');
         hub.collect(publisherProfileId, pubId, abi.encode(address(currency), 1 ether));
         vm.stopPrank();
@@ -324,7 +323,7 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -399,15 +398,16 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
-            publisherProfileId,
-            secondPubId
-        );
+        BaseProfilePublicationData memory fetchedData = BaseFeeCollectModule(baseFeeCollectModule)
+            .getBasePublicationData(publisherProfileId, secondPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = baseFeeCollectModule.getPublicationData(publisherProfileId, secondPubId);
+            fetchedData = BaseFeeCollectModule(baseFeeCollectModule).getBasePublicationData(
+                publisherProfileId,
+                secondPubId
+            );
             assertEq(fetchedData.currentCollects, collects);
         }
         vm.stopPrank();
@@ -445,7 +445,7 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
             DataTypes.PostData({
                 profileId: userTwoProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -466,7 +466,7 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
 
         currency.mint(user, type(uint256).max);
         vm.prank(user);
-        currency.approve(address(baseFeeCollectModule), type(uint256).max);
+        currency.approve(baseFeeCollectModule, type(uint256).max);
     }
 
     function hubPost() public override returns (uint256) {
@@ -475,7 +475,7 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
             DataTypes.PostData({
                 profileId: userTwoProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''
@@ -500,15 +500,16 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
-            userTwoProfileId,
-            origPubId
-        );
+        BaseProfilePublicationData memory fetchedData = BaseFeeCollectModule(baseFeeCollectModule)
+            .getBasePublicationData(userTwoProfileId, origPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = baseFeeCollectModule.getPublicationData(userTwoProfileId, origPubId);
+            fetchedData = BaseFeeCollectModule(baseFeeCollectModule).getBasePublicationData(
+                userTwoProfileId,
+                origPubId
+            );
             assertEq(fetchedData.currentCollects, collects);
         }
         vm.stopPrank();
@@ -574,7 +575,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
 
         currency.mint(user, type(uint256).max);
         vm.prank(user);
-        currency.approve(address(baseFeeCollectModule), type(uint256).max);
+        currency.approve(baseFeeCollectModule, type(uint256).max);
     }
 
     function hubPostAndMirror(uint16 referralFee, uint128 amount)
@@ -588,7 +589,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
             DataTypes.PostData({
                 profileId: publisherProfileId,
                 contentURI: MOCK_URI,
-                collectModule: address(baseFeeCollectModule),
+                collectModule: baseFeeCollectModule,
                 collectModuleInitData: getEncodedInitData(),
                 referenceModule: address(0),
                 referenceModuleInitData: ''

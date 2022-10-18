@@ -2,7 +2,7 @@
 pragma solidity ^0.8.10;
 
 import '../BaseSetup.t.sol';
-import {InheritedCollectModuleBase} from './InheritedFeeCollectModule.base.sol';
+import {MultirecipientCollectModuleBase} from './MultirecipientCollectModule.base.sol';
 import '../helpers/TestHelpers.sol';
 import {FeeCollectV2ProfilePublicationData, FeeCollectModuleV2InitData, RecipientData, FeeCollectModuleV2} from 'contracts/collect/MultirecipientFeeCollectModule.sol';
 import '@aave/lens-protocol/contracts/libraries/Events.sol';
@@ -12,15 +12,18 @@ import {BaseFeeCollectModuleBase} from './BaseFeeCollectModule.base.sol';
 /////////
 // Publication Creation with InheritedFeeCollectModule
 //
-contract InheritedCollectModule_Publication is InheritedCollectModuleBase, BaseFeeCollectModule_Publication {
+contract MultirecipientCollectModule_Publication is
+    MultirecipientCollectModuleBase,
+    BaseFeeCollectModule_Publication
+{
     constructor() {}
 
     function getEncodedInitData()
         internal
-        override(InheritedCollectModuleBase, BaseFeeCollectModuleBase)
+        override(MultirecipientCollectModuleBase, BaseFeeCollectModuleBase)
         returns (bytes memory)
     {
-        return InheritedCollectModuleBase.getEncodedInitData();
+        return MultirecipientCollectModuleBase.getEncodedInitData();
     }
 
     function testCannotPostWithoutRecipients() public {
@@ -39,16 +42,26 @@ contract InheritedCollectModule_Publication is InheritedCollectModuleBase, BaseF
     }
 
     function testCannotPostWithZeroAddressRecipient() public {
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: address(0), split: BPS_MAX}));
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: address(0), split: BPS_MAX})
+        );
         hubPostWithRevert(Errors.InitParamsInvalid.selector);
     }
 
     function testCannotPostWithOneOfRecipientsAddressIsZero() public {
         delete inheritedExampleInitData.recipients;
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX / 4}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX / 4}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: address(0), split: BPS_MAX / 4}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX / 4}));
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: me, split: BPS_MAX / 4})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: me, split: BPS_MAX / 4})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: address(0), split: BPS_MAX / 4})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: me, split: BPS_MAX / 4})
+        );
         hubPostWithRevert(Errors.InitParamsInvalid.selector);
     }
 
@@ -60,7 +73,9 @@ contract InheritedCollectModule_Publication is InheritedCollectModuleBase, BaseF
             inheritedExampleInitData.recipients.push(RecipientData({recipient: me, split: 1000}));
             splitUsed += 1000;
         }
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: me, split: BPS_MAX - splitUsed}));
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: me, split: BPS_MAX - splitUsed})
+        );
         assert(inheritedExampleInitData.recipients.length > MAX_RECIPIENTS);
         hubPostWithRevert(FeeCollectModuleV2.TooManyRecipients.selector);
     }
@@ -89,7 +104,9 @@ contract InheritedCollectModule_Publication is InheritedCollectModuleBase, BaseF
         uint16 splitUsed;
         for (uint256 i = 0; i < MAX_RECIPIENTS; i++) {
             if (i != 3) {
-                inheritedExampleInitData.recipients.push(RecipientData({recipient: me, split: 2500}));
+                inheritedExampleInitData.recipients.push(
+                    RecipientData({recipient: me, split: 2500})
+                );
                 splitUsed += 2500;
             } else {
                 inheritedExampleInitData.recipients.push(RecipientData({recipient: me, split: 0}));
@@ -149,10 +166,8 @@ contract InheritedCollectModule_Publication is InheritedCollectModuleBase, BaseF
             })
         );
         assert(pubId > 0);
-        FeeCollectV2ProfilePublicationData memory fetchedData = feeCollectModuleV2.getFullPublicationData(
-            userProfileId,
-            pubId
-        );
+        FeeCollectV2ProfilePublicationData memory fetchedData = feeCollectModuleV2
+            .getPublicationData(userProfileId, pubId);
         assertEq(fetchedData.currency, fuzzyInitData.currency);
         assertEq(fetchedData.amount, fuzzyInitData.amount);
         assertEq(fetchedData.referralFee, fuzzyInitData.referralFee);
@@ -220,37 +235,46 @@ contract InheritedCollectModule_Publication is InheritedCollectModuleBase, BaseF
 //////////////
 // Collect with InheritedFeeCollectModule
 //
-contract InheritedCollectModule_Collect is InheritedCollectModuleBase, BaseFeeCollectModule_Collect {
+contract MultirecipientCollectModule_Collect is
+    MultirecipientCollectModuleBase,
+    BaseFeeCollectModule_Collect
+{
     constructor() {}
 
     function getEncodedInitData()
         internal
-        override(InheritedCollectModuleBase, BaseFeeCollectModuleBase)
+        override(MultirecipientCollectModuleBase, BaseFeeCollectModuleBase)
         returns (bytes memory)
     {
-        return InheritedCollectModuleBase.getEncodedInitData();
+        return MultirecipientCollectModuleBase.getEncodedInitData();
     }
 }
 
 //////////////
 // Collect on Mirror with InheritedFeeCollectModule
 //
-contract InheritedCollectModule_Mirror is InheritedCollectModuleBase, BaseFeeCollectModule_Mirror {
+contract MultirecipientCollectModule_Mirror is
+    MultirecipientCollectModuleBase,
+    BaseFeeCollectModule_Mirror
+{
     constructor() {}
 
     function getEncodedInitData()
         internal
-        override(InheritedCollectModuleBase, BaseFeeCollectModuleBase)
+        override(MultirecipientCollectModuleBase, BaseFeeCollectModuleBase)
         returns (bytes memory)
     {
-        return InheritedCollectModuleBase.getEncodedInitData();
+        return MultirecipientCollectModuleBase.getEncodedInitData();
     }
 }
 
 //////////////
 // Fee Distribution of InheritedFeeCollectModule
 //
-contract InheritedCollectModule_FeeDistribution is InheritedCollectModuleBase, BaseFeeCollectModule_FeeDistribution {
+contract MultirecipientCollectModule_FeeDistribution is
+    MultirecipientCollectModuleBase,
+    BaseFeeCollectModule_FeeDistribution
+{
     constructor() {}
 
     struct InheritedBalances {
@@ -266,10 +290,10 @@ contract InheritedCollectModule_FeeDistribution is InheritedCollectModuleBase, B
 
     function getEncodedInitData()
         internal
-        override(InheritedCollectModuleBase, BaseFeeCollectModuleBase)
+        override(MultirecipientCollectModuleBase, BaseFeeCollectModuleBase)
         returns (bytes memory)
     {
-        return InheritedCollectModuleBase.getEncodedInitData();
+        return MultirecipientCollectModuleBase.getEncodedInitData();
     }
 
     function testFeeSplitEquallyWithFiveRecipients(uint128 totalCollectFee) public {
@@ -284,11 +308,21 @@ contract InheritedCollectModule_FeeDistribution is InheritedCollectModuleBase, B
 
         // Set users in initData to publisher, u2, u3, u4, userFive with equal split of fee
         delete inheritedExampleInitData.recipients;
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: publisher, split: splitPerUser}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userTwo, split: splitPerUser}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userThree, split: splitPerUser}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userFour, split: splitPerUser}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userFive, split: splitPerUser}));
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: publisher, split: splitPerUser})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userTwo, split: splitPerUser})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userThree, split: splitPerUser})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userFour, split: splitPerUser})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userFive, split: splitPerUser})
+        );
 
         (uint256 pubId, ) = hubPostAndMirror(0, totalCollectFee);
 
@@ -333,18 +367,31 @@ contract InheritedCollectModule_FeeDistribution is InheritedCollectModuleBase, B
         uint16 userFourSplit = extraSplit / 2;
         uint16 userFiveSplit = extraSplit - userFourSplit;
 
-        assertEq(publisherSplit + userTwoSplit + userThreeSplit + userFourSplit + userFiveSplit, BPS_MAX);
+        assertEq(
+            publisherSplit + userTwoSplit + userThreeSplit + userFourSplit + userFiveSplit,
+            BPS_MAX
+        );
 
         InheritedBalances memory balancesBefore;
         InheritedBalances memory balancesAfter;
 
         // Set users in initData to five recipients with fuzzed splits
         delete inheritedExampleInitData.recipients;
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: publisher, split: publisherSplit}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userTwo, split: userTwoSplit}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userThree, split: userThreeSplit}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userFour, split: userFourSplit}));
-        inheritedExampleInitData.recipients.push(RecipientData({recipient: userFive, split: userFiveSplit}));
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: publisher, split: publisherSplit})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userTwo, split: userTwoSplit})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userThree, split: userThreeSplit})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userFour, split: userFourSplit})
+        );
+        inheritedExampleInitData.recipients.push(
+            RecipientData({recipient: userFive, split: userFiveSplit})
+        );
 
         (uint256 pubId, ) = hubPostAndMirror(0, totalCollectFee);
 
@@ -388,7 +435,11 @@ contract InheritedCollectModule_FeeDistribution is InheritedCollectModuleBase, B
         );
     }
 
-    function predictCutAmount(uint256 totalAfterTreasuryCut, uint16 cutBPS) internal pure returns (uint256) {
+    function predictCutAmount(uint256 totalAfterTreasuryCut, uint16 cutBPS)
+        internal
+        pure
+        returns (uint256)
+    {
         return (totalAfterTreasuryCut * cutBPS) / BPS_MAX;
     }
 }

@@ -3,7 +3,7 @@
 pragma solidity 0.8.10;
 
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
-import {BaseProfilePublicationData, BaseCollectModuleInitData, BaseFeeCollectModule} from './BaseFeeCollectModule.sol';
+import {BaseProfilePublicationData, BaseCollectModuleInitData, AbstractCollectModule} from './AbstractCollectModule.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
@@ -56,7 +56,7 @@ struct FeeCollectV2ProfilePublicationData {
     RecipientData[] recipients;
 }
 
-contract FeeCollectModuleV2 is BaseFeeCollectModule {
+contract FeeCollectModuleV2 is AbstractCollectModule {
     using SafeERC20 for IERC20;
 
     uint256 internal constant MAX_RECIPIENTS = 5;
@@ -68,7 +68,7 @@ contract FeeCollectModuleV2 is BaseFeeCollectModule {
     error InvalidRecipientSplits();
     error RecipientSplitCannotBeZero();
 
-    constructor(address hub, address moduleGlobals) BaseFeeCollectModule(hub, moduleGlobals) {}
+    constructor(address hub, address moduleGlobals) AbstractCollectModule(hub, moduleGlobals) {}
 
     function initializePublicationCollectModule(
         uint256 profileId,
@@ -170,25 +170,23 @@ contract FeeCollectModuleV2 is BaseFeeCollectModule {
      *
      * @return The BaseProfilePublicationData struct mapped to that publication.
      */
-    function getFullPublicationData(uint256 profileId, uint256 pubId)
+    function getPublicationData(uint256 profileId, uint256 pubId)
         external
         view
         returns (FeeCollectV2ProfilePublicationData memory)
     {
-        BaseProfilePublicationData memory standardData = _dataByPublicationByProfile[profileId][
-            pubId
-        ];
+        BaseProfilePublicationData memory baseData = _getPublicationData(profileId, pubId);
         RecipientData[] memory recipients = _recipientsByPublicationByProfile[profileId][pubId];
 
         return
             FeeCollectV2ProfilePublicationData({
-                amount: standardData.amount,
-                collectLimit: standardData.collectLimit,
-                currency: standardData.currency,
-                currentCollects: standardData.currentCollects,
-                referralFee: standardData.referralFee,
-                followerOnly: standardData.followerOnly,
-                endTimestamp: standardData.endTimestamp,
+                amount: baseData.amount,
+                collectLimit: baseData.collectLimit,
+                currency: baseData.currency,
+                currentCollects: baseData.currentCollects,
+                referralFee: baseData.referralFee,
+                followerOnly: baseData.followerOnly,
+                endTimestamp: baseData.endTimestamp,
                 recipients: recipients
             });
     }

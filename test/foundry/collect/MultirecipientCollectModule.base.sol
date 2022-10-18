@@ -5,7 +5,7 @@ import 'forge-std/Test.sol';
 import './BaseFeeCollectModule.base.sol';
 import 'contracts/collect/MultirecipientFeeCollectModule.sol';
 
-contract InheritedCollectModuleBase is BaseFeeCollectModuleBase {
+contract MultirecipientCollectModuleBase is BaseFeeCollectModuleBase {
     uint16 constant BPS_MAX = 10000;
 
     FeeCollectModuleV2 immutable feeCollectModuleV2;
@@ -14,7 +14,10 @@ contract InheritedCollectModuleBase is BaseFeeCollectModuleBase {
     // Deploy & Whitelist FeeCollectModuleV2
     constructor() {
         vm.prank(deployer);
-        baseFeeCollectModule = new FeeCollectModuleV2(hubProxyAddr, address(moduleGlobals));
+        baseFeeCollectModule = address(
+            new FeeCollectModuleV2(hubProxyAddr, address(moduleGlobals))
+        );
+
         feeCollectModuleV2 = new FeeCollectModuleV2(hubProxyAddr, address(moduleGlobals));
         vm.startPrank(governance);
         hub.whitelistCollectModule(address(feeCollectModuleV2), true);
