@@ -3,7 +3,7 @@
 pragma solidity 0.8.10;
 
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
-import {ProfilePublicationData, CollectModuleInitData, BaseFeeCollectModule} from './BaseFeeCollectModule.sol';
+import {BaseProfilePublicationData, BaseCollectModuleInitData, BaseFeeCollectModule} from './BaseFeeCollectModule.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
@@ -70,33 +70,26 @@ contract FeeCollectModuleV2 is BaseFeeCollectModule {
 
     constructor(address hub, address moduleGlobals) BaseFeeCollectModule(hub, moduleGlobals) {}
 
-    function _validateInitData(
+    function initializePublicationCollectModule(
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
-    ) internal override {
-        super._validateInitData(profileId, pubId, data);
+    ) external override onlyHub returns (bytes memory) {
         FeeCollectModuleV2InitData memory initData = abi.decode(data, (FeeCollectModuleV2InitData));
-        _validateAndStoreRecipients(initData.recipients, profileId, pubId);
-    }
 
-    function _decodeStandardInitParameters(bytes calldata data)
-        internal
-        pure
-        override
-        returns (CollectModuleInitData memory)
-    {
-        FeeCollectModuleV2InitData memory initData = abi.decode(data, (FeeCollectModuleV2InitData));
-        return
-            CollectModuleInitData({
-                amount: initData.amount,
-                collectLimit: initData.collectLimit,
-                currency: initData.currency,
-                referralFee: initData.referralFee,
-                followerOnly: initData.followerOnly,
-                endTimestamp: initData.endTimestamp,
-                recipient: address(0)
-            });
+        BaseCollectModuleInitData memory baseInitData = BaseCollectModuleInitData({
+            amount: initData.amount,
+            collectLimit: initData.collectLimit,
+            currency: initData.currency,
+            referralFee: initData.referralFee,
+            followerOnly: initData.followerOnly,
+            endTimestamp: initData.endTimestamp,
+            recipient: address(0)
+        });
+
+        _initializeBasePublicationCollectModule(profileId, pubId, baseInitData);
+        _validateAndStoreRecipients(initData.recipients, profileId, pubId);
+        return data;
     }
 
     function _validateAndStoreRecipients(
@@ -175,14 +168,16 @@ contract FeeCollectModuleV2 is BaseFeeCollectModule {
      * @param profileId The token ID of the profile mapped to the publication to query.
      * @param pubId The publication ID of the publication to query.
      *
-     * @return The ProfilePublicationData struct mapped to that publication.
+     * @return The BaseProfilePublicationData struct mapped to that publication.
      */
     function getFullPublicationData(uint256 profileId, uint256 pubId)
         external
         view
         returns (FeeCollectV2ProfilePublicationData memory)
     {
-        ProfilePublicationData memory standardData = _dataByPublicationByProfile[profileId][pubId];
+        BaseProfilePublicationData memory standardData = _dataByPublicationByProfile[profileId][
+            pubId
+        ];
         RecipientData[] memory recipients = _recipientsByPublicationByProfile[profileId][pubId];
 
         return

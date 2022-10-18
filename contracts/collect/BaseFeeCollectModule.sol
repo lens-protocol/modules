@@ -24,7 +24,7 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
  * @param recipient Recipient of collect fees.
  */
-struct ProfilePublicationData {
+struct BaseProfilePublicationData {
     uint160 amount;
     uint96 collectLimit;
     address currency;
@@ -46,7 +46,7 @@ struct ProfilePublicationData {
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
  * @param recipient Recipient of collect fees.
  */
-struct CollectModuleInitData {
+struct BaseCollectModuleInitData {
     uint160 amount;
     uint96 collectLimit;
     address currency;
@@ -67,7 +67,7 @@ struct CollectModuleInitData {
 contract BaseFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICollectModule {
     using SafeERC20 for IERC20;
 
-    mapping(uint256 => mapping(uint256 => ProfilePublicationData))
+    mapping(uint256 => mapping(uint256 => BaseProfilePublicationData))
         internal _dataByPublicationByProfile;
 
     constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
@@ -90,61 +90,44 @@ contract BaseFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
-    ) external virtual override onlyHub returns (bytes memory) {
-        _validateInitData(profileId, pubId, data);
-        _beforeStoreHook(profileId, pubId, data);
-        _storePublicationCollectParameters(profileId, pubId, data);
-        _afterStoreHook(profileId, pubId, data);
+    ) external virtual onlyHub returns (bytes memory) {
+        BaseCollectModuleInitData memory baseInitData = abi.decode(
+            data,
+            (BaseCollectModuleInitData)
+        );
+        _initializeBasePublicationCollectModule(profileId, pubId, baseInitData);
         return data;
     }
 
-    function _validateInitData(
+    function _initializeBasePublicationCollectModule(
         uint256 profileId,
         uint256 pubId,
-        bytes calldata data
+        BaseCollectModuleInitData memory baseInitData
     ) internal virtual {
-        CollectModuleInitData memory initData = _decodeStandardInitParameters(data);
+        _validateBaseInitData(baseInitData);
+        _storeBasePublicationCollectParameters(profileId, pubId, baseInitData);
+    }
+
+    function _validateBaseInitData(BaseCollectModuleInitData memory baseInitData) internal virtual {
         if (
-            !_currencyWhitelisted(initData.currency) ||
-            initData.referralFee > BPS_MAX ||
-            (initData.endTimestamp < block.timestamp && initData.endTimestamp > 0)
+            !_currencyWhitelisted(baseInitData.currency) ||
+            baseInitData.referralFee > BPS_MAX ||
+            (baseInitData.endTimestamp < block.timestamp && baseInitData.endTimestamp > 0)
         ) revert Errors.InitParamsInvalid();
     }
 
-    function _decodeStandardInitParameters(bytes calldata data)
-        internal
-        virtual
-        returns (CollectModuleInitData memory)
-    {
-        return abi.decode(data, (CollectModuleInitData));
-    }
-
-    function _beforeStoreHook(
+    function _storeBasePublicationCollectParameters(
         uint256 profileId,
         uint256 pubId,
-        bytes calldata data
-    ) internal virtual {}
-
-    function _afterStoreHook(
-        uint256 profileId,
-        uint256 pubId,
-        bytes calldata data
-    ) internal virtual {}
-
-    function _storePublicationCollectParameters(
-        uint256 profileId,
-        uint256 pubId,
-        bytes calldata data
+        BaseCollectModuleInitData memory baseInitData
     ) internal virtual {
-        CollectModuleInitData memory initData = _decodeStandardInitParameters(data);
-
-        _dataByPublicationByProfile[profileId][pubId].amount = initData.amount;
-        _dataByPublicationByProfile[profileId][pubId].collectLimit = initData.collectLimit;
-        _dataByPublicationByProfile[profileId][pubId].currency = initData.currency;
-        _dataByPublicationByProfile[profileId][pubId].recipient = initData.recipient;
-        _dataByPublicationByProfile[profileId][pubId].referralFee = initData.referralFee;
-        _dataByPublicationByProfile[profileId][pubId].followerOnly = initData.followerOnly;
-        _dataByPublicationByProfile[profileId][pubId].endTimestamp = initData.endTimestamp;
+        _dataByPublicationByProfile[profileId][pubId].amount = baseInitData.amount;
+        _dataByPublicationByProfile[profileId][pubId].collectLimit = baseInitData.collectLimit;
+        _dataByPublicationByProfile[profileId][pubId].currency = baseInitData.currency;
+        _dataByPublicationByProfile[profileId][pubId].recipient = baseInitData.recipient;
+        _dataByPublicationByProfile[profileId][pubId].referralFee = baseInitData.referralFee;
+        _dataByPublicationByProfile[profileId][pubId].followerOnly = baseInitData.followerOnly;
+        _dataByPublicationByProfile[profileId][pubId].endTimestamp = baseInitData.endTimestamp;
     }
 
     /**
@@ -160,7 +143,7 @@ contract BaseFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
-    ) external override onlyHub {
+    ) external virtual onlyHub {
         uint96 currentCollects = _validateCollect(
             referrerProfileId,
             collector,
@@ -207,12 +190,13 @@ contract BaseFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
      * @param profileId The token ID of the profile mapped to the publication to query.
      * @param pubId The publication ID of the publication to query.
      *
-     * @return The ProfilePublicationData struct mapped to that publication.
+     * @return The BaseProfilePublicationData struct mapped to that publication.
      */
     function getPublicationData(uint256 profileId, uint256 pubId)
         external
         view
-        returns (ProfilePublicationData memory)
+        virtual
+        returns (BaseProfilePublicationData memory)
     {
         return _dataByPublicationByProfile[profileId][pubId];
     }
@@ -239,7 +223,7 @@ contract BaseFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
-    ) internal {
+    ) internal virtual {
         uint256 amount = calculateFee(profileId, pubId, data);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);
@@ -275,7 +259,7 @@ contract BaseFeeCollectModule is FeeModuleBase, FollowValidationModuleBase, ICol
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
-    ) internal {
+    ) internal virtual {
         uint256 amount = calculateFee(profileId, pubId, data);
         address currency = _dataByPublicationByProfile[profileId][pubId].currency;
         _validateDataIsExpected(data, currency, amount);

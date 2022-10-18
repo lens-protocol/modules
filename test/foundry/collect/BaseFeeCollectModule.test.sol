@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 import '../BaseSetup.t.sol';
 import {BaseFeeCollectModuleBase} from './BaseFeeCollectModule.base.sol';
-import {ProfilePublicationData, CollectModuleInitData} from 'contracts/collect/BaseFeeCollectModule.sol';
+import {BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/BaseFeeCollectModule.sol';
 
 import '../helpers/TestHelpers.sol';
 import '@aave/lens-protocol/contracts/libraries/Events.sol';
@@ -83,7 +83,11 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
 
     function testCannotPostIfCalledFromNonHubAddress() public {
         vm.expectRevert(Errors.NotHub.selector);
-        baseFeeCollectModule.initializePublicationCollectModule(userProfileId, 1, getEncodedInitData());
+        baseFeeCollectModule.initializePublicationCollectModule(
+            userProfileId,
+            1,
+            getEncodedInitData()
+        );
     }
 
     function testCannotPostWithWrongInitDataFormat() public {
@@ -138,7 +142,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
         vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
         vm.assume(endTimestamp > block.timestamp || endTimestamp == 0);
 
-        CollectModuleInitData memory fuzzyInitData = CollectModuleInitData({
+        BaseCollectModuleInitData memory fuzzyInitData = BaseCollectModuleInitData({
             amount: amount,
             collectLimit: collectLimit,
             currency: address(currency),
@@ -170,7 +174,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
         vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
         vm.assume(endTimestamp > block.timestamp);
 
-        CollectModuleInitData memory fuzzyInitData = CollectModuleInitData({
+        BaseCollectModuleInitData memory fuzzyInitData = BaseCollectModuleInitData({
             amount: amount,
             collectLimit: collectLimit,
             currency: address(currency),
@@ -191,7 +195,10 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             })
         );
         assert(pubId > 0);
-        ProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(userProfileId, pubId);
+        BaseProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
+            userProfileId,
+            pubId
+        );
         assertEq(fetchedData.currency, fuzzyInitData.currency);
         assertEq(fetchedData.amount, fuzzyInitData.amount);
         assertEq(fetchedData.referralFee, fuzzyInitData.referralFee);
@@ -392,7 +399,7 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        ProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
+        BaseProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
             publisherProfileId,
             secondPubId
         );
@@ -493,7 +500,7 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        ProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
+        BaseProfilePublicationData memory fetchedData = baseFeeCollectModule.getPublicationData(
             userTwoProfileId,
             origPubId
         );
@@ -570,7 +577,10 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         currency.approve(address(baseFeeCollectModule), type(uint256).max);
     }
 
-    function hubPostAndMirror(uint16 referralFee, uint128 amount) public returns (uint256, uint256) {
+    function hubPostAndMirror(uint16 referralFee, uint128 amount)
+        public
+        returns (uint256, uint256)
+    {
         exampleInitData.referralFee = referralFee;
         exampleInitData.amount = amount;
         vm.prank(publisher);
@@ -641,7 +651,11 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
             assertEq(balancesChange.publisher, 0);
             assertEq(balancesChange.user, 0);
         } else {
-            uint256 ownerFeeTransferEventAmount = TestHelpers.getTransferFromEvents(entries, user, publisher);
+            uint256 ownerFeeTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                publisher
+            );
             assertEq(ownerFeeTransferEventAmount, adjustedAmount);
         }
         if (treasuryFee == 0 || treasuryAmount == 0) {
@@ -649,7 +663,11 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
             TestHelpers.getTransferFromEvents(entries, user, treasury);
             assertEq(balancesChange.treasury, 0);
         } else {
-            uint256 treasuryTransferEventAmount = TestHelpers.getTransferFromEvents(entries, user, treasury);
+            uint256 treasuryTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                treasury
+            );
             assertEq(treasuryTransferEventAmount, treasuryAmount);
         }
     }
@@ -689,7 +707,10 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         balancesChange.publisher = balancesAfter.publisher - balancesBefore.publisher;
         balancesChange.user = balancesBefore.user - balancesAfter.user;
 
-        assertEq(balancesChange.treasury + balancesChange.referral + balancesChange.publisher, balancesChange.user);
+        assertEq(
+            balancesChange.treasury + balancesChange.referral + balancesChange.publisher,
+            balancesChange.user
+        );
 
         uint256 treasuryAmount = (uint256(amount) * treasuryFee) / BPS_MAX;
         uint256 adjustedAmount = uint256(amount) - treasuryAmount;
@@ -710,7 +731,11 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
             assertEq(balancesChange.publisher, 0);
             assertEq(balancesChange.user, 0);
         } else {
-            uint256 ownerFeeTransferEventAmount = TestHelpers.getTransferFromEvents(entries, user, publisher);
+            uint256 ownerFeeTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                publisher
+            );
             assertEq(ownerFeeTransferEventAmount, adjustedAmount);
         }
 
@@ -719,7 +744,11 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
             TestHelpers.getTransferFromEvents(entries, user, treasury);
             assertEq(balancesChange.treasury, 0);
         } else {
-            uint256 treasuryTransferEventAmount = TestHelpers.getTransferFromEvents(entries, user, treasury);
+            uint256 treasuryTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                treasury
+            );
             assertEq(treasuryTransferEventAmount, treasuryAmount);
         }
 
@@ -728,7 +757,11 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
             TestHelpers.getTransferFromEvents(entries, user, userTwo);
             assertEq(balancesChange.referral, referralAmount);
         } else {
-            uint256 referralTransferEventAmount = TestHelpers.getTransferFromEvents(entries, user, userTwo);
+            uint256 referralTransferEventAmount = TestHelpers.getTransferFromEvents(
+                entries,
+                user,
+                userTwo
+            );
             assertEq(referralTransferEventAmount, referralAmount);
         }
     }

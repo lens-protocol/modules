@@ -8,7 +8,7 @@ import 'contracts/collect/BaseFeeCollectModule.sol';
 contract BaseFeeCollectModuleBase is BaseSetup {
     BaseFeeCollectModule baseFeeCollectModule;
 
-    CollectModuleInitData exampleInitData;
+    BaseCollectModuleInitData exampleInitData;
 
     uint256 constant DEFAULT_COLLECT_LIMIT = 3;
     uint16 constant REFERRAL_FEE_BPS = 250;
