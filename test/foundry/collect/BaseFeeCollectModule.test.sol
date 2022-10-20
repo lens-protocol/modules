@@ -17,8 +17,6 @@ uint16 constant BPS_MAX = 10000;
 contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
     uint256 immutable userProfileId;
 
-    uint256 internal constant MAX_RECIPIENTS = 5;
-
     constructor() BaseFeeCollectModuleBase() {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
@@ -806,5 +804,59 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         vm.assume(treasuryFee < BPS_MAX / 2 - 1);
         vm.assume(referralFee < BPS_MAX / 2 - 1);
         verifyFeesWithMirror(treasuryFee, referralFee, amount);
+    }
+}
+
+/////////
+// Publication Creation with BaseFeeCollectModule
+//
+contract BaseFeeCollectModule_GasReport is BaseFeeCollectModuleBase {
+    uint256 immutable userProfileId;
+
+    constructor() BaseFeeCollectModuleBase() {
+        userProfileId = hub.createProfile(
+            DataTypes.CreateProfileData({
+                to: me,
+                handle: 'user.lens',
+                imageURI: OTHER_MOCK_URI,
+                followModule: address(0),
+                followModuleInitData: '',
+                followNFTURI: MOCK_FOLLOW_NFT_URI
+            })
+        );
+    }
+
+    function testCreatePublicationWithDifferentInitData() public {
+        uint96 collectLimit = 10;
+        bool followerOnly = false;
+        uint72 endTimestamp = uint72(block.timestamp + 100);
+
+        for (uint16 referralFee = 0; referralFee <= BPS_MAX; referralFee++) {
+            if (referralFee >= 2) referralFee += BPS_MAX / 4;
+            if (referralFee > 9000) referralFee = BPS_MAX;
+            for (uint160 amount = 0; amount < type(uint160).max; amount++) {
+                if (amount >= 2) amount += 1 ether;
+                if (amount >= 2 ether) amount = type(uint160).max - 1;
+
+                exampleInitData.amount = amount;
+                exampleInitData.collectLimit = collectLimit;
+                exampleInitData.currency = address(currency);
+                exampleInitData.referralFee = referralFee;
+                exampleInitData.followerOnly = followerOnly;
+                exampleInitData.endTimestamp = endTimestamp;
+                exampleInitData.recipient = me;
+
+                hub.post(
+                    DataTypes.PostData({
+                        profileId: userProfileId,
+                        contentURI: MOCK_URI,
+                        collectModule: baseFeeCollectModule,
+                        collectModuleInitData: getEncodedInitData(),
+                        referenceModule: address(0),
+                        referenceModuleInitData: ''
+                    })
+                );
+            }
+        }
     }
 }

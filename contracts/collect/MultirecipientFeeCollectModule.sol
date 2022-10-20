@@ -6,6 +6,7 @@ import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
 import {BaseProfilePublicationData, BaseCollectModuleInitData, AbstractCollectModule} from './AbstractCollectModule.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectModule.sol';
 
 struct RecipientData {
     address recipient;
@@ -13,7 +14,7 @@ struct RecipientData {
 }
 
 /**
- * @notice A struct containing the necessary data to initialize FeeCollect Module V2.
+ * @notice A struct containing the necessary data to initialize MultirecipientFeeCollectModule.
  *
  * @param amount The collecting cost associated with this publication. 0 for free collect.
  * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
@@ -23,7 +24,7 @@ struct RecipientData {
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
  * @param recipients Array of RecipientData items to split collect fees across multiple recipients.
  */
-struct FeeCollectModuleV2InitData {
+struct MultirecipientFeeCollectModuleInitData {
     uint160 amount;
     uint96 collectLimit;
     address currency;
@@ -45,7 +46,7 @@ struct FeeCollectModuleV2InitData {
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
  * @param recipients Array of RecipientData items to split collect fees across multiple recipients.
  */
-struct FeeCollectV2ProfilePublicationData {
+struct MultirecipientFeeCollectProfilePublicationData {
     uint160 amount;
     uint96 collectLimit;
     address currency;
@@ -56,7 +57,19 @@ struct FeeCollectV2ProfilePublicationData {
     RecipientData[] recipients;
 }
 
-contract FeeCollectModuleV2 is AbstractCollectModule {
+error TooManyRecipients();
+error InvalidRecipientSplits();
+error RecipientSplitCannotBeZero();
+
+/**
+ * @title MultirecipientCollectModule
+ * @author Lens Protocol
+ *
+ * @notice This is a simple Lens CollectModule implementation, allowing customization of time to collect, number of collects,
+ * splitting collect fee across multiple recipients, and whether only followers can collect.
+ * It is charging a fee for collect (if enabled) and distributing it among Receivers/Referral/Treasury.
+ */
+contract MultirecipientFeeCollectModule is AbstractCollectModule {
     using SafeERC20 for IERC20;
 
     uint256 internal constant MAX_RECIPIENTS = 5;
@@ -64,18 +77,20 @@ contract FeeCollectModuleV2 is AbstractCollectModule {
     mapping(uint256 => mapping(uint256 => RecipientData[]))
         internal _recipientsByPublicationByProfile;
 
-    error TooManyRecipients();
-    error InvalidRecipientSplits();
-    error RecipientSplitCannotBeZero();
-
     constructor(address hub, address moduleGlobals) AbstractCollectModule(hub, moduleGlobals) {}
 
+    /**
+     * @inheritdoc ICollectModule
+     */
     function initializePublicationCollectModule(
         uint256 profileId,
         uint256 pubId,
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
-        FeeCollectModuleV2InitData memory initData = abi.decode(data, (FeeCollectModuleV2InitData));
+        MultirecipientFeeCollectModuleInitData memory initData = abi.decode(
+            data,
+            (MultirecipientFeeCollectModuleInitData)
+        );
 
         BaseCollectModuleInitData memory baseInitData = BaseCollectModuleInitData({
             amount: initData.amount,
@@ -87,11 +102,19 @@ contract FeeCollectModuleV2 is AbstractCollectModule {
             recipient: address(0)
         });
 
-        _initializeBasePublicationCollectModule(profileId, pubId, baseInitData);
+        _validateBaseInitData(baseInitData);
         _validateAndStoreRecipients(initData.recipients, profileId, pubId);
+        _storeBasePublicationCollectParameters(profileId, pubId, baseInitData);
         return data;
     }
 
+    /**
+     * @dev Validates the recipients array and stores them to (a separate from Base) storage.
+     *
+     * @param recipients An array of recipients
+     * @param profileId The profile ID who is publishing the publication.
+     * @param pubId The associated publication's LensHub publication ID.
+     */
     function _validateAndStoreRecipients(
         RecipientData[] memory recipients,
         uint256 profileId,
@@ -130,6 +153,11 @@ contract FeeCollectModuleV2 is AbstractCollectModule {
         }
     }
 
+    /**
+     * @dev Transfers the fee to multiple recipients.
+     *
+     * @inheritdoc AbstractCollectModule
+     */
     function _transferToRecipients(
         address currency,
         address collector,
@@ -173,13 +201,13 @@ contract FeeCollectModuleV2 is AbstractCollectModule {
     function getPublicationData(uint256 profileId, uint256 pubId)
         external
         view
-        returns (FeeCollectV2ProfilePublicationData memory)
+        returns (MultirecipientFeeCollectProfilePublicationData memory)
     {
-        BaseProfilePublicationData memory baseData = _getPublicationData(profileId, pubId);
+        BaseProfilePublicationData memory baseData = getBasePublicationData(profileId, pubId);
         RecipientData[] memory recipients = _recipientsByPublicationByProfile[profileId][pubId];
 
         return
-            FeeCollectV2ProfilePublicationData({
+            MultirecipientFeeCollectProfilePublicationData({
                 amount: baseData.amount,
                 collectLimit: baseData.collectLimit,
                 currency: baseData.currency,

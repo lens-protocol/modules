@@ -36,7 +36,7 @@ struct BaseProfilePublicationData {
 }
 
 /**
- * @notice A struct containing the necessary data to initialize FeeCollect Module V2.
+ * @notice A struct containing the necessary data to initialize this Base Collect Module.
  *
  * @param amount The collecting cost associated with this publication. 0 for free collect.
  * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
@@ -57,12 +57,15 @@ struct BaseCollectModuleInitData {
 }
 
 /**
- * @title BaseFeeCollectModule
+ * @title AbstractCollectModule
  * @author Lens Protocol
  *
- * @notice This is a base Lens CollectModule implementation, allowing customization of time to collect, number of collects
- * and whether only followers can collect.
- * You can build your own collect modules by inheriting this contract and overriding functions.
+ * @notice This is an abstract Lens CollectModule implementation, allowing customization of time to collect, number of collects
+ * and whether only followers can collect, charging a fee for collect and distributing it among Receiver/Referral/Treasury.
+ * @dev Here we use "Base" terminology to anything that represents this base functionality (base structs, base functions, base storage).
+ * @dev You can build your own collect modules on top of the "Base" by inheriting this contract and overriding functions.
+ * @dev This contract is marked "abstract" as it requires you to implement initializePublicationCollectModule and getPublicationData functions when you inherit from it.
+ * @dev See BaseFeeCollectModule as an example implementation.
  */
 abstract contract AbstractCollectModule is
     FeeModuleBase,
@@ -77,69 +80,11 @@ abstract contract AbstractCollectModule is
     constructor(address hub, address moduleGlobals) ModuleBase(hub) FeeModuleBase(moduleGlobals) {}
 
     /**
-     * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
-     *
-     * @param data The arbitrary data parameter, decoded into:
-     *      uint160 amount: The currency total amount to levy.
-     *      uint96 collectLimit: The maximum amount of collects.
-     *      address currency: The currency address, must be internally whitelisted.
-     *      uint16 referralFee: The referral fee to set.
-     *      bool followerOnly: Whether only followers should be able to collect.
-     *      uint72 endTimestamp: The end timestamp after which collecting is impossible.
-     *      RecipientData[] recipients: Array of RecipientData items to split collect fees across multiple recipients.
-     *
-     * @return An abi encoded bytes parameter, which is the same as the passed data parameter.
-     */
-    function initializePublicationCollectModule(
-        uint256 profileId,
-        uint256 pubId,
-        bytes calldata data
-    ) external virtual onlyHub returns (bytes memory) {
-        BaseCollectModuleInitData memory baseInitData = abi.decode(
-            data,
-            (BaseCollectModuleInitData)
-        );
-        _initializeBasePublicationCollectModule(profileId, pubId, baseInitData);
-        return data;
-    }
-
-    function _initializeBasePublicationCollectModule(
-        uint256 profileId,
-        uint256 pubId,
-        BaseCollectModuleInitData memory baseInitData
-    ) internal virtual {
-        _validateBaseInitData(baseInitData);
-        _storeBasePublicationCollectParameters(profileId, pubId, baseInitData);
-    }
-
-    function _validateBaseInitData(BaseCollectModuleInitData memory baseInitData) internal virtual {
-        if (
-            !_currencyWhitelisted(baseInitData.currency) ||
-            baseInitData.referralFee > BPS_MAX ||
-            (baseInitData.endTimestamp < block.timestamp && baseInitData.endTimestamp > 0)
-        ) revert Errors.InitParamsInvalid();
-    }
-
-    function _storeBasePublicationCollectParameters(
-        uint256 profileId,
-        uint256 pubId,
-        BaseCollectModuleInitData memory baseInitData
-    ) internal virtual {
-        _dataByPublicationByProfile[profileId][pubId].amount = baseInitData.amount;
-        _dataByPublicationByProfile[profileId][pubId].collectLimit = baseInitData.collectLimit;
-        _dataByPublicationByProfile[profileId][pubId].currency = baseInitData.currency;
-        _dataByPublicationByProfile[profileId][pubId].recipient = baseInitData.recipient;
-        _dataByPublicationByProfile[profileId][pubId].referralFee = baseInitData.referralFee;
-        _dataByPublicationByProfile[profileId][pubId].followerOnly = baseInitData.followerOnly;
-        _dataByPublicationByProfile[profileId][pubId].endTimestamp = baseInitData.endTimestamp;
-    }
-
-    /**
      * @dev Processes a collect by:
-     *  1. Ensuring the collector is a follower if followerOnly mode == true
-     *  2. Ensuring the current timestamp is less than or equal to the collect end timestamp
-     *  2. Ensuring the collect does not pass the collect limit
-     *  3. Charging a fee
+     *  1. Validating that collect action meets all needded criteria
+     *  2. Processing the collect action either with or withour referral
+     *
+     * @inheritdoc ICollectModule
      */
     function processCollect(
         uint256 referrerProfileId,
@@ -148,14 +93,15 @@ abstract contract AbstractCollectModule is
         uint256 pubId,
         bytes calldata data
     ) external virtual onlyHub {
-        uint96 currentCollects = _validateCollect(
+        // "post-" here in the meaning of: "number of collects after collect action performed"
+        uint96 postCollects = _validateCollect(
             referrerProfileId,
             collector,
             profileId,
             pubId,
             data
         );
-        _dataByPublicationByProfile[profileId][pubId].currentCollects = ++currentCollects;
+        _dataByPublicationByProfile[profileId][pubId].currentCollects = postCollects;
         if (referrerProfileId == profileId) {
             _processCollect(collector, profileId, pubId, data);
         } else {
@@ -163,32 +109,11 @@ abstract contract AbstractCollectModule is
         }
     }
 
-    function _validateCollect(
-        uint256 referrerProfileId,
-        address collector,
-        uint256 profileId,
-        uint256 pubId,
-        bytes calldata data
-    ) internal virtual returns (uint96) {
-        if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
-            _checkFollowValidity(profileId, collector);
-
-        uint256 endTimestamp = _dataByPublicationByProfile[profileId][pubId].endTimestamp;
-        uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
-        uint96 currentCollects = _dataByPublicationByProfile[profileId][pubId].currentCollects;
-
-        if (collectLimit != 0 && currentCollects == collectLimit) {
-            revert Errors.MintLimitExceeded();
-        }
-        if (block.timestamp > endTimestamp && endTimestamp != 0) {
-            revert Errors.CollectExpired();
-        }
-
-        return currentCollects;
-    }
+    // This function is not implemented because each Collect module has its own return data type
+    // function getPublicationData(uint256 profileId, uint256 pubId) external view returns (.....) {}
 
     /**
-     * @notice Returns the publication data for a given publication, or an empty struct if that publication was not
+     * @notice Returns the Base publication data for a given publication, or an empty struct if that publication was not
      * initialized with this module.
      *
      * @param profileId The token ID of the profile mapped to the publication to query.
@@ -196,8 +121,8 @@ abstract contract AbstractCollectModule is
      *
      * @return The BaseProfilePublicationData struct mapped to that publication.
      */
-    function _getPublicationData(uint256 profileId, uint256 pubId)
-        internal
+    function getBasePublicationData(uint256 profileId, uint256 pubId)
+        public
         view
         virtual
         returns (BaseProfilePublicationData memory)
@@ -205,17 +130,9 @@ abstract contract AbstractCollectModule is
         return _dataByPublicationByProfile[profileId][pubId];
     }
 
-    function getBasePublicationData(uint256 profileId, uint256 pubId)
-        external
-        view
-        virtual
-        returns (BaseProfilePublicationData memory)
-    {
-        return _getPublicationData(profileId, pubId);
-    }
-
     /**
      * @notice Calculates and returns the collect fee of a publication.
+     * @dev Override this function to use a different formula for the fee.
      *
      * @param profileId The token ID of the profile mapped to the publication to query.
      * @param pubId The publication ID of the publication to query.
@@ -231,6 +148,135 @@ abstract contract AbstractCollectModule is
         return _dataByPublicationByProfile[profileId][pubId].amount;
     }
 
+    /**
+     * @dev Validates the Base parameters like:
+     * 1) Is the currency whitelisted
+     * 2) Is the referralFee in valid range
+     * 3) Is the end of collects timestamp in valid range
+     *
+     * This should be called during initializePublicationCollectModule()
+     *
+     * @param baseInitData Module initialization data (see BaseCollectModuleInitData struct)
+     */
+    function _validateBaseInitData(BaseCollectModuleInitData memory baseInitData) internal virtual {
+        if (
+            !_currencyWhitelisted(baseInitData.currency) ||
+            baseInitData.referralFee > BPS_MAX ||
+            (baseInitData.endTimestamp < block.timestamp && baseInitData.endTimestamp > 0)
+        ) revert Errors.InitParamsInvalid();
+    }
+
+    /**
+     * @dev Stores the initial module parameters
+     *
+     * This should be called during initializePublicationCollectModule()
+     *
+     * @param profileId The token ID of the profile publishing the publication.
+     * @param pubId The publication ID.
+     * @param baseInitData Module initialization data (see BaseCollectModuleInitData struct)
+     */
+    function _storeBasePublicationCollectParameters(
+        uint256 profileId,
+        uint256 pubId,
+        BaseCollectModuleInitData memory baseInitData
+    ) internal virtual {
+        // TODO: Should we check these for 0 before writing or does compiler do this for us?
+        // Minimum gas usage falls -2000 gas
+        // But Average raises +500 gas
+        // And Median raises +1600 gas
+        // And Maximum raises +750 gas
+        // So maybe not worth it, because it's a rare case where most of these are zero's
+        if (baseInitData.amount > 0)
+            _dataByPublicationByProfile[profileId][pubId].amount = baseInitData.amount;
+        if (baseInitData.collectLimit > 0)
+            _dataByPublicationByProfile[profileId][pubId].collectLimit = baseInitData.collectLimit;
+
+        _dataByPublicationByProfile[profileId][pubId].currency = baseInitData.currency;
+
+        if (baseInitData.recipient != payable(address(0)))
+            _dataByPublicationByProfile[profileId][pubId].recipient = baseInitData.recipient;
+        if (baseInitData.referralFee > 0)
+            _dataByPublicationByProfile[profileId][pubId].referralFee = baseInitData.referralFee;
+        if (baseInitData.followerOnly)
+            _dataByPublicationByProfile[profileId][pubId].followerOnly = baseInitData.followerOnly;
+        if (baseInitData.endTimestamp > 0)
+            _dataByPublicationByProfile[profileId][pubId].endTimestamp = baseInitData.endTimestamp;
+    }
+
+    /**
+     * @dev Validates the collect action by checking that:
+     * 1) the collector is a follower (if enabled)
+     * 2) the number of collects after the action doesn't surpass the collect limit (if enabled)
+     * 3) the current block timestamp doesn't surpass the end timestamp (if enabled)
+     *
+     * This should be called during processCollect()
+     *
+     * @param referrerProfileId The LensHub profile token ID of the referrer's profile (only different in case of mirrors).
+     * @param collector The collector address.
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param data Arbitrary data __passed from the collector!__ to be decoded.
+     *
+     * @return Number of collects after the action (to write to storage)
+     */
+    function _validateCollect(
+        uint256 referrerProfileId,
+        address collector,
+        uint256 profileId,
+        uint256 pubId,
+        bytes calldata data
+    ) internal virtual returns (uint96) {
+        if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
+            _checkFollowValidity(profileId, collector);
+
+        uint256 endTimestamp = _dataByPublicationByProfile[profileId][pubId].endTimestamp;
+        uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
+
+        // Number of total collects after collect action will be performed
+        uint96 collectsAfter = _getCollectsAfter(profileId, pubId, data);
+
+        if (collectLimit != 0 && collectsAfter > collectLimit) {
+            revert Errors.MintLimitExceeded();
+        }
+        if (endTimestamp != 0 && block.timestamp > endTimestamp) {
+            revert Errors.CollectExpired();
+        }
+
+        return collectsAfter;
+    }
+
+    /**
+     * @dev Gets the number of total collects after collect action will be performed
+     *
+     * Modify this if you want to, for example, process multiple collects at the same time
+     *
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param data Arbitrary data __passed from the collector!__ to be decoded.
+     *
+     * @return Number of collects after the action (to write to storage)
+     */
+    function _getCollectsAfter(
+        uint256 profileId,
+        uint256 pubId,
+        bytes calldata data
+    ) internal virtual returns (uint96) {
+        unchecked {
+            return _dataByPublicationByProfile[profileId][pubId].currentCollects + 1;
+        }
+    }
+
+    /**
+     * @dev Internal processing of a collect:
+     *  1. Calculation of fees
+     *  2. Validation that fees are what collector expected
+     *  3. Transfer of fees to recipient(-s) and treasury
+     *
+     * @param collector The address that will collect the post.
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param data Arbitrary data __passed from the collector!__ to be decoded.
+     */
     function _processCollect(
         address collector,
         uint256 profileId,
@@ -252,6 +298,17 @@ abstract contract AbstractCollectModule is
         }
     }
 
+    /**
+     * @dev Tranfers the fee to recipient(-s)
+     *
+     * Override this to add additional functionality (e.g. multiple recipients)
+     *
+     * @param currency Currency of the transaction
+     * @param collector The address that collects the post (and pays the fee).
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param amount Amount to transfer to recipient(-s)
+     */
     function _transferToRecipients(
         address currency,
         address collector,
@@ -266,6 +323,20 @@ abstract contract AbstractCollectModule is
         }
     }
 
+    /**
+     * @dev Internal processing of a collect with a referral(-s).
+     *
+     * Same as _processCollect, but also includes transfer to referral(-s):
+     *  1. Calculation of fees
+     *  2. Validation that fees are what collector expected
+     *  3. Transfer of fees to recipient(-s), referral(-s) and treasury
+     *
+     * @param referrerProfileId The address of the referral.
+     * @param collector The address that will collect the post.
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param data Arbitrary data __passed from the collector!__ to be decoded.
+     */
     function _processCollectWithReferral(
         uint256 referrerProfileId,
         address collector,
@@ -294,7 +365,8 @@ abstract contract AbstractCollectModule is
             collector,
             profileId,
             pubId,
-            adjustedAmount
+            adjustedAmount,
+            data
         );
 
         _transferToRecipients(currency, collector, profileId, pubId, adjustedAmount);
@@ -304,13 +376,27 @@ abstract contract AbstractCollectModule is
         }
     }
 
+    /**
+     * @dev Tranfers the part of fee to referral(-s)
+     *
+     * Override this to add additional functionality (e.g. multiple referrals)
+     *
+     * @param currency Currency of the transaction
+     * @param referrerProfileId The address of the referral.
+     * @param collector The address that collects the post (and pays the fee).
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param adjustedAmount Amount of the fee after subtracting the Treasury part.
+     * @param data Arbitrary data __passed from the collector!__ to be decoded.
+     */
     function _transferToReferrals(
         address currency,
         uint256 referrerProfileId,
         address collector,
         uint256 profileId,
         uint256 pubId,
-        uint256 adjustedAmount
+        uint256 adjustedAmount,
+        bytes calldata data
     ) internal virtual returns (uint256) {
         uint256 referralFee = _dataByPublicationByProfile[profileId][pubId].referralFee;
         if (referralFee != 0) {
