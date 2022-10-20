@@ -162,7 +162,7 @@ abstract contract AbstractCollectModule is
         if (
             !_currencyWhitelisted(baseInitData.currency) ||
             baseInitData.referralFee > BPS_MAX ||
-            (baseInitData.endTimestamp < block.timestamp && baseInitData.endTimestamp > 0)
+            (baseInitData.endTimestamp != 0 && baseInitData.endTimestamp < block.timestamp)
         ) revert Errors.InitParamsInvalid();
     }
 
@@ -180,27 +180,13 @@ abstract contract AbstractCollectModule is
         uint256 pubId,
         BaseCollectModuleInitData memory baseInitData
     ) internal virtual {
-        // TODO: Should we check these for 0 before writing or does compiler do this for us?
-        // Minimum gas usage falls -2000 gas
-        // But Average raises +500 gas
-        // And Median raises +1600 gas
-        // And Maximum raises +750 gas
-        // So maybe not worth it, because it's a rare case where most of these are zero's
-        if (baseInitData.amount > 0)
-            _dataByPublicationByProfile[profileId][pubId].amount = baseInitData.amount;
-        if (baseInitData.collectLimit > 0)
-            _dataByPublicationByProfile[profileId][pubId].collectLimit = baseInitData.collectLimit;
-
+        _dataByPublicationByProfile[profileId][pubId].amount = baseInitData.amount;
+        _dataByPublicationByProfile[profileId][pubId].collectLimit = baseInitData.collectLimit;
         _dataByPublicationByProfile[profileId][pubId].currency = baseInitData.currency;
-
-        if (baseInitData.recipient != payable(address(0)))
-            _dataByPublicationByProfile[profileId][pubId].recipient = baseInitData.recipient;
-        if (baseInitData.referralFee > 0)
-            _dataByPublicationByProfile[profileId][pubId].referralFee = baseInitData.referralFee;
-        if (baseInitData.followerOnly)
-            _dataByPublicationByProfile[profileId][pubId].followerOnly = baseInitData.followerOnly;
-        if (baseInitData.endTimestamp > 0)
-            _dataByPublicationByProfile[profileId][pubId].endTimestamp = baseInitData.endTimestamp;
+        _dataByPublicationByProfile[profileId][pubId].recipient = baseInitData.recipient;
+        _dataByPublicationByProfile[profileId][pubId].referralFee = baseInitData.referralFee;
+        _dataByPublicationByProfile[profileId][pubId].followerOnly = baseInitData.followerOnly;
+        _dataByPublicationByProfile[profileId][pubId].endTimestamp = baseInitData.endTimestamp;
     }
 
     /**
@@ -371,7 +357,7 @@ abstract contract AbstractCollectModule is
 
         _transferToRecipients(currency, collector, profileId, pubId, adjustedAmount);
 
-        if (treasuryAmount != 0) {
+        if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
         }
     }
@@ -403,7 +389,7 @@ abstract contract AbstractCollectModule is
             // The reason we levy the referral fee on the adjusted amount is so that referral fees
             // don't bypass the treasury fee, in essence referrals pay their fair share to the treasury.
             uint256 referralAmount = (adjustedAmount * referralFee) / BPS_MAX;
-            if (referralAmount != 0) {
+            if (referralAmount > 0) {
                 adjustedAmount = adjustedAmount - referralAmount;
 
                 address referralRecipient = IERC721(HUB).ownerOf(referrerProfileId);
