@@ -3,8 +3,8 @@ pragma solidity ^0.8.10;
 
 import '../BaseSetup.t.sol';
 import {BaseFeeCollectModuleBase} from './BaseFeeCollectModule.base.sol';
-import {BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/AbstractCollectModule.sol';
-import {BaseFeeCollectModule} from 'contracts/collect/BaseFeeCollectModule.sol';
+import {AbstractCollectModule, BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/AbstractCollectModule.sol';
+import {SimpleFeeCollectModule} from 'contracts/collect/SimpleFeeCollectModule.sol';
 
 import '../helpers/TestHelpers.sol';
 import '@aave/lens-protocol/contracts/libraries/Events.sol';
@@ -82,7 +82,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
 
     function testCannotPostIfCalledFromNonHubAddress() public {
         vm.expectRevert(Errors.NotHub.selector);
-        BaseFeeCollectModule(baseFeeCollectModule).initializePublicationCollectModule(
+        SimpleFeeCollectModule(baseFeeCollectModule).initializePublicationCollectModule(
             userProfileId,
             1,
             getEncodedInitData()
@@ -194,7 +194,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
             })
         );
         assert(pubId > 0);
-        BaseProfilePublicationData memory fetchedData = BaseFeeCollectModule(baseFeeCollectModule)
+        BaseProfilePublicationData memory fetchedData = SimpleFeeCollectModule(baseFeeCollectModule)
             .getPublicationData(userProfileId, pubId);
         assertEq(fetchedData.currency, fuzzyInitData.currency);
         assertEq(fetchedData.amount, fuzzyInitData.amount);
@@ -269,7 +269,7 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
 
     function testCannotCollectIfCalledFromNonHubAddress() public {
         vm.expectRevert(Errors.NotHub.selector);
-        BaseFeeCollectModule(baseFeeCollectModule).processCollect(
+        SimpleFeeCollectModule(baseFeeCollectModule).processCollect(
             publisherProfileId,
             me,
             publisherProfileId,
@@ -396,13 +396,13 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = BaseFeeCollectModule(baseFeeCollectModule)
+        BaseProfilePublicationData memory fetchedData = AbstractCollectModule(baseFeeCollectModule)
             .getBasePublicationData(publisherProfileId, secondPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = BaseFeeCollectModule(baseFeeCollectModule).getBasePublicationData(
+            fetchedData = AbstractCollectModule(baseFeeCollectModule).getBasePublicationData(
                 publisherProfileId,
                 secondPubId
             );
@@ -498,13 +498,13 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = BaseFeeCollectModule(baseFeeCollectModule)
+        BaseProfilePublicationData memory fetchedData = AbstractCollectModule(baseFeeCollectModule)
             .getBasePublicationData(userTwoProfileId, origPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = BaseFeeCollectModule(baseFeeCollectModule).getBasePublicationData(
+            fetchedData = AbstractCollectModule(baseFeeCollectModule).getBasePublicationData(
                 userTwoProfileId,
                 origPubId
             );
