@@ -94,14 +94,12 @@ abstract contract AbstractCollectModule is
         bytes calldata data
     ) external virtual onlyHub {
         // "post-" here in the meaning of: "number of collects after collect action performed"
-        uint96 postCollects = _validateCollect(
-            referrerProfileId,
-            collector,
-            profileId,
-            pubId,
-            data
-        );
-        _dataByPublicationByProfile[profileId][pubId].currentCollects = postCollects;
+        // Number of total collects after collect action will be performed
+        uint96 collectsAfter = _getCollectsAfter(profileId, pubId, data);
+
+        _validateCollect(referrerProfileId, collector, profileId, pubId, collectsAfter, data);
+        _dataByPublicationByProfile[profileId][pubId].currentCollects = collectsAfter;
+
         if (referrerProfileId == profileId) {
             _processCollect(collector, profileId, pubId, data);
         } else {
@@ -202,14 +200,14 @@ abstract contract AbstractCollectModule is
      * @param profileId The token ID of the profile associated with the publication being collected.
      * @param pubId The LensHub publication ID associated with the publication being collected.
      * @param data Arbitrary data __passed from the collector!__ to be decoded.
-     *
-     * @return Number of collects after the action (to write to storage)
+     * @param collectsAfter Number of total collects after collect action will be performed
      */
     function _validateCollect(
         uint256 referrerProfileId,
         address collector,
         uint256 profileId,
         uint256 pubId,
+        uint256 collectsAfter,
         bytes calldata data
     ) internal virtual returns (uint96) {
         if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
@@ -218,17 +216,12 @@ abstract contract AbstractCollectModule is
         uint256 endTimestamp = _dataByPublicationByProfile[profileId][pubId].endTimestamp;
         uint256 collectLimit = _dataByPublicationByProfile[profileId][pubId].collectLimit;
 
-        // Number of total collects after collect action will be performed
-        uint96 collectsAfter = _getCollectsAfter(profileId, pubId, data);
-
         if (collectLimit != 0 && collectsAfter > collectLimit) {
             revert Errors.MintLimitExceeded();
         }
         if (endTimestamp != 0 && block.timestamp > endTimestamp) {
             revert Errors.CollectExpired();
         }
-
-        return collectsAfter;
     }
 
     /**
