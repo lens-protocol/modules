@@ -3,7 +3,8 @@
 pragma solidity 0.8.10;
 
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
-import {BaseProfilePublicationData, BaseCollectModuleInitData, AbstractCollectModule} from './AbstractCollectModule.sol';
+import {BaseCollectModule} from './base/BaseCollectModule.sol';
+import {BaseProfilePublicationData, BaseCollectModuleInitData} from './base/IBaseCollectModule.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectModule.sol';
@@ -69,7 +70,7 @@ error RecipientSplitCannotBeZero();
  * splitting collect fee across multiple recipients, and whether only followers can collect.
  * It is charging a fee for collect (if enabled) and distributing it among Receivers/Referral/Treasury.
  */
-contract MultirecipientFeeCollectModule is AbstractCollectModule {
+contract MultirecipientFeeCollectModule is BaseCollectModule {
     using SafeERC20 for IERC20;
 
     uint256 internal constant MAX_RECIPIENTS = 5;
@@ -77,7 +78,7 @@ contract MultirecipientFeeCollectModule is AbstractCollectModule {
     mapping(uint256 => mapping(uint256 => RecipientData[]))
         internal _recipientsByPublicationByProfile;
 
-    constructor(address hub, address moduleGlobals) AbstractCollectModule(hub, moduleGlobals) {}
+    constructor(address hub, address moduleGlobals) BaseCollectModule(hub, moduleGlobals) {}
 
     /**
      * @inheritdoc ICollectModule
@@ -156,7 +157,7 @@ contract MultirecipientFeeCollectModule is AbstractCollectModule {
     /**
      * @dev Transfers the fee to multiple recipients.
      *
-     * @inheritdoc AbstractCollectModule
+     * @inheritdoc BaseCollectModule
      */
     function _transferToRecipients(
         address currency,

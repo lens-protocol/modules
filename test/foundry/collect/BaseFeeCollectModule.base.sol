@@ -4,7 +4,7 @@ pragma solidity ^0.8.10;
 import 'forge-std/Test.sol';
 import '../BaseSetup.t.sol';
 import {SimpleFeeCollectModule} from 'contracts/collect/SimpleFeeCollectModule.sol';
-import {BaseCollectModuleInitData} from 'contracts/collect/AbstractCollectModule.sol';
+import {BaseCollectModuleInitData} from 'contracts/collect/base/IBaseCollectModule.sol';
 
 contract BaseFeeCollectModuleBase is BaseSetup {
     address baseFeeCollectModule;

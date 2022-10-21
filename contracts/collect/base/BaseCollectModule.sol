@@ -12,65 +12,23 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
-/**
- * @notice A struct containing the necessary data to execute collect actions on a publication.
- *
- * @param amount The collecting cost associated with this publication. 0 for free collect.
- * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
- * @param currency The currency associated with this publication.
- * @param currentCollects The current number of collects for this publication.
- * @param referralFee The referral fee associated with this publication.
- * @param followerOnly True if only followers of publisher may collect the post.
- * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
- * @param recipient Recipient of collect fees.
- */
-struct BaseProfilePublicationData {
-    uint160 amount;
-    uint96 collectLimit;
-    address currency;
-    uint96 currentCollects;
-    address recipient;
-    uint16 referralFee;
-    bool followerOnly;
-    uint72 endTimestamp;
-}
+import {BaseCollectModuleInitData, BaseProfilePublicationData, IBaseCollectModule} from './IBaseCollectModule.sol';
 
 /**
- * @notice A struct containing the necessary data to initialize this Base Collect Module.
- *
- * @param amount The collecting cost associated with this publication. 0 for free collect.
- * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
- * @param currency The currency associated with this publication.
- * @param referralFee The referral fee associated with this publication.
- * @param followerOnly True if only followers of publisher may collect the post.
- * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
- * @param recipient Recipient of collect fees.
- */
-struct BaseCollectModuleInitData {
-    uint160 amount;
-    uint96 collectLimit;
-    address currency;
-    uint16 referralFee;
-    bool followerOnly;
-    uint72 endTimestamp;
-    address recipient;
-}
-
-/**
- * @title AbstractCollectModule
+ * @title BaseCollectModule
  * @author Lens Protocol
  *
- * @notice This is an abstract Lens CollectModule implementation, allowing customization of time to collect, number of collects
+ * @notice This is an base Lens CollectModule implementation, allowing customization of time to collect, number of collects
  * and whether only followers can collect, charging a fee for collect and distributing it among Receiver/Referral/Treasury.
  * @dev Here we use "Base" terminology to anything that represents this base functionality (base structs, base functions, base storage).
  * @dev You can build your own collect modules on top of the "Base" by inheriting this contract and overriding functions.
  * @dev This contract is marked "abstract" as it requires you to implement initializePublicationCollectModule and getPublicationData functions when you inherit from it.
  * @dev See BaseFeeCollectModule as an example implementation.
  */
-abstract contract AbstractCollectModule is
+abstract contract BaseCollectModule is
     FeeModuleBase,
     FollowValidationModuleBase,
-    ICollectModule
+    IBaseCollectModule
 {
     using SafeERC20 for IERC20;
 

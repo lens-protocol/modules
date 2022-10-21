@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 import '../BaseSetup.t.sol';
 import {BaseFeeCollectModuleBase} from './BaseFeeCollectModule.base.sol';
-import {AbstractCollectModule, BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/AbstractCollectModule.sol';
+import {IBaseCollectModule, BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/base/IBaseCollectModule.sol';
 import {SimpleFeeCollectModule} from 'contracts/collect/SimpleFeeCollectModule.sol';
 
 import '../helpers/TestHelpers.sol';
@@ -396,13 +396,13 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = AbstractCollectModule(baseFeeCollectModule)
+        BaseProfilePublicationData memory fetchedData = IBaseCollectModule(baseFeeCollectModule)
             .getBasePublicationData(publisherProfileId, secondPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = AbstractCollectModule(baseFeeCollectModule).getBasePublicationData(
+            fetchedData = IBaseCollectModule(baseFeeCollectModule).getBasePublicationData(
                 publisherProfileId,
                 secondPubId
             );
@@ -498,13 +498,13 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = AbstractCollectModule(baseFeeCollectModule)
+        BaseProfilePublicationData memory fetchedData = IBaseCollectModule(baseFeeCollectModule)
             .getBasePublicationData(userTwoProfileId, origPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = AbstractCollectModule(baseFeeCollectModule).getBasePublicationData(
+            fetchedData = IBaseCollectModule(baseFeeCollectModule).getBasePublicationData(
                 userTwoProfileId,
                 origPubId
             );

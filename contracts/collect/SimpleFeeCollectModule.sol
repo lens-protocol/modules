@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import {BaseCollectModuleInitData, BaseProfilePublicationData, AbstractCollectModule} from '../collect/AbstractCollectModule.sol';
+import {BaseCollectModule} from './base/BaseCollectModule.sol';
+import {BaseCollectModuleInitData, BaseProfilePublicationData} from './base/IBaseCollectModule.sol';
 
 /**
  * @title SimpleFeeCollectModule
@@ -10,11 +11,11 @@ import {BaseCollectModuleInitData, BaseProfilePublicationData, AbstractCollectMo
  * @notice This is a simple Lens CollectModule implementation, allowing customization of time to collect,
  * number of collects and whether only followers can collect.
  *
- * You can build your own collect modules by inheriting from AbstractCollectModule and adding your
+ * You can build your own collect modules by inheriting from BaseCollectModule and adding your
  * functionality along with getPublicationData function.
  */
-contract SimpleFeeCollectModule is AbstractCollectModule {
-    constructor(address hub, address moduleGlobals) AbstractCollectModule(hub, moduleGlobals) {}
+contract SimpleFeeCollectModule is BaseCollectModule {
+    constructor(address hub, address moduleGlobals) BaseCollectModule(hub, moduleGlobals) {}
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
