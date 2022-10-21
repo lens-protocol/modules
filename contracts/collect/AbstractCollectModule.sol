@@ -93,12 +93,7 @@ abstract contract AbstractCollectModule is
         uint256 pubId,
         bytes calldata data
     ) external virtual onlyHub {
-        // "post-" here in the meaning of: "number of collects after collect action performed"
-        // Number of total collects after collect action will be performed
-        uint96 collectsAfter = _getCollectsAfter(profileId, pubId, data);
-
-        _validateCollect(referrerProfileId, collector, profileId, pubId, collectsAfter, data);
-        _dataByPublicationByProfile[profileId][pubId].currentCollects = collectsAfter;
+        _validateAndStoreCollect(referrerProfileId, collector, profileId, pubId, data);
 
         if (referrerProfileId == profileId) {
             _processCollect(collector, profileId, pubId, data);
@@ -200,16 +195,16 @@ abstract contract AbstractCollectModule is
      * @param profileId The token ID of the profile associated with the publication being collected.
      * @param pubId The LensHub publication ID associated with the publication being collected.
      * @param data Arbitrary data __passed from the collector!__ to be decoded.
-     * @param collectsAfter Number of total collects after collect action will be performed
      */
-    function _validateCollect(
+    function _validateAndStoreCollect(
         uint256 referrerProfileId,
         address collector,
         uint256 profileId,
         uint256 pubId,
-        uint256 collectsAfter,
         bytes calldata data
-    ) internal virtual returns (uint96) {
+    ) internal virtual {
+        uint96 collectsAfter = ++_dataByPublicationByProfile[profileId][pubId].currentCollects;
+
         if (_dataByPublicationByProfile[profileId][pubId].followerOnly)
             _checkFollowValidity(profileId, collector);
 
@@ -221,27 +216,6 @@ abstract contract AbstractCollectModule is
         }
         if (endTimestamp != 0 && block.timestamp > endTimestamp) {
             revert Errors.CollectExpired();
-        }
-    }
-
-    /**
-     * @dev Gets the number of total collects after collect action will be performed
-     *
-     * Modify this if you want to, for example, process multiple collects at the same time
-     *
-     * @param profileId The token ID of the profile associated with the publication being collected.
-     * @param pubId The LensHub publication ID associated with the publication being collected.
-     * @param data Arbitrary data __passed from the collector!__ to be decoded.
-     *
-     * @return Number of collects after the action (to write to storage)
-     */
-    function _getCollectsAfter(
-        uint256 profileId,
-        uint256 pubId,
-        bytes calldata data
-    ) internal virtual returns (uint96) {
-        unchecked {
-            return _dataByPublicationByProfile[profileId][pubId].currentCollects + 1;
         }
     }
 
@@ -274,31 +248,6 @@ abstract contract AbstractCollectModule is
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
-        }
-    }
-
-    /**
-     * @dev Tranfers the fee to recipient(-s)
-     *
-     * Override this to add additional functionality (e.g. multiple recipients)
-     *
-     * @param currency Currency of the transaction
-     * @param collector The address that collects the post (and pays the fee).
-     * @param profileId The token ID of the profile associated with the publication being collected.
-     * @param pubId The LensHub publication ID associated with the publication being collected.
-     * @param amount Amount to transfer to recipient(-s)
-     */
-    function _transferToRecipients(
-        address currency,
-        address collector,
-        uint256 profileId,
-        uint256 pubId,
-        uint256 amount
-    ) internal virtual {
-        address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
-
-        if (amount > 0) {
-            IERC20(currency).safeTransferFrom(collector, recipient, amount);
         }
     }
 
@@ -352,6 +301,31 @@ abstract contract AbstractCollectModule is
 
         if (treasuryAmount > 0) {
             IERC20(currency).safeTransferFrom(collector, treasury, treasuryAmount);
+        }
+    }
+
+    /**
+     * @dev Tranfers the fee to recipient(-s)
+     *
+     * Override this to add additional functionality (e.g. multiple recipients)
+     *
+     * @param currency Currency of the transaction
+     * @param collector The address that collects the post (and pays the fee).
+     * @param profileId The token ID of the profile associated with the publication being collected.
+     * @param pubId The LensHub publication ID associated with the publication being collected.
+     * @param amount Amount to transfer to recipient(-s)
+     */
+    function _transferToRecipients(
+        address currency,
+        address collector,
+        uint256 profileId,
+        uint256 pubId,
+        uint256 amount
+    ) internal virtual {
+        address recipient = _dataByPublicationByProfile[profileId][pubId].recipient;
+
+        if (amount > 0) {
+            IERC20(currency).safeTransferFrom(collector, recipient, amount);
         }
     }
 
