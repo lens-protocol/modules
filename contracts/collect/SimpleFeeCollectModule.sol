@@ -19,7 +19,6 @@ contract SimpleFeeCollectModule is BaseCollectModule {
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
-     * TODO: Fix this
      * @param data The arbitrary data parameter, decoded into:
      *        amount: The collecting cost associated with this publication. 0 for free collect.
      *        collectLimit: The maximum number of collects for this publication. 0 for no limit.
