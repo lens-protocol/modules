@@ -121,7 +121,7 @@ contract MultirecipientFeeCollectModule is BaseCollectModule {
         uint256 profileId,
         uint256 pubId
     ) internal {
-        (uint256 i, uint256 len) = (0, recipients.length);
+        uint256 len = recipients.length;
 
         // Check number of recipients is supported
         if (len > MAX_RECIPIENTS) revert TooManyRecipients();
@@ -137,7 +137,7 @@ contract MultirecipientFeeCollectModule is BaseCollectModule {
         } else {
             // Check recipient splits sum to 10 000 BPS (100%)
             uint256 totalSplits;
-            for (i; i < len; ) {
+            for (uint256 i = 0; i < len; ) {
                 if (recipients[i].recipient == address(0)) revert Errors.InitParamsInvalid();
                 if (recipients[i].split == 0) revert RecipientSplitCannotBeZero();
                 totalSplits += recipients[i].split;
@@ -167,14 +167,14 @@ contract MultirecipientFeeCollectModule is BaseCollectModule {
         uint256 amount
     ) internal override {
         RecipientData[] memory recipients = _recipientsByPublicationByProfile[profileId][pubId];
-        (uint256 i, uint256 len) = (0, recipients.length);
+        uint256 len = recipients.length;
 
         // If only 1 recipient, transfer full amount and skip split calculations
         if (len == 1 && amount != 0) {
             IERC20(currency).safeTransferFrom(collector, recipients[0].recipient, amount);
         } else {
             uint256 splitAmount;
-            for (i; i < len; ) {
+            for (uint256 i = 0; i < len; ) {
                 splitAmount = (amount * recipients[i].split) / BPS_MAX;
                 if (splitAmount != 0)
                     IERC20(currency).safeTransferFrom(
