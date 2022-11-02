@@ -37,7 +37,7 @@ struct BaseProfilePublicationData {
  * @param endTimestamp The end timestamp after which collecting is impossible. 0 for no expiry.
  * @param recipient Recipient of collect fees.
  */
-struct BaseCollectModuleInitData {
+struct BaseFeeCollectModuleInitData {
     uint160 amount;
     uint96 collectLimit;
     address currency;
@@ -47,7 +47,7 @@ struct BaseCollectModuleInitData {
     address recipient;
 }
 
-interface IBaseCollectModule is ICollectModule {
+interface IBaseFeeCollectModule is ICollectModule {
     function getBasePublicationData(uint256 profileId, uint256 pubId)
         external
         view

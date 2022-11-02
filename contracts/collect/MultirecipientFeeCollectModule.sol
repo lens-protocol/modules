@@ -3,8 +3,8 @@
 pragma solidity 0.8.10;
 
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
-import {BaseCollectModule} from './base/BaseCollectModule.sol';
-import {BaseProfilePublicationData, BaseCollectModuleInitData} from './base/IBaseCollectModule.sol';
+import {BaseFeeCollectModule} from './base/BaseFeeCollectModule.sol';
+import {BaseProfilePublicationData, BaseFeeCollectModuleInitData} from './base/IBaseFeeCollectModule.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectModule.sol';
@@ -70,7 +70,7 @@ error RecipientSplitCannotBeZero();
  * splitting collect fee across multiple recipients, and whether only followers can collect.
  * It is charging a fee for collect (if enabled) and distributing it among Receivers/Referral/Treasury.
  */
-contract MultirecipientFeeCollectModule is BaseCollectModule {
+contract MultirecipientFeeCollectModule is BaseFeeCollectModule {
     using SafeERC20 for IERC20;
 
     uint256 internal constant MAX_RECIPIENTS = 5;
@@ -78,7 +78,7 @@ contract MultirecipientFeeCollectModule is BaseCollectModule {
     mapping(uint256 => mapping(uint256 => RecipientData[]))
         internal _recipientsByPublicationByProfile;
 
-    constructor(address hub, address moduleGlobals) BaseCollectModule(hub, moduleGlobals) {}
+    constructor(address hub, address moduleGlobals) BaseFeeCollectModule(hub, moduleGlobals) {}
 
     /**
      * @inheritdoc ICollectModule
@@ -93,7 +93,7 @@ contract MultirecipientFeeCollectModule is BaseCollectModule {
             (MultirecipientFeeCollectModuleInitData)
         );
 
-        BaseCollectModuleInitData memory baseInitData = BaseCollectModuleInitData({
+        BaseFeeCollectModuleInitData memory baseInitData = BaseFeeCollectModuleInitData({
             amount: initData.amount,
             collectLimit: initData.collectLimit,
             currency: initData.currency,
@@ -157,7 +157,7 @@ contract MultirecipientFeeCollectModule is BaseCollectModule {
     /**
      * @dev Transfers the fee to multiple recipients.
      *
-     * @inheritdoc BaseCollectModule
+     * @inheritdoc BaseFeeCollectModule
      */
     function _transferToRecipients(
         address currency,

@@ -12,10 +12,10 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
-import {BaseCollectModuleInitData, BaseProfilePublicationData, IBaseCollectModule} from './IBaseCollectModule.sol';
+import {BaseFeeCollectModuleInitData, BaseProfilePublicationData, IBaseFeeCollectModule} from './IBaseFeeCollectModule.sol';
 
 /**
- * @title BaseCollectModule
+ * @title BaseFeeCollectModule
  * @author Lens Protocol
  *
  * @notice This is an base Lens CollectModule implementation, allowing customization of time to collect, number of collects
@@ -25,10 +25,10 @@ import {BaseCollectModuleInitData, BaseProfilePublicationData, IBaseCollectModul
  * @dev This contract is marked "abstract" as it requires you to implement initializePublicationCollectModule and getPublicationData functions when you inherit from it.
  * @dev See BaseFeeCollectModule as an example implementation.
  */
-abstract contract BaseCollectModule is
+abstract contract BaseFeeCollectModule is
     FeeModuleBase,
     FollowValidationModuleBase,
-    IBaseCollectModule
+    IBaseFeeCollectModule
 {
     using SafeERC20 for IERC20;
 
@@ -107,9 +107,12 @@ abstract contract BaseCollectModule is
      *
      * This should be called during initializePublicationCollectModule()
      *
-     * @param baseInitData Module initialization data (see BaseCollectModuleInitData struct)
+     * @param baseInitData Module initialization data (see BaseFeeCollectModuleInitData struct)
      */
-    function _validateBaseInitData(BaseCollectModuleInitData memory baseInitData) internal virtual {
+    function _validateBaseInitData(BaseFeeCollectModuleInitData memory baseInitData)
+        internal
+        virtual
+    {
         if (
             !_currencyWhitelisted(baseInitData.currency) ||
             baseInitData.referralFee > BPS_MAX ||
@@ -124,12 +127,12 @@ abstract contract BaseCollectModule is
      *
      * @param profileId The token ID of the profile publishing the publication.
      * @param pubId The publication ID.
-     * @param baseInitData Module initialization data (see BaseCollectModuleInitData struct)
+     * @param baseInitData Module initialization data (see BaseFeeCollectModuleInitData struct)
      */
     function _storeBasePublicationCollectParameters(
         uint256 profileId,
         uint256 pubId,
-        BaseCollectModuleInitData memory baseInitData
+        BaseFeeCollectModuleInitData memory baseInitData
     ) internal virtual {
         _dataByPublicationByProfile[profileId][pubId].amount = baseInitData.amount;
         _dataByPublicationByProfile[profileId][pubId].collectLimit = baseInitData.collectLimit;

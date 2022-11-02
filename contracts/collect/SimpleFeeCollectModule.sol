@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import {BaseCollectModule} from './base/BaseCollectModule.sol';
-import {BaseCollectModuleInitData, BaseProfilePublicationData} from './base/IBaseCollectModule.sol';
+import {BaseFeeCollectModule} from './base/BaseFeeCollectModule.sol';
+import {BaseFeeCollectModuleInitData, BaseProfilePublicationData} from './base/IBaseFeeCollectModule.sol';
 
 /**
  * @title SimpleFeeCollectModule
@@ -11,11 +11,11 @@ import {BaseCollectModuleInitData, BaseProfilePublicationData} from './base/IBas
  * @notice This is a simple Lens CollectModule implementation, allowing customization of time to collect,
  * number of collects and whether only followers can collect.
  *
- * You can build your own collect modules by inheriting from BaseCollectModule and adding your
+ * You can build your own collect modules by inheriting from BaseFeeCollectModule and adding your
  * functionality along with getPublicationData function.
  */
-contract SimpleFeeCollectModule is BaseCollectModule {
-    constructor(address hub, address moduleGlobals) BaseCollectModule(hub, moduleGlobals) {}
+contract SimpleFeeCollectModule is BaseFeeCollectModule {
+    constructor(address hub, address moduleGlobals) BaseFeeCollectModule(hub, moduleGlobals) {}
 
     /**
      * @notice This collect module levies a fee on collects and supports referrals. Thus, we need to decode data.
@@ -35,9 +35,9 @@ contract SimpleFeeCollectModule is BaseCollectModule {
         uint256 pubId,
         bytes calldata data
     ) external virtual onlyHub returns (bytes memory) {
-        BaseCollectModuleInitData memory baseInitData = abi.decode(
+        BaseFeeCollectModuleInitData memory baseInitData = abi.decode(
             data,
-            (BaseCollectModuleInitData)
+            (BaseFeeCollectModuleInitData)
         );
         _validateBaseInitData(baseInitData);
         _storeBasePublicationCollectParameters(profileId, pubId, baseInitData);

@@ -4,12 +4,12 @@ pragma solidity ^0.8.10;
 import 'forge-std/Test.sol';
 import '../BaseSetup.t.sol';
 import {SimpleFeeCollectModule} from 'contracts/collect/SimpleFeeCollectModule.sol';
-import {BaseCollectModuleInitData} from 'contracts/collect/base/IBaseCollectModule.sol';
+import {BaseFeeCollectModuleInitData} from 'contracts/collect/base/IBaseFeeCollectModule.sol';
 
 contract BaseFeeCollectModuleBase is BaseSetup {
     address baseFeeCollectModule;
 
-    BaseCollectModuleInitData exampleInitData;
+    BaseFeeCollectModuleInitData exampleInitData;
 
     uint256 constant DEFAULT_COLLECT_LIMIT = 3;
     uint16 constant REFERRAL_FEE_BPS = 250;

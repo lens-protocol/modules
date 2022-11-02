@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 import '../BaseSetup.t.sol';
 import {BaseFeeCollectModuleBase} from './BaseFeeCollectModule.base.sol';
-import {IBaseCollectModule, BaseProfilePublicationData, BaseCollectModuleInitData} from 'contracts/collect/base/IBaseCollectModule.sol';
+import {IBaseFeeCollectModule, BaseProfilePublicationData, BaseFeeCollectModuleInitData} from 'contracts/collect/base/IBaseFeeCollectModule.sol';
 import {SimpleFeeCollectModule} from 'contracts/collect/SimpleFeeCollectModule.sol';
 
 import '../helpers/TestHelpers.sol';
@@ -141,7 +141,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
         referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
         vm.assume(endTimestamp > block.timestamp || endTimestamp == 0);
 
-        BaseCollectModuleInitData memory fuzzyInitData = BaseCollectModuleInitData({
+        BaseFeeCollectModuleInitData memory fuzzyInitData = BaseFeeCollectModuleInitData({
             amount: amount,
             collectLimit: collectLimit,
             currency: address(currency),
@@ -173,7 +173,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
         referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
         endTimestamp = uint72(bound(endTimestamp, block.timestamp + 1, type(uint72).max));
 
-        BaseCollectModuleInitData memory fuzzyInitData = BaseCollectModuleInitData({
+        BaseFeeCollectModuleInitData memory fuzzyInitData = BaseFeeCollectModuleInitData({
             amount: amount,
             collectLimit: collectLimit,
             currency: address(currency),
@@ -396,13 +396,13 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = IBaseCollectModule(baseFeeCollectModule)
+        BaseProfilePublicationData memory fetchedData = IBaseFeeCollectModule(baseFeeCollectModule)
             .getBasePublicationData(publisherProfileId, secondPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = IBaseCollectModule(baseFeeCollectModule).getBasePublicationData(
+            fetchedData = IBaseFeeCollectModule(baseFeeCollectModule).getBasePublicationData(
                 publisherProfileId,
                 secondPubId
             );
@@ -498,13 +498,13 @@ contract BaseFeeCollectModule_Mirror is BaseFeeCollectModuleBase, BaseFeeCollect
         uint256 secondPubId = hubPost();
         vm.startPrank(user);
 
-        BaseProfilePublicationData memory fetchedData = IBaseCollectModule(baseFeeCollectModule)
+        BaseProfilePublicationData memory fetchedData = IBaseFeeCollectModule(baseFeeCollectModule)
             .getBasePublicationData(userTwoProfileId, origPubId);
         assertEq(fetchedData.currentCollects, 0);
 
         for (uint256 collects = 1; collects < 5; collects++) {
             hub.collect(publisherProfileId, secondPubId, abi.encode(address(currency), 1 ether));
-            fetchedData = IBaseCollectModule(baseFeeCollectModule).getBasePublicationData(
+            fetchedData = IBaseFeeCollectModule(baseFeeCollectModule).getBasePublicationData(
                 userTwoProfileId,
                 origPubId
             );
