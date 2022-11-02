@@ -138,7 +138,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
         bool followerOnly,
         uint72 endTimestamp
     ) public virtual {
-        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
+        referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
         vm.assume(endTimestamp > block.timestamp || endTimestamp == 0);
 
         BaseCollectModuleInitData memory fuzzyInitData = BaseCollectModuleInitData({
@@ -170,8 +170,8 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
         bool followerOnly,
         uint72 endTimestamp
     ) public virtual {
-        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
-        vm.assume(endTimestamp > block.timestamp);
+        referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
+        endTimestamp = uint72(bound(endTimestamp, block.timestamp + 1, type(uint72).max));
 
         BaseCollectModuleInitData memory fuzzyInitData = BaseCollectModuleInitData({
             amount: amount,
@@ -775,7 +775,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
     }
 
     function testFeesDistributionWithoutMirrorFuzzing(uint16 treasuryFee, uint128 amount) public {
-        vm.assume(treasuryFee < BPS_MAX / 2 - 1);
+        treasuryFee = uint16(bound(treasuryFee, 0, BPS_MAX / 2 - 2));
         verifyFeesWithoutMirror(treasuryFee, amount);
     }
 
@@ -801,8 +801,8 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         uint16 referralFee,
         uint128 amount
     ) public {
-        vm.assume(treasuryFee < BPS_MAX / 2 - 1);
-        vm.assume(referralFee < BPS_MAX / 2 - 1);
+        treasuryFee = uint16(bound(treasuryFee, 0, BPS_MAX / 2 - 2));
+        referralFee = uint16(bound(referralFee, 0, BPS_MAX / 2 - 2));
         verifyFeesWithMirror(treasuryFee, referralFee, amount);
     }
 }

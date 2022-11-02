@@ -138,9 +138,9 @@ contract MultirecipientCollectModule_Publication is
         uint72 endTimestamp,
         uint8 recipientsNumber
     ) public {
-        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
-        vm.assume(endTimestamp > block.timestamp);
-        vm.assume(recipientsNumber > 0 && recipientsNumber <= 5);
+        referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
+        endTimestamp = uint72(bound(endTimestamp, block.timestamp + 1, type(uint72).max));
+        recipientsNumber = uint8(bound(recipientsNumber, 1, 5));
 
         RecipientData[] memory recipients = new RecipientData[](recipientsNumber);
         uint16 sum;
@@ -206,9 +206,9 @@ contract MultirecipientCollectModule_Publication is
         uint72 endTimestamp,
         uint8 recipientsNumber
     ) public {
-        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
+        referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
         vm.assume(endTimestamp > block.timestamp || endTimestamp == 0);
-        vm.assume(recipientsNumber > 0 && recipientsNumber <= 5);
+        recipientsNumber = uint8(bound(recipientsNumber, 1, 5));
 
         RecipientData[] memory recipients = new RecipientData[](recipientsNumber);
         uint16 sum;
@@ -367,8 +367,8 @@ contract MultirecipientCollectModule_FeeDistribution is
         uint16 userTwoSplit,
         uint16 extraSplit
     ) public {
-        vm.assume(userTwoSplit < BPS_MAX / 2 && userTwoSplit != 0);
-        vm.assume(extraSplit < BPS_MAX / 2 && extraSplit > 1);
+        userTwoSplit = uint16(bound(userTwoSplit, 1, BPS_MAX / 2 - 1));
+        extraSplit = uint16(bound(extraSplit, 2, BPS_MAX / 2 - 1));
 
         uint256 treasuryAmount = (uint256(totalCollectFee) * TREASURY_FEE_BPS) / BPS_MAX;
 
