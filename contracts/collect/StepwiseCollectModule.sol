@@ -106,33 +106,31 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         uint256 pubId,
         bytes calldata data
     ) external override onlyHub returns (bytes memory) {
-        unchecked {
-            StepwiseCollectModuleInitData memory initData = abi.decode(
-                data,
-                (StepwiseCollectModuleInitData)
-            );
-            {
-                if (
-                    !_currencyWhitelisted(initData.currency) ||
-                    initData.recipient == address(0) ||
-                    initData.referralFee > BPS_MAX ||
-                    (initData.endTimestamp != 0 && initData.endTimestamp < block.timestamp)
-                ) revert Errors.InitParamsInvalid();
-            }
-            _dataByPublicationByProfile[profileId][pubId] = ProfilePublicationData({
-                currency: initData.currency,
-                a: initData.a,
-                referralFee: initData.referralFee,
-                followerOnly: initData.followerOnly,
-                recipient: initData.recipient,
-                b: initData.b,
-                endTimestamp: initData.endTimestamp,
-                c: initData.c,
-                currentCollects: 0,
-                collectLimit: initData.collectLimit
-            });
-            return data;
+        StepwiseCollectModuleInitData memory initData = abi.decode(
+            data,
+            (StepwiseCollectModuleInitData)
+        );
+        {
+            if (
+                !_currencyWhitelisted(initData.currency) ||
+                initData.recipient == address(0) ||
+                initData.referralFee > BPS_MAX ||
+                (initData.endTimestamp != 0 && initData.endTimestamp < block.timestamp)
+            ) revert Errors.InitParamsInvalid();
         }
+        _dataByPublicationByProfile[profileId][pubId] = ProfilePublicationData({
+            currency: initData.currency,
+            a: initData.a,
+            referralFee: initData.referralFee,
+            followerOnly: initData.followerOnly,
+            recipient: initData.recipient,
+            b: initData.b,
+            endTimestamp: initData.endTimestamp,
+            c: initData.c,
+            currentCollects: 0,
+            collectLimit: initData.collectLimit
+        });
+        return data;
     }
 
     /**
@@ -163,7 +161,9 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         ) {
             revert Errors.MintLimitExceeded();
         } else {
-            ++_dataByPublicationByProfile[profileId][pubId].currentCollects;
+            unchecked {
+                ++_dataByPublicationByProfile[profileId][pubId].currentCollects;
+            }
             if (referrerProfileId == profileId) {
                 _processCollect(collector, profileId, pubId, data);
             } else {
@@ -216,8 +216,6 @@ contract StepwiseCollectModule is FeeModuleBase, FollowValidationModuleBase, ICo
         // Because we already incremented the current collects in storage - we need to adjust it here.
         // This is done to allow the first collect price to be equal to c parameter (better UX)
         uint256 collects = data.currentCollects - 1;
-        // This looks ugly but saves some gas:
-        if (data.a == 0 && data.b == 0) return data.c;
         if (data.a == 0) return (uint256(data.b) * collects) / B_DECIMALS + data.c;
         return
             ((uint256(data.a) * collects * collects) / A_DECIMALS) +
