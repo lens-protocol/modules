@@ -141,8 +141,8 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
         uint56 b,
         uint128 c
     ) public {
-        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
-        vm.assume(endTimestamp > block.timestamp);
+        referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
+        endTimestamp = uint40(bound(endTimestamp, block.timestamp + 1, type(uint40).max));
 
         StepwiseCollectModuleInitData memory fuzzyInitData = StepwiseCollectModuleInitData({
             collectLimit: collectLimit,
@@ -176,8 +176,8 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
         uint56 b,
         uint128 c
     ) public {
-        vm.assume(referralFee <= TREASURY_FEE_MAX_BPS);
-        vm.assume(endTimestamp > block.timestamp);
+        referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
+        endTimestamp = uint40(bound(endTimestamp, block.timestamp + 1, type(uint40).max));
 
         StepwiseCollectModuleInitData memory fuzzyInitData = StepwiseCollectModuleInitData({
             collectLimit: collectLimit,
@@ -817,7 +817,8 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
     }
 
     function testFeesDistributionWithoutMirrorFuzzing(uint16 treasuryFee, uint128 amount) public {
-        vm.assume(treasuryFee < BPS_MAX / 2 - 1);
+        treasuryFee = uint16(bound(treasuryFee, 0, BPS_MAX / 2 - 2));
+
         verifyFeesWithoutMirror(treasuryFee, amount);
     }
 
@@ -843,8 +844,8 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
         uint16 referralFee,
         uint128 amount
     ) public {
-        vm.assume(treasuryFee < BPS_MAX / 2 - 1);
-        vm.assume(referralFee < BPS_MAX / 2 - 1);
+        treasuryFee = uint16(bound(treasuryFee, 0, BPS_MAX / 2 - 2));
+        referralFee = uint16(bound(referralFee, 0, BPS_MAX / 2 - 2));
         verifyFeesWithMirror(treasuryFee, referralFee, amount);
     }
 }
@@ -1018,7 +1019,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         uint64 numberOfCollects
     ) public {
         console.log('Testing %s collects:', numberOfCollects);
-        vm.assume(numberOfCollects < 100 && numberOfCollects > 1);
+        numberOfCollects = uint64(bound(numberOfCollects, 1, 99));
 
         exampleInitData.a = a;
         exampleInitData.b = b;
@@ -1090,7 +1091,7 @@ contract StepwiseCollectModule_StepwiseCalculateFeeInternal is StepwiseCollectMo
         uint128 c,
         uint64 currentCollects
     ) public {
-        vm.assume(currentCollects > 0);
+        currentCollects = uint64(bound(currentCollects, 1, type(uint64).max));
         ProfilePublicationData memory testData;
         testData.a = a;
         testData.b = b;
