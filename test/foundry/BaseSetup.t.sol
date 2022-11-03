@@ -24,6 +24,9 @@ contract BaseSetup is Test {
     address constant publisher = address(4);
     address constant user = address(5);
     address constant userTwo = address(6);
+    address constant userThree = address(7);
+    address constant userFour = address(8);
+    address constant userFive = address(9);
     address immutable me = address(this); // Main test User is this (rather inheriting from this) contract
 
     string constant MOCK_HANDLE = 'handle.lens';
