@@ -47,6 +47,8 @@ import {
   TokenGatedReferenceModule,
   DegreesOfSeparationReferenceModule,
   DegreesOfSeparationReferenceModule__factory,
+  StepwiseCollectModule,
+  StepwiseCollectModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import { ProfileFollowModule__factory } from '../typechain/factories/ProfileFollowModule__factory';
@@ -115,6 +117,7 @@ export let profileFollowModule: ProfileFollowModule;
 export let auctionCollectModule: AuctionCollectModule;
 export let aaveFeeCollectModule: AaveFeeCollectModule;
 export let updatableOwnableFeeCollectModule: UpdatableOwnableFeeCollectModule;
+export let stepwiseCollectModule: StepwiseCollectModule;
 export let erc4626FeeCollectModule: ERC4626FeeCollectModule;
 
 export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
@@ -284,6 +287,15 @@ beforeEach(async function () {
   );
   await expect(
     lensHub.connect(governance).whitelistReferenceModule(tokenGatedReferenceModule.address, true)
+  ).to.not.be.reverted;
+
+  // Collect modules
+  stepwiseCollectModule = await new StepwiseCollectModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address
+  );
+  await expect(
+    lensHub.connect(governance).whitelistCollectModule(stepwiseCollectModule.address, true)
   ).to.not.be.reverted;
 
   // Unpausing protocol
