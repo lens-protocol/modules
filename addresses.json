@@ -1,0 +1,23 @@
+{
+  "mainnet": {
+    "chainId": 137,
+    "network": "polygon",
+    "LensHubProxy": "0xDb46d1Dc155634FbC732f92E853b10B288AD5a1d",
+    "LensHubImplementation": "0x96f1ba24294ffe0dfcd832d8376da4a4645a4cd6",
+    "ModuleGlobals": "0x3Df697FF746a60CBe9ee8D47555c88CB66f03BB9"
+  },
+  "testnet": {
+    "chainId": 80001,
+    "network": "mumbai",
+    "LensHubProxy": "0x60Ae865ee4C725cd04353b5AAb364553f56ceF82",
+    "LensHubImplementation": "0x1bF5788bEaa62Bc2C2De78523630263312040F77",
+    "ModuleGlobals": "0x1353aAdfE5FeD85382826757A95DE908bd21C4f9"
+  },
+  "sandbox": {
+    "chainId": 80001,
+    "network": "mumbai",
+    "LensHubProxy": "0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5",
+    "LensHubImplementation": "0x1b30F214c192EF4B7F8c9926c47C4161016955DA",
+    "ModuleGlobals": "0xcbCC5b9611d22d11403373432642Df9Ef7Dd81AD"
+  }
+}

@@ -11,3 +11,6 @@ artifacts
 # Compiler files
 forge-cache/
 out/
+
+# Forge stuff
+broadcast/
