@@ -18,6 +18,8 @@
     "network": "mumbai",
     "LensHubProxy": "0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5",
     "LensHubImplementation": "0x1b30F214c192EF4B7F8c9926c47C4161016955DA",
-    "ModuleGlobals": "0xcbCC5b9611d22d11403373432642Df9Ef7Dd81AD"
+    "ModuleGlobals": "0xcbCC5b9611d22d11403373432642Df9Ef7Dd81AD",
+    "MultirecipientFeeCollectModule": "0xaaa4178798f6b0cb313abfb225f3eab9d50d28d9",
+    "StepwiseCollectModule": "0x6928d6127dfa0da401737e6ff421fcf62d5617a3"
   }
 }
