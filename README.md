@@ -26,6 +26,12 @@ This repository contains both - Hardhat and Foundry tests. Foundry will be used 
 1. `npm run coverage` for Hardhat coverage report
 2. `forge coverage` for Foundry coverage report
 
+## Deployment
+
+1. Make sure to fill in the `.env` using `.env.example` (the `Foundry` section). You can specify either a `MNEMONIC` or a single `PRIVATE_KEY` (make sure to include both variables, even if one of them is an empty string)
+2. Run deployment script with a command like `bash script/deploy-module.sh testnet StepwiseCollectModule` from the project root folder (e.g. to deploy `StepwiseCollectModule` on `testnet`).
+3. Follow the on-screen instructions to verify if everything is correct and confirm deployment & contract verification.
+
 # Modules
 
 ## Collect modules
