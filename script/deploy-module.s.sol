@@ -5,6 +5,9 @@ import 'forge-std/Script.sol';
 import 'forge-std/StdJson.sol';
 import {StepwiseCollectModule} from 'contracts/collect/StepwiseCollectModule.sol';
 import {MultirecipientFeeCollectModule} from 'contracts/collect/MultirecipientFeeCollectModule.sol';
+import {AaveFeeCollectModule} from 'contracts/collect/AaveFeeCollectModule.sol';
+import {ERC4626FeeCollectModule} from 'contracts/collect/ERC4626FeeCollectModule.sol';
+import {TokenGatedReferenceModule} from 'contracts/reference/TokenGatedReferenceModule.sol';
 
 contract DeployBase is Script {
     using stdJson for string;
@@ -33,7 +36,7 @@ contract DeployBase is Script {
         console.log('ChainId:', chainId);
     }
 
-    function loadBaseAddresses(string memory json, string memory targetEnv) internal {
+    function loadBaseAddresses(string memory json, string memory targetEnv) internal virtual {
         lensHubProxy = json.readAddress(string(abi.encodePacked('.', targetEnv, '.LensHubProxy')));
         moduleGlobals = json.readAddress(
             string(abi.encodePacked('.', targetEnv, '.ModuleGlobals'))
@@ -97,6 +100,67 @@ contract DeployMultirecipientFeeCollectModule is DeployBase {
             lensHubProxy,
             moduleGlobals
         );
+        vm.stopBroadcast();
+
+        return address(module);
+    }
+}
+
+import {IPoolAddressesProvider} from '@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol';
+
+contract DeployAaveFeeCollectModule is DeployBase {
+    using stdJson for string;
+    address poolAddressesProvider;
+
+    function loadBaseAddresses(string memory json, string memory targetEnv) internal override {
+        super.loadBaseAddresses(json, targetEnv);
+        poolAddressesProvider = json.readAddress(
+            string(abi.encodePacked('.', targetEnv, '.PoolAddressesProvider'))
+        );
+    }
+
+    function deploy() internal override returns (address) {
+        console.log('\nContract: AaveFeeCollectModule');
+        console.log('Init params:');
+        console.log('\tLensHubProxy:', lensHubProxy);
+        console.log('\tModuleGlobals:', moduleGlobals);
+        console.log('\tPoolAddressesProvider:', poolAddressesProvider);
+
+        vm.startBroadcast(deployerPrivateKey);
+        AaveFeeCollectModule module = new AaveFeeCollectModule(
+            lensHubProxy,
+            moduleGlobals,
+            IPoolAddressesProvider(poolAddressesProvider)
+        );
+        vm.stopBroadcast();
+
+        return address(module);
+    }
+}
+
+contract DeployERC4626FeeCollectModule is DeployBase {
+    function deploy() internal override returns (address) {
+        console.log('\nContract: ERC4626FeeCollectModule');
+        console.log('Init params:');
+        console.log('\tLensHubProxy:', lensHubProxy);
+        console.log('\tModuleGlobals:', moduleGlobals);
+
+        vm.startBroadcast(deployerPrivateKey);
+        ERC4626FeeCollectModule module = new ERC4626FeeCollectModule(lensHubProxy, moduleGlobals);
+        vm.stopBroadcast();
+
+        return address(module);
+    }
+}
+
+contract DeployTokenGatedReferenceModule is DeployBase {
+    function deploy() internal override returns (address) {
+        console.log('\nContract: TokenGatedReferenceModule');
+        console.log('Init params:');
+        console.log('\tLensHubProxy:', lensHubProxy);
+
+        vm.startBroadcast(deployerPrivateKey);
+        TokenGatedReferenceModule module = new TokenGatedReferenceModule(lensHubProxy);
         vm.stopBroadcast();
 
         return address(module);
