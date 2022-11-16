@@ -84,6 +84,9 @@ contract DeployStepwiseCollectModule is DeployBase {
         );
         vm.stopBroadcast();
 
+        console.log('Constructor arguments:');
+        console.logBytes(abi.encode(lensHubProxy, moduleGlobals));
+
         return address(stepwiseCollectModule);
     }
 }
@@ -101,6 +104,9 @@ contract DeployMultirecipientFeeCollectModule is DeployBase {
             moduleGlobals
         );
         vm.stopBroadcast();
+
+        console.log('Constructor arguments:');
+        console.logBytes(abi.encode(lensHubProxy, moduleGlobals));
 
         return address(module);
     }
@@ -134,6 +140,11 @@ contract DeployAaveFeeCollectModule is DeployBase {
         );
         vm.stopBroadcast();
 
+        console.log('Constructor arguments:');
+        console.logBytes(
+            abi.encode(lensHubProxy, moduleGlobals, IPoolAddressesProvider(poolAddressesProvider))
+        );
+
         return address(module);
     }
 }
@@ -149,6 +160,9 @@ contract DeployERC4626FeeCollectModule is DeployBase {
         ERC4626FeeCollectModule module = new ERC4626FeeCollectModule(lensHubProxy, moduleGlobals);
         vm.stopBroadcast();
 
+        console.log('Constructor arguments:');
+        console.logBytes(abi.encode(lensHubProxy, moduleGlobals));
+
         return address(module);
     }
 }
@@ -162,6 +176,9 @@ contract DeployTokenGatedReferenceModule is DeployBase {
         vm.startBroadcast(deployerPrivateKey);
         TokenGatedReferenceModule module = new TokenGatedReferenceModule(lensHubProxy);
         vm.stopBroadcast();
+
+        console.log('Constructor arguments:');
+        console.logBytes(abi.encode(lensHubProxy));
 
         return address(module);
     }
