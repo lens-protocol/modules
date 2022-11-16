@@ -5,7 +5,12 @@
     "LensHubProxy": "0xDb46d1Dc155634FbC732f92E853b10B288AD5a1d",
     "LensHubImplementation": "0x96f1ba24294ffe0dfcd832d8376da4a4645a4cd6",
     "ModuleGlobals": "0x3Df697FF746a60CBe9ee8D47555c88CB66f03BB9",
-    "PoolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb"
+    "PoolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+    "MultirecipientFeeCollectModule": "0x0db53999f80aa352db0b3f1e8002a20b14202595",
+    "StepwiseCollectModule": "0x210c94877dcfceda8238acd382372278844a54d7",
+    "ERC4626FeeCollectModule": "0x394fd100b13197787023ef4cf318cde456545db7",
+    "AaveFeeCollectModule": "0xa94713d0688c8a483c3352635cec4e0ce88d6a29",
+    "TokenGatedReferenceModule": "0x3d7f4f71a90fe5a9d13fab2716080f2917cf88f3"
   },
   "testnet": {
     "chainId": 80001,
