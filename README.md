@@ -31,6 +31,7 @@ This repository contains both - Hardhat and Foundry tests. Foundry will be used 
 1. Make sure to fill in the `.env` using `.env.example` (the `Foundry` section). You can specify either a `MNEMONIC` or a single `PRIVATE_KEY` (make sure to include both variables, even if one of them is an empty string)
 2. Run deployment script with a command like `bash script/deploy-module.sh testnet StepwiseCollectModule` from the project root folder (e.g. to deploy `StepwiseCollectModule` on `testnet`).
 3. Follow the on-screen instructions to verify if everything is correct and confirm deployment & contract verification.
+4. If only the verification is needed of an existing deployed contract - use the `--verify-only` flag followed by ABI-Encoded constructor args.
 
 # Modules
 
