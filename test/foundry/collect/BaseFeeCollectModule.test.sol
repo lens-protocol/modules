@@ -21,7 +21,7 @@ contract BaseFeeCollectModule_Publication is BaseFeeCollectModuleBase {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -219,7 +219,7 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
-                handle: 'publisher.lens',
+                handle: 'pub',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -230,7 +230,7 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -340,10 +340,10 @@ contract BaseFeeCollectModule_Collect is BaseFeeCollectModuleBase {
     }
 
     function testCannotCollectAfterEndTimestamp() public {
-        exampleInitData.endTimestamp = 100;
+        exampleInitData.endTimestamp = uint72(block.timestamp) + 100;
         uint256 secondPubId = hubPost();
 
-        vm.warp(101);
+        vm.warp(exampleInitData.endTimestamp + 1);
 
         vm.startPrank(user);
         vm.expectRevert(Errors.CollectExpired.selector);
@@ -531,7 +531,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
-                handle: 'publisher.lens',
+                handle: 'pub',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -542,7 +542,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -817,7 +817,7 @@ contract BaseFeeCollectModule_GasReport is BaseFeeCollectModuleBase {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',

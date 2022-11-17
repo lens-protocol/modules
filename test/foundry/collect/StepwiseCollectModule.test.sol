@@ -19,7 +19,7 @@ contract StepwiseCollectModule_Publication is StepwiseCollectModuleBase {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -233,7 +233,7 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
         publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
-                handle: 'publisher.lens',
+                handle: 'pub',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -244,7 +244,7 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -362,10 +362,10 @@ contract StepwiseCollectModule_Collect is StepwiseCollectModuleBase {
     }
 
     function testCannotCollectAfterEndTimestamp() public {
-        exampleInitData.endTimestamp = 100;
+        exampleInitData.endTimestamp = uint40(block.timestamp) + 100;
         uint256 secondPubId = hubPost(exampleInitData);
 
-        vm.warp(101);
+        vm.warp(exampleInitData.endTimestamp + 1);
 
         vm.startPrank(user);
         vm.expectRevert(Errors.CollectExpired.selector);
@@ -568,7 +568,7 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
         publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
-                handle: 'publisher.lens',
+                handle: 'pub',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -579,7 +579,7 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -884,7 +884,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         publisherProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: publisher,
-                handle: 'publisher.lens',
+                handle: 'pub',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -895,7 +895,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
         userProfileId = hub.createProfile(
             DataTypes.CreateProfileData({
                 to: user,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',

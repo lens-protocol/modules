@@ -17,7 +17,7 @@ contract TokenGatedReferenceModule_Publication is TokenGatedReferenceModuleBase 
         hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -140,7 +140,7 @@ contract TokenGatedReferenceModule_ERC20_Gated is TokenGatedReferenceModuleBase 
         hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',
@@ -270,7 +270,7 @@ contract TokenGatedReferenceModule_ERC721_Gated is TokenGatedReferenceModuleBase
         hub.createProfile(
             DataTypes.CreateProfileData({
                 to: me,
-                handle: 'user.lens',
+                handle: 'user',
                 imageURI: OTHER_MOCK_URI,
                 followModule: address(0),
                 followModuleInitData: '',

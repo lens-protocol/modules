@@ -21,6 +21,11 @@ This repository contains both - Hardhat and Foundry tests. Foundry will be used 
 
 1. `forge test` will compile and run the Foundry tests suite.
 
+### Foundry tests against forks
+
+1. Edit `TESTING_FORK` .env variable to be one of `mainnet/testnet/sandbox` and fill the rest of .env (`FOUNDRY` section)
+2. Run `forge test` to fork the chosen network and test against existing LensHub contracts.
+
 ## Coverage
 
 1. `npm run coverage` for Hardhat coverage report
