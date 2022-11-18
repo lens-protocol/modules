@@ -19,7 +19,7 @@ fi
 NETWORK=$(node script/helpers/readNetwork.js $1)
 if [[ $NETWORK == "" ]]
     then
-        echo "No network found for $1 envirotnment target in addresses.json. Terminating"
+        echo "No network found for $1 environment target in addresses.json. Terminating"
         exit 1
 fi
 
