@@ -10,7 +10,6 @@ contract MultirecipientCollectModuleBase is BaseFeeCollectModuleBase {
     uint16 constant BPS_MAX = 10000;
     uint256 MAX_RECIPIENTS = 5;
 
-    // TODO: Consider refactoring back to immutable + ternary
     MultirecipientFeeCollectModule multirecipientFeeCollectModule;
     MultirecipientFeeCollectModuleInitData multirecipientExampleInitData;
 

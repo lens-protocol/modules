@@ -12,11 +12,12 @@ import {FreeCollectModule} from '@aave/lens-protocol/contracts/core/modules/coll
 import {TransparentUpgradeableProxy} from '@aave/lens-protocol/contracts/upgradeability/TransparentUpgradeableProxy.sol';
 import {DataTypes} from '@aave/lens-protocol/contracts/libraries/DataTypes.sol';
 import {Errors} from '@aave/lens-protocol/contracts/libraries/Errors.sol';
+import {ForkManagement} from 'script/helpers/ForkManagement.sol';
 
 import {Currency} from '@aave/lens-protocol/contracts/mocks/Currency.sol';
 import {NFT} from 'contracts/mocks/NFT.sol';
 
-contract BaseSetup is Test {
+contract BaseSetup is Test, ForkManagement {
     using stdJson for string;
 
     string forkEnv;
@@ -25,7 +26,6 @@ contract BaseSetup is Test {
     string json;
     uint256 forkBlockNumber;
 
-    // TODO: Consider refactoring back to immutable + ternary
     uint256 firstProfileId;
     address deployer;
     address governance;
@@ -66,23 +66,9 @@ contract BaseSetup is Test {
         return json.parseRaw(key).length > 0;
     }
 
-    // TODO: Consider refactoring these funcs into a library (similar functions are also used in deploy script):
-    function loadJson() internal returns (string memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string(abi.encodePacked(root, '/addresses.json'));
-        string memory json = vm.readFile(path);
-        return json;
-    }
-
-    function checkNetworkParams(string memory json, string memory targetEnv) internal {
-        uint256 chainId = json.readUint(string(abi.encodePacked('.', targetEnv, '.chainId')));
-
-        console.log('\nTarget environment:', targetEnv);
-        if (block.chainid != chainId) revert('Wrong chainId');
-        console.log('ChainId:', chainId);
-    }
-
     function loadBaseAddresses(string memory json, string memory targetEnv) internal virtual {
+        bytes32 PROXY_IMPLEMENTATION_STORAGE_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
         console.log('targetEnv:', targetEnv);
 
         hubProxyAddr = json.readAddress(string(abi.encodePacked('.', targetEnv, '.LensHubProxy')));
@@ -96,14 +82,7 @@ contract BaseSetup is Test {
         address collectNFTAddr = hub.getCollectNFTImpl();
 
         address hubImplAddr = address(
-            uint160(
-                uint256(
-                    vm.load(
-                        hubProxyAddr,
-                        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
-                    )
-                )
-            )
+            uint160(uint256(vm.load(hubProxyAddr, PROXY_IMPLEMENTATION_STORAGE_SLOT)))
         );
         console.log('Found hubImplAddr:', hubImplAddr);
         hubImpl = LensHub(hubImplAddr);
@@ -185,9 +164,7 @@ contract BaseSetup is Test {
             console.log('\n\n Testing using %s fork', forkEnv);
             json = loadJson();
 
-            network = json.readString(string(abi.encodePacked('.', forkEnv, '.network')));
-            console.log('Network:', network);
-
+            network = getNetwork(json, forkEnv);
             vm.createSelectFork(network);
 
             forkBlockNumber = block.number;

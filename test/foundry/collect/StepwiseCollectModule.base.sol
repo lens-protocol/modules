@@ -7,7 +7,6 @@ import 'contracts/collect/StepwiseCollectModule.sol';
 
 contract StepwiseCollectModuleBase is BaseSetup {
     using stdJson for string;
-    // TODO: Consider refactoring back to immutable + ternary
     StepwiseCollectModule stepwiseCollectModule;
 
     uint256 constant DEFAULT_COLLECT_LIMIT = 3;

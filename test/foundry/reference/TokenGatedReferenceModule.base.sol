@@ -9,7 +9,6 @@ import 'contracts/reference/TokenGatedReferenceModule.sol';
 
 contract TokenGatedReferenceModuleBase is BaseSetup {
     using stdJson for string;
-    // TODO: Consider refactoring back to immutable + ternary
     TokenGatedReferenceModule tokenGatedReferenceModule;
 
     // Deploy & Whitelist TokenGatedReferenceModule

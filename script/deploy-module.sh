@@ -16,18 +16,24 @@ if [[ $1 == "" || $2 == "" || ($3 != "--verify-only" && $3 != "")]]
         exit 1
 fi
 
+if [[ $1 == "mainnet" ]]
+    then
+        VERIFIER_URL=$MAINNET_EXPLORER_API
+    else
+        if [[ $1 == "testnet" || $1 == "sandbox" ]]
+            then
+                VERIFIER_URL=$TESTNET_EXPLORER_API
+            else
+                echo "Unrecognized target environment '$1'. Should be one of mainnet/testnet/sandbox"
+                exit 1
+        fi
+fi
+
 NETWORK=$(node script/helpers/readNetwork.js $1)
 if [[ $NETWORK == "" ]]
     then
         echo "No network found for $1 environment target in addresses.json. Terminating"
         exit 1
-fi
-
-if [[ $1 == "mainnet" ]]
-    then
-        VERIFIER_URL=$MAINNET_EXPLORER_API
-    else
-        VERIFIER_URL=$TESTNET_EXPLORER_API
 fi
 
 SAVED_ADDRESS=$(node script/helpers/readAddress.js $1 $2)

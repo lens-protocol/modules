@@ -8,33 +8,15 @@ import {MultirecipientFeeCollectModule} from 'contracts/collect/MultirecipientFe
 import {AaveFeeCollectModule} from 'contracts/collect/AaveFeeCollectModule.sol';
 import {ERC4626FeeCollectModule} from 'contracts/collect/ERC4626FeeCollectModule.sol';
 import {TokenGatedReferenceModule} from 'contracts/reference/TokenGatedReferenceModule.sol';
+import {ForkManagement} from 'script/helpers/ForkManagement.sol';
 
-contract DeployBase is Script {
+contract DeployBase is Script, ForkManagement {
     using stdJson for string;
 
     uint256 deployerPrivateKey;
     address deployer;
     address lensHubProxy;
     address moduleGlobals;
-
-    function loadJson() internal returns (string memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string(abi.encodePacked(root, '/addresses.json'));
-        string memory json = vm.readFile(path);
-        return json;
-    }
-
-    function checkNetworkParams(string memory json, string memory targetEnv) internal {
-        string memory network = json.readString(
-            string(abi.encodePacked('.', targetEnv, '.network'))
-        );
-        uint256 chainId = json.readUint(string(abi.encodePacked('.', targetEnv, '.chainId')));
-
-        console.log('\nTarget environment:', targetEnv);
-        console.log('Network:', network);
-        if (block.chainid != chainId) revert('Wrong chainId');
-        console.log('ChainId:', chainId);
-    }
 
     function loadBaseAddresses(string memory json, string memory targetEnv) internal virtual {
         lensHubProxy = json.readAddress(string(abi.encodePacked('.', targetEnv, '.LensHubProxy')));
