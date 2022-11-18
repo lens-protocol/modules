@@ -12,5 +12,4 @@ artifacts
 forge-cache/
 out/
 
-# Forge stuff
 broadcast/
