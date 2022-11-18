@@ -17,40 +17,128 @@ import {Currency} from '@aave/lens-protocol/contracts/mocks/Currency.sol';
 import {NFT} from 'contracts/mocks/NFT.sol';
 
 contract BaseSetup is Test {
-    uint256 constant firstProfileId = 1;
-    address constant deployer = address(1);
-    address constant governance = address(2);
-    address constant treasury = address(3);
+    using stdJson for string;
+
+    string forkEnv;
+    bool fork;
+    string network;
+    string json;
+    uint256 forkBlockNumber;
+
+    // TODO: Consider refactoring back to immutable + ternary
+    uint256 firstProfileId;
+    address deployer;
+    address governance;
+    address treasury;
+
     address constant publisher = address(4);
     address constant user = address(5);
     address constant userTwo = address(6);
     address constant userThree = address(7);
     address constant userFour = address(8);
     address constant userFive = address(9);
-    address immutable me = address(this); // Main test User is this (rather inheriting from this) contract
+    address immutable me = address(this);
 
-    string constant MOCK_HANDLE = 'handle.lens';
+    string constant MOCK_HANDLE = 'mock';
     string constant MOCK_URI = 'ipfs://QmUXfQWe43RKx31VzA2BnbwhSMW8WuaJvszFWChD59m76U';
     string constant OTHER_MOCK_URI =
         'https://ipfs.io/ipfs/QmTFLSXdEQ6qsSzaXaCSNtiv6wA56qq87ytXJ182dXDQJS';
     string constant MOCK_FOLLOW_NFT_URI =
         'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 
-    uint16 constant TREASURY_FEE_BPS = 50;
+    uint16 TREASURY_FEE_BPS;
     uint16 constant TREASURY_FEE_MAX_BPS = 10000;
 
-    address immutable hubProxyAddr;
-    CollectNFT immutable collectNFT;
-    FollowNFT immutable followNFT;
-    LensHub immutable hubImpl;
-    TransparentUpgradeableProxy immutable hubAsProxy;
-    LensHub immutable hub;
-    FreeCollectModule immutable freeCollectModule;
-    Currency immutable currency;
-    ModuleGlobals immutable moduleGlobals;
-    NFT immutable nft;
+    address hubProxyAddr;
+    CollectNFT collectNFT;
+    FollowNFT followNFT;
+    LensHub hubImpl;
+    TransparentUpgradeableProxy hubAsProxy;
+    LensHub hub;
+    FreeCollectModule freeCollectModule;
+    Currency currency;
+    ModuleGlobals moduleGlobals;
+    NFT nft;
 
-    constructor() {
+    // TODO: Replace with forge-std/StdJson.sol::keyExists(...) when/if PR is approved
+    function keyExists(string memory key) internal view returns (bool) {
+        return json.parseRaw(key).length > 0;
+    }
+
+    // TODO: Refactor these funcs as a library (also used in deploy script):
+    function loadJson() internal returns (string memory) {
+        string memory root = vm.projectRoot();
+        string memory path = string(abi.encodePacked(root, '/addresses.json'));
+        string memory json = vm.readFile(path);
+        return json;
+    }
+
+    function checkNetworkParams(string memory json, string memory targetEnv) internal {
+        uint256 chainId = json.readUint(string(abi.encodePacked('.', targetEnv, '.chainId')));
+
+        console.log('\nTarget environment:', targetEnv);
+        if (block.chainid != chainId) revert('Wrong chainId');
+        console.log('ChainId:', chainId);
+    }
+
+    function loadBaseAddresses(string memory json, string memory targetEnv) internal virtual {
+        console.log('targetEnv:', targetEnv);
+
+        hubProxyAddr = json.readAddress(string(abi.encodePacked('.', targetEnv, '.LensHubProxy')));
+        console.log('hubProxyAddr:', hubProxyAddr);
+
+        hub = LensHub(hubProxyAddr);
+
+        console.log('Hub:', address(hub));
+
+        address followNFTAddr = hub.getFollowNFTImpl();
+        address collectNFTAddr = hub.getCollectNFTImpl();
+
+        address hubImplAddr = address(
+            uint160(
+                uint256(
+                    vm.load(
+                        hubProxyAddr,
+                        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
+                    )
+                )
+            )
+        );
+        console.log('Found hubImplAddr:', hubImplAddr);
+        hubImpl = LensHub(hubImplAddr);
+        followNFT = FollowNFT(followNFTAddr);
+        collectNFT = CollectNFT(collectNFTAddr);
+        hubAsProxy = TransparentUpgradeableProxy(payable(address(hub)));
+        freeCollectModule = FreeCollectModule(
+            json.readAddress(string(abi.encodePacked('.', targetEnv, '.FreeCollectModule')))
+        );
+
+        moduleGlobals = ModuleGlobals(
+            json.readAddress(string(abi.encodePacked('.', targetEnv, '.ModuleGlobals')))
+        );
+
+        currency = new Currency();
+        nft = new NFT();
+
+        firstProfileId = uint256(vm.load(hubProxyAddr, bytes32(uint256(22)))) + 1;
+        console.log('firstProfileId:', firstProfileId);
+
+        deployer = address(1);
+
+        governance = hub.getGovernance();
+        treasury = moduleGlobals.getTreasury();
+
+        TREASURY_FEE_BPS = moduleGlobals.getTreasuryFee();
+    }
+
+    function deployBaseContracts() internal {
+        firstProfileId = 1;
+        deployer = address(1);
+        governance = address(2);
+        treasury = address(3);
+
+        TREASURY_FEE_BPS = 50;
+
         ///////////////////////////////////////// Start deployments.
         vm.startPrank(deployer);
 
@@ -86,12 +174,35 @@ contract BaseSetup is Test {
 
         vm.stopPrank();
         ///////////////////////////////////////// End deployments.
+    }
 
+    constructor() {
+        forkEnv = vm.envString('TESTING_FORK');
+
+        if (bytes(forkEnv).length > 0) {
+            fork = true;
+            console.log('\n\n Testing using %s fork', forkEnv);
+            json = loadJson();
+
+            network = json.readString(string(abi.encodePacked('.', forkEnv, '.network')));
+            console.log('Network:', network);
+
+            vm.createSelectFork(network);
+
+            forkBlockNumber = block.number;
+            console.log('Fork Block number:', forkBlockNumber);
+
+            checkNetworkParams(json, forkEnv);
+
+            loadBaseAddresses(json, forkEnv);
+        } else {
+            deployBaseContracts();
+        }
         ///////////////////////////////////////// Start governance actions.
         vm.startPrank(governance);
 
-        // Set the state to unpaused.
-        hub.setState(DataTypes.ProtocolState.Unpaused);
+        if (hub.getState() != DataTypes.ProtocolState.Unpaused)
+            hub.setState(DataTypes.ProtocolState.Unpaused);
 
         // Whitelist the FreeCollectModule.
         hub.whitelistCollectModule(address(freeCollectModule), true);
