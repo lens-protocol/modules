@@ -22,9 +22,10 @@ contract BaseSetup is Test {
     string forkEnv;
     bool fork;
     string network;
+    string json;
     uint256 forkBlockNumber;
 
-    // TODO: Refactor back to immutable + ternary
+    // TODO: Consider refactoring back to immutable + ternary
     uint256 firstProfileId;
     address deployer;
     address governance;
@@ -59,6 +60,11 @@ contract BaseSetup is Test {
     ModuleGlobals moduleGlobals;
     NFT nft;
 
+    // TODO: Replace with forge-std/StdJson.sol::keyExists(...) when/if PR is approved
+    function keyExists(string memory key) internal view returns (bool) {
+        return json.parseRaw(key).length > 0;
+    }
+
     // TODO: Refactor these funcs as a library (also used in deploy script):
     function loadJson() internal returns (string memory) {
         string memory root = vm.projectRoot();
@@ -77,7 +83,6 @@ contract BaseSetup is Test {
 
     function loadBaseAddresses(string memory json, string memory targetEnv) internal virtual {
         console.log('targetEnv:', targetEnv);
-        console.log('json:', json);
 
         hubProxyAddr = json.readAddress(string(abi.encodePacked('.', targetEnv, '.LensHubProxy')));
         console.log('hubProxyAddr:', hubProxyAddr);
@@ -177,7 +182,7 @@ contract BaseSetup is Test {
         if (bytes(forkEnv).length > 0) {
             fork = true;
             console.log('\n\n Testing using %s fork', forkEnv);
-            string memory json = loadJson();
+            json = loadJson();
 
             network = json.readString(string(abi.encodePacked('.', forkEnv, '.network')));
             console.log('Network:', network);

@@ -8,12 +8,28 @@ import 'contracts/reference/TokenGatedReferenceModule.sol';
 // import '../helpers/TestHelpers.sol';
 
 contract TokenGatedReferenceModuleBase is BaseSetup {
-    TokenGatedReferenceModule immutable tokenGatedReferenceModule;
+    using stdJson for string;
+    // TODO: Consider refactoring back to immutable + ternary
+    TokenGatedReferenceModule tokenGatedReferenceModule;
 
     // Deploy & Whitelist TokenGatedReferenceModule
     constructor() BaseSetup() {
-        vm.prank(deployer);
-        tokenGatedReferenceModule = new TokenGatedReferenceModule(hubProxyAddr);
+        if (
+            fork && keyExists(string(abi.encodePacked('.', forkEnv, '.TokenGatedReferenceModule')))
+        ) {
+            tokenGatedReferenceModule = TokenGatedReferenceModule(
+                json.readAddress(
+                    string(abi.encodePacked('.', forkEnv, '.TokenGatedReferenceModule'))
+                )
+            );
+            console.log(
+                'Testing against already deployed module at:',
+                address(tokenGatedReferenceModule)
+            );
+        } else {
+            vm.prank(deployer);
+            tokenGatedReferenceModule = new TokenGatedReferenceModule(hubProxyAddr);
+        }
         vm.prank(governance);
         hub.whitelistReferenceModule(address(tokenGatedReferenceModule), true);
     }
