@@ -60,12 +60,13 @@ contract BaseSetup is Test {
     ModuleGlobals moduleGlobals;
     NFT nft;
 
-    // TODO: Replace with forge-std/StdJson.sol::keyExists(...) when/if PR is approved
+    // TODO: Replace with forge-std/StdJson.sol::keyExists(...) when/if this PR is approved:
+    //       https://github.com/foundry-rs/forge-std/pull/226
     function keyExists(string memory key) internal view returns (bool) {
         return json.parseRaw(key).length > 0;
     }
 
-    // TODO: Refactor these funcs as a library (also used in deploy script):
+    // TODO: Consider refactoring these funcs into a library (similar functions are also used in deploy script):
     function loadJson() internal returns (string memory) {
         string memory root = vm.projectRoot();
         string memory path = string(abi.encodePacked(root, '/addresses.json'));
