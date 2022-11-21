@@ -41,6 +41,10 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+      - name: Create env file
+        run: |
+          cp .env.example .env
+          cat .env
       - name: Run Forge build
         run: |
           forge --version
