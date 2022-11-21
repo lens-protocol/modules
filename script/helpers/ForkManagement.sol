@@ -6,7 +6,7 @@ import 'forge-std/Script.sol';
 contract ForkManagement is Script {
     using stdJson for string;
 
-    function loadJson() internal view returns (string memory) {
+    function loadJson() internal returns (string memory) {
         string memory root = vm.projectRoot();
         string memory path = string(abi.encodePacked(root, '/addresses.json'));
         string memory json = vm.readFile(path);
@@ -15,7 +15,6 @@ contract ForkManagement is Script {
 
     function checkNetworkParams(string memory json, string memory targetEnv)
         internal
-        view
         returns (string memory network, uint256 chainId)
     {
         network = json.readString(string(abi.encodePacked('.', targetEnv, '.network')));
@@ -29,7 +28,6 @@ contract ForkManagement is Script {
 
     function getNetwork(string memory json, string memory targetEnv)
         internal
-        pure
         returns (string memory)
     {
         return json.readString(string(abi.encodePacked('.', targetEnv, '.network')));

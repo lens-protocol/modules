@@ -62,7 +62,7 @@ contract BaseSetup is Test, ForkManagement {
 
     // TODO: Replace with forge-std/StdJson.sol::keyExists(...) when/if this PR is approved:
     //       https://github.com/foundry-rs/forge-std/pull/226
-    function keyExists(string memory key) internal view returns (bool) {
+    function keyExists(string memory key) internal returns (bool) {
         return json.parseRaw(key).length > 0;
     }
 
