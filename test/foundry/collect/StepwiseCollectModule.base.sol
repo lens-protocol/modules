@@ -6,15 +6,26 @@ import '../BaseSetup.t.sol';
 import 'contracts/collect/StepwiseCollectModule.sol';
 
 contract StepwiseCollectModuleBase is BaseSetup {
-    StepwiseCollectModule immutable stepwiseCollectModule;
+    using stdJson for string;
+    StepwiseCollectModule stepwiseCollectModule;
 
     uint256 constant DEFAULT_COLLECT_LIMIT = 3;
     uint16 constant REFERRAL_FEE_BPS = 250;
 
     // Deploy & Whitelist StepwiseCollectModule
     constructor() BaseSetup() {
-        vm.prank(deployer);
-        stepwiseCollectModule = new StepwiseCollectModule(hubProxyAddr, address(moduleGlobals));
+        if (fork && keyExists(string(abi.encodePacked('.', forkEnv, '.StepwiseCollectModule')))) {
+            stepwiseCollectModule = StepwiseCollectModule(
+                json.readAddress(string(abi.encodePacked('.', forkEnv, '.StepwiseCollectModule')))
+            );
+            console.log(
+                'Testing against already deployed module at:',
+                address(stepwiseCollectModule)
+            );
+        } else {
+            vm.prank(deployer);
+            stepwiseCollectModule = new StepwiseCollectModule(hubProxyAddr, address(moduleGlobals));
+        }
         vm.prank(governance);
         hub.whitelistCollectModule(address(stepwiseCollectModule), true);
     }

@@ -1,0 +1,44 @@
+{
+  "mainnet": {
+    "chainId": 137,
+    "network": "polygon",
+    "LensHubProxy": "0xDb46d1Dc155634FbC732f92E853b10B288AD5a1d",
+    "LensHubImplementation": "0x96f1ba24294ffe0dfcd832d8376da4a4645a4cd6",
+    "ModuleGlobals": "0x3Df697FF746a60CBe9ee8D47555c88CB66f03BB9",
+    "FreeCollectModule": "0x23b9467334bEb345aAa6fd1545538F3d54436e96",
+    "PoolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+    "MultirecipientFeeCollectModule": "0x0db53999f80aa352db0b3f1e8002a20b14202595",
+    "StepwiseCollectModule": "0x210c94877dcfceda8238acd382372278844a54d7",
+    "ERC4626FeeCollectModule": "0x394fd100b13197787023ef4cf318cde456545db7",
+    "AaveFeeCollectModule": "0xa94713d0688c8a483c3352635cec4e0ce88d6a29",
+    "TokenGatedReferenceModule": "0x3d7f4f71a90fe5a9d13fab2716080f2917cf88f3"
+  },
+  "testnet": {
+    "chainId": 80001,
+    "network": "mumbai",
+    "LensHubProxy": "0x60Ae865ee4C725cd04353b5AAb364553f56ceF82",
+    "LensHubImplementation": "0x1bF5788bEaa62Bc2C2De78523630263312040F77",
+    "ModuleGlobals": "0x1353aAdfE5FeD85382826757A95DE908bd21C4f9",
+    "FreeCollectModule": "0x0BE6bD7092ee83D44a6eC1D949626FeE48caB30c",
+    "PoolAddressesProvider": "0x5343b5bA672Ae99d627A1C87866b8E53F47Db2E6",
+    "MultirecipientFeeCollectModule": "0x24c6047e3a5575a8cf58b863446e0ed5c51f312c",
+    "StepwiseCollectModule": "0x7a7b8e7699e0492da1d3c7eab7e2f3bf1065aa40",
+    "ERC4626FeeCollectModule": "0x79697402bd2caa19a53d615fb1a30a98e35b84d5",
+    "AaveFeeCollectModule": "0x912860ed4ed6160c48a52d52fcab5c059d34fe5a",
+    "TokenGatedReferenceModule": "0xb4ba8dccd35bd3dcc5d58dbb9c7dff9c9268add9"
+  },
+  "sandbox": {
+    "chainId": 80001,
+    "network": "mumbai",
+    "LensHubProxy": "0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5",
+    "LensHubImplementation": "0x1b30F214c192EF4B7F8c9926c47C4161016955DA",
+    "ModuleGlobals": "0xcbCC5b9611d22d11403373432642Df9Ef7Dd81AD",
+    "FreeCollectModule": "0x11C45Cbc6fDa2dbe435C0079a2ccF9c4c7051595",
+    "PoolAddressesProvider": "0x5343b5bA672Ae99d627A1C87866b8E53F47Db2E6",
+    "MultirecipientFeeCollectModule": "0xaaa4178798f6b0cb313abfb225f3eab9d50d28d9",
+    "StepwiseCollectModule": "0x6928d6127dfa0da401737e6ff421fcf62d5617a3",
+    "ERC4626FeeCollectModule": "0x31126c602cf88193825a99dcd1d17bf1124b1b4f",
+    "AaveFeeCollectModule": "0x666e06215747879ee68b3e5a317dcd8411de1897",
+    "TokenGatedReferenceModule": "0x86d35562ceb9f10d7c2c23c098dfeacb02f53853"
+  }
+}

@@ -6,26 +6,38 @@ import './BaseFeeCollectModule.base.sol';
 import 'contracts/collect/MultirecipientFeeCollectModule.sol';
 
 contract MultirecipientCollectModuleBase is BaseFeeCollectModuleBase {
+    using stdJson for string;
     uint16 constant BPS_MAX = 10000;
     uint256 MAX_RECIPIENTS = 5;
 
-    MultirecipientFeeCollectModule immutable multirecipientFeeCollectModule;
+    MultirecipientFeeCollectModule multirecipientFeeCollectModule;
     MultirecipientFeeCollectModuleInitData multirecipientExampleInitData;
 
     // Deploy & Whitelist MultirecipientFeeCollectModule
     constructor() {
-        vm.prank(deployer);
-        baseFeeCollectModule = address(
-            new MultirecipientFeeCollectModule(hubProxyAddr, address(moduleGlobals))
-        );
-
-        multirecipientFeeCollectModule = new MultirecipientFeeCollectModule(
-            hubProxyAddr,
-            address(moduleGlobals)
-        );
+        if (
+            fork &&
+            keyExists(string(abi.encodePacked('.', forkEnv, '.MultirecipientFeeCollectModule')))
+        ) {
+            multirecipientFeeCollectModule = MultirecipientFeeCollectModule(
+                json.readAddress(
+                    string(abi.encodePacked('.', forkEnv, '.MultirecipientFeeCollectModule'))
+                )
+            );
+            console.log(
+                'Testing against already deployed module at:',
+                address(multirecipientFeeCollectModule)
+            );
+        } else {
+            vm.prank(deployer);
+            multirecipientFeeCollectModule = new MultirecipientFeeCollectModule(
+                hubProxyAddr,
+                address(moduleGlobals)
+            );
+        }
+        baseFeeCollectModule = address(multirecipientFeeCollectModule);
         vm.startPrank(governance);
         hub.whitelistCollectModule(address(multirecipientFeeCollectModule), true);
-        hub.whitelistCollectModule(address(baseFeeCollectModule), true);
         vm.stopPrank();
     }
 
