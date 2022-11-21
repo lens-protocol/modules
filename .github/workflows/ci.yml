@@ -41,14 +41,13 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-      - name: Create env file
-        run: |
-          cp .env.example .env
-          cat .env
       - name: Run Forge build
         run: |
           forge --version
           forge build
       - name: Run Forge tests
         run: |
+          cp .env.example .env
+          source .env
+          echo $MUMBAI_RPC_URL
           forge test -vvv
