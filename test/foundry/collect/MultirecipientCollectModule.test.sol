@@ -26,6 +26,11 @@ contract MultirecipientCollectModule_Publication is
         return MultirecipientCollectModuleBase.getEncodedInitData();
     }
 
+    function testCannotPostWithZeroAmount() public {
+        exampleInitData.amount = 0;
+        hubPostWithRevert(Errors.InitParamsInvalid.selector);
+    }
+
     function testCannotPostWithoutRecipients() public {
         delete multirecipientExampleInitData.recipients;
         vm.expectRevert(Errors.InitParamsInvalid.selector);
@@ -138,6 +143,7 @@ contract MultirecipientCollectModule_Publication is
         uint72 endTimestamp,
         uint8 recipientsNumber
     ) public {
+        vm.assume(amount != 0);
         referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
         endTimestamp = uint72(bound(endTimestamp, block.timestamp + 1, type(uint72).max));
         recipientsNumber = uint8(bound(recipientsNumber, 1, 5));
@@ -206,6 +212,7 @@ contract MultirecipientCollectModule_Publication is
         uint72 endTimestamp,
         uint8 recipientsNumber
     ) public {
+        vm.assume(amount != 0);
         referralFee = uint16(bound(referralFee, 0, TREASURY_FEE_MAX_BPS));
         vm.assume(endTimestamp > block.timestamp || endTimestamp == 0);
         recipientsNumber = uint8(bound(recipientsNumber, 1, 5));
@@ -308,6 +315,7 @@ contract MultirecipientCollectModule_FeeDistribution is
     }
 
     function testFeeSplitEquallyWithFiveRecipients(uint128 totalCollectFee) public {
+        vm.assume(totalCollectFee != 0);
         uint256 treasuryAmount = (uint256(totalCollectFee) * TREASURY_FEE_BPS) / BPS_MAX;
         uint256 adjustedAmount = totalCollectFee - treasuryAmount;
 
@@ -367,6 +375,7 @@ contract MultirecipientCollectModule_FeeDistribution is
         uint16 userTwoSplit,
         uint16 extraSplit
     ) public {
+        vm.assume(totalCollectFee != 0);
         userTwoSplit = uint16(bound(userTwoSplit, 1, BPS_MAX / 2 - 1));
         extraSplit = uint16(bound(extraSplit, 2, BPS_MAX / 2 - 1));
 
@@ -444,6 +453,50 @@ contract MultirecipientCollectModule_FeeDistribution is
             balancesAfter.userFive - balancesBefore.userFive,
             predictCutAmount(totalCollectFee - treasuryAmount, userFiveSplit)
         );
+    }
+
+    // Overriding some tests from Base to disable zero amounts:
+
+    function testFeesDistributionWithMirrorFuzzing(
+        uint16 treasuryFee,
+        uint16 referralFee,
+        uint128 amount
+    ) public override {
+        vm.assume(amount != 0);
+        super.testFeesDistributionWithMirrorFuzzing(treasuryFee, referralFee, amount);
+    }
+
+    function testFeesDistributionWithoutMirrorFuzzing(uint16 treasuryFee, uint128 amount)
+        public
+        override
+    {
+        vm.assume(amount != 0);
+        super.testFeesDistributionWithoutMirrorFuzzing(treasuryFee, amount);
+    }
+
+    // Using 1 wei instead of zero here in (, amount):
+    function testFeesDistributionEdgeCasesWithoutMirror() public override {
+        verifyFeesWithoutMirror(0, 1);
+        verifyFeesWithoutMirror(0, 1 ether);
+        verifyFeesWithoutMirror(0, type(uint128).max);
+        verifyFeesWithoutMirror(BPS_MAX / 2 - 1, 1);
+        verifyFeesWithoutMirror(BPS_MAX / 2 - 1, 1 ether);
+        verifyFeesWithoutMirror(BPS_MAX / 2 - 1, type(uint128).max);
+    }
+
+    // Using 1 wei instead of zero here in (, , amount):
+    function testFeesDistributionEdgeCasesWithMirror() public override {
+        verifyFeesWithMirror(0, 0, type(uint128).max);
+        verifyFeesWithMirror(0, BPS_MAX / 2 - 1, 1);
+        verifyFeesWithMirror(0, BPS_MAX / 2 - 1, type(uint128).max);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, 0, 1);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, 0, type(uint128).max);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, BPS_MAX / 2 - 1, 1);
+        verifyFeesWithMirror(BPS_MAX / 2 - 1, BPS_MAX / 2 - 1, type(uint128).max);
+        verifyFeesWithMirror(0, 0, 1);
+        verifyFeesWithMirror(0, 1, 1);
+        verifyFeesWithMirror(1, 0, 1);
+        verifyFeesWithMirror(1, 1, 1);
     }
 
     function predictCutAmount(uint256 totalAfterTreasuryCut, uint16 cutBPS)
