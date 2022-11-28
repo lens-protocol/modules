@@ -678,7 +678,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
     ) public {
         vm.prank(governance);
         moduleGlobals.setTreasuryFee(treasuryFee);
-        (uint256 pubId, uint256 mirrorId) = hubPostAndMirror(referralFee, amount);
+        (, uint256 mirrorId) = hubPostAndMirror(referralFee, amount);
 
         Vm.Log[] memory entries;
 
@@ -765,7 +765,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         }
     }
 
-    function testFeesDistributionEdgeCasesWithoutMirror() public {
+    function testFeesDistributionEdgeCasesWithoutMirror() public virtual {
         verifyFeesWithoutMirror(0, 0);
         verifyFeesWithoutMirror(0, 1 ether);
         verifyFeesWithoutMirror(0, type(uint128).max);
@@ -774,12 +774,15 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         verifyFeesWithoutMirror(BPS_MAX / 2 - 1, type(uint128).max);
     }
 
-    function testFeesDistributionWithoutMirrorFuzzing(uint16 treasuryFee, uint128 amount) public {
+    function testFeesDistributionWithoutMirrorFuzzing(uint16 treasuryFee, uint128 amount)
+        public
+        virtual
+    {
         treasuryFee = uint16(bound(treasuryFee, 0, BPS_MAX / 2 - 2));
         verifyFeesWithoutMirror(treasuryFee, amount);
     }
 
-    function testFeesDistributionEdgeCasesWithMirror() public {
+    function testFeesDistributionEdgeCasesWithMirror() public virtual {
         verifyFeesWithMirror(0, 0, 0);
         verifyFeesWithMirror(0, 0, type(uint128).max);
         verifyFeesWithMirror(0, BPS_MAX / 2 - 1, 0);
@@ -800,7 +803,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         uint16 treasuryFee,
         uint16 referralFee,
         uint128 amount
-    ) public {
+    ) public virtual {
         treasuryFee = uint16(bound(treasuryFee, 0, BPS_MAX / 2 - 2));
         referralFee = uint16(bound(referralFee, 0, BPS_MAX / 2 - 2));
         verifyFeesWithMirror(treasuryFee, referralFee, amount);

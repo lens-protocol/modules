@@ -17,7 +17,7 @@ struct RecipientData {
 /**
  * @notice A struct containing the necessary data to initialize MultirecipientFeeCollectModule.
  *
- * @param amount The collecting cost associated with this publication. 0 for free collect.
+ * @param amount The collecting cost associated with this publication. Cannot be 0.
  * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
  * @param currency The currency associated with this publication.
  * @param referralFee The referral fee associated with this publication.
@@ -38,7 +38,7 @@ struct MultirecipientFeeCollectModuleInitData {
 /**
  * @notice A struct containing the necessary data to execute collect actions on a publication.
  *
- * @param amount The collecting cost associated with this publication. 0 for free collect.
+ * @param amount The collecting cost associated with this publication. Cannot be 0.
  * @param collectLimit The maximum number of collects for this publication. 0 for no limit.
  * @param currency The currency associated with this publication.
  * @param currentCollects The current number of collects for this publication.
@@ -68,7 +68,7 @@ error RecipientSplitCannotBeZero();
  *
  * @notice This is a simple Lens CollectModule implementation, allowing customization of time to collect, number of collects,
  * splitting collect fee across multiple recipients, and whether only followers can collect.
- * It is charging a fee for collect (if enabled) and distributing it among Receivers/Referral/Treasury.
+ * It is charging a fee for collect and distributing it among (one or up to five) Receivers, Referral, Treasury.
  */
 contract MultirecipientFeeCollectModule is BaseFeeCollectModule {
     using SafeERC20 for IERC20;
@@ -103,6 +103,9 @@ contract MultirecipientFeeCollectModule is BaseFeeCollectModule {
             recipient: address(0)
         });
 
+        // Zero amount for collect doesn't make sense here (in a module with 5 recipients)
+        // For this better use FreeCollect module instead
+        if (baseInitData.amount == 0) revert Errors.InitParamsInvalid();
         _validateBaseInitData(baseInitData);
         _validateAndStoreRecipients(initData.recipients, profileId, pubId);
         _storeBasePublicationCollectParameters(profileId, pubId, baseInitData);
@@ -170,7 +173,7 @@ contract MultirecipientFeeCollectModule is BaseFeeCollectModule {
         uint256 len = recipients.length;
 
         // If only 1 recipient, transfer full amount and skip split calculations
-        if (len == 1 && amount != 0) {
+        if (len == 1) {
             IERC20(currency).safeTransferFrom(collector, recipients[0].recipient, amount);
         } else {
             uint256 splitAmount;
