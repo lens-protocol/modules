@@ -11,6 +11,7 @@ export enum eEthereumNetwork {
   hardhat = 'hardhat',
   tenderlyMain = 'tenderlyMain',
   harhatevm = 'harhatevm',
+  goerli = 'goerli',
 }
 
 export enum ePolygonNetwork {
@@ -29,6 +30,7 @@ export enum EthereumNetworkNames {
   matic = 'matic',
   mumbai = 'mumbai',
   xdai = 'xdai',
+  goerli = 'goerli',
 }
 
 export type tEthereumAddress = string;
@@ -52,6 +54,7 @@ export interface iEthereumParamsPerNetwork<eNetwork> {
   [eEthereumNetwork.main]: eNetwork;
   [eEthereumNetwork.hardhat]: eNetwork;
   [eEthereumNetwork.tenderlyMain]: eNetwork;
+  [eEthereumNetwork.goerli]: eNetwork;
 }
 
 export interface iPolygonParamsPerNetwork<T> {

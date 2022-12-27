@@ -18,6 +18,11 @@ export function getAddrs(): any {
   return addrs;
 }
 
+export function saveAddrs(json: any) {
+  fs.writeFileSync('addresses.json', JSON.stringify(json, null, 2) + '\n');
+  console.log('Updated `addresses.json`');
+}
+
 export async function waitForTx(tx: Promise<ContractTransaction>) {
   await (await tx).wait();
 }
@@ -76,6 +81,12 @@ export async function initEnv(hre: HardhatRuntimeEnvironment): Promise<SignerWit
   const user = accounts[3];
 
   return [governance, treasury, user];
+}
+
+export function getEnvFromNetworkName(networkName: string, sandbox: boolean = false): string {
+  return networkName === 'mumbai'
+    ? (sandbox ? 'sandbox' : 'testnet')
+    : 'mainnet';
 }
 
 async function delay(ms: number) {
