@@ -273,7 +273,7 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         collectModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
@@ -296,7 +296,7 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         collectModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');

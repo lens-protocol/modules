@@ -287,7 +287,7 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         referenceModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
@@ -310,7 +310,7 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         referenceModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
@@ -435,7 +435,7 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         referenceModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
@@ -459,7 +459,7 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         referenceModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');

@@ -1,6 +1,6 @@
 import '@nomiclabs/hardhat-ethers';
 import { expect } from 'chai';
-import { Signer } from 'ethers';
+import { Signer, BigNumber } from 'ethers';
 const { getContractAddress } = require('@ethersproject/address');
 import { ethers } from 'hardhat';
 import {
@@ -181,6 +181,7 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
 
   describe('#processFollow (triggered from LZGatedProxy#relayFollowWithSig)', () => {
     let followWithSigData;
+    let expectedPayload;
 
     beforeEach(async() => {
       await setFollowModule({
@@ -244,7 +245,7 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         followModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
@@ -267,7 +268,7 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
       matchEvent(
         txReceipt,
         'MessageFailed',
-        undefined, // @TODO: need all the args
+        undefined,
         followModule
       );
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
