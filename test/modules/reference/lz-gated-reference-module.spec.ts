@@ -246,7 +246,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     it('reverts if the caller does not have sufficient balance', async () => {
       await expect(
         lzGatedProxy
-          .connect(anotherUser)
           .relayCommentWithSig(
             anotherUserAddress,
             erc721.address,
@@ -260,7 +259,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     it('reverts if the contract call for balanceOf() fails', async () => {
       await expect(
         lzGatedProxy
-          .connect(anotherUser)
           .relayCommentWithSig(
             userAddress,
             lzEndpoint.address,
@@ -275,7 +273,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       await erc721.safeMint(anotherUserAddress);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayCommentWithSig(
           anotherUserAddress,
           erc721.address,
@@ -298,7 +295,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       await erc20.mint(anotherUserAddress, LZ_GATED_BALANCE_THRESHOLD);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayCommentWithSig(
           anotherUserAddress,
           erc20.address,
@@ -316,11 +312,32 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
 
+    it('[non-blocking] fails if the balance check is done against an address other than the signer', async () => {
+      await erc721.safeMint(deployerAddress);
+
+      const tx = lzGatedProxy
+        .relayCommentWithSig(
+          deployerAddress,
+          erc721.address,
+          LZ_GATED_BALANCE_THRESHOLD,
+          0, // lzCustomGasAmount
+          commentWithSigData
+        );
+
+      const txReceipt = await waitForTx(tx);
+      matchEvent(
+        txReceipt,
+        'MessageFailed',
+        undefined,
+        referenceModule
+      );
+      // expect(messageFailedReason).to.equal('InvalidSender');
+    });
+
     it('processes a valid comment', async () => {
       await erc721.safeMint(anotherUserAddress);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayCommentWithSig(
           anotherUserAddress,
           erc721.address,
@@ -393,7 +410,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     it('reverts if the caller does not have sufficient balance', async () => {
       await expect(
         lzGatedProxy
-          .connect(anotherUser)
           .relayMirrorWithSig(
             anotherUserAddress,
             erc721.address,
@@ -407,7 +423,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     it('reverts if the contract call for balanceOf() fails', async () => {
       await expect(
         lzGatedProxy
-          .connect(anotherUser)
           .relayMirrorWithSig(
             anotherUserAddress,
             lzEndpoint.address,
@@ -422,7 +437,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       await erc721.safeMint(anotherUserAddress);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayMirrorWithSig(
           anotherUserAddress,
           erc721.address,
@@ -446,7 +460,6 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       await erc20.mint(anotherUserAddress, LZ_GATED_BALANCE_THRESHOLD);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayMirrorWithSig(
           anotherUserAddress,
           erc20.address,
@@ -465,11 +478,32 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
       // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
 
+    it('[non-blocking] fails if the balance check is done against an address other than the signer', async () => {
+      await erc721.safeMint(deployerAddress);
+
+      const tx = lzGatedProxy
+        .relayMirrorWithSig(
+          deployerAddress,
+          erc721.address,
+          LZ_GATED_BALANCE_THRESHOLD,
+          0, // lzCustomGasAmount
+          mirrorWithSigData
+        );
+
+      const txReceipt = await waitForTx(tx);
+      matchEvent(
+        txReceipt,
+        'MessageFailed',
+        undefined,
+        referenceModule
+      );
+      // expect(messageFailedReason).to.equal('InvalidSender');
+    });
+
     it('processes a valid mirror', async () => {
       await erc721.safeMint(anotherUserAddress);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayMirrorWithSig(
           anotherUserAddress,
           erc721.address,

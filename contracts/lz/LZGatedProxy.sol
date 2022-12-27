@@ -70,10 +70,10 @@ contract LZGatedProxy is SimpleLzApp {
   }
 
   /**
-   * TODO: validate that `sender` is the one who signed `commentSig` (ecrecover)
    * @notice validate a token balance on this chain before relaying the intent to comment on a Lens post on the remote
    * chain.
    * NOTE: callers of this function MUST pass the exact values for `tokenContract` and `balanceThreshold` returned from
+   * NOTE: we validate that `sender` is the owner of `commentSig.profileId` on the remote chain for sanity
    * the call to LZGatedReferenceModule.gatedReferenceDataPerPub(profileIdPointed, pubIdPointed) - or the transaction
    * on the remote chain WILL revert.
    * @param sender: the account wishing to perform the comment action
@@ -95,6 +95,7 @@ contract LZGatedProxy is SimpleLzApp {
       remoteReferenceModule,
       abi.encode(
         true, // isComment
+        sender,
         tokenContract,
         balanceThreshold,
         commentSig
@@ -105,10 +106,10 @@ contract LZGatedProxy is SimpleLzApp {
   }
 
   /**
-   * TODO: validate that `sender` is the one who signed `mirrorSig` (ecrecover)
    * @notice validate a token balance on this chain before relaying the intent to mirror a Lens post on the remote
    * chain.
    * NOTE: callers of this function MUST pass the exact values for `tokenContract` and `balanceThreshold` returned from
+   * NOTE: we validate that `sender` is the owner of `mirrorSig.profileId` on the remote chain for sanity
    * the call to LZGatedReferenceModule.gatedReferenceDataPerPub(profileIdPointed, pubIdPointed) - or the transaction
    * on the remote chain WILL revert.
    * @param sender: the account wishing to perform the mirror action
@@ -130,6 +131,7 @@ contract LZGatedProxy is SimpleLzApp {
       remoteReferenceModule,
       abi.encode(
         false, // isComment
+        sender,
         tokenContract,
         balanceThreshold,
         mirrorSig

@@ -122,7 +122,7 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
     uint64 _nonce,
     bytes memory _payload
   ) internal override {
-    (bool isComment,,,) = abi.decode(_payload, (bool, address, uint256, bytes));
+    (bool isComment,,,,) = abi.decode(_payload, (bool, address, address, uint256, bytes));
 
     // parse the payload for either #commentWithSig or #mirrorWithSig
     string memory error = isComment ? _handleComment(_srcChainId, _payload) : _handleMirror(_srcChainId, _payload);
@@ -137,9 +137,9 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
    * @return error an error string if the call failed, else empty string
    */
   function _handleComment(uint16 _srcChainId, bytes memory _payload) internal returns (string memory error) {
-    (,address token, uint256 threshold, DataTypes.CommentWithSigData memory commentSig) = abi.decode(
+    (,address sender, address token, uint256 threshold, DataTypes.CommentWithSigData memory commentSig) = abi.decode(
       _payload,
-      (bool, address, uint256, DataTypes.CommentWithSigData)
+      (bool, address, address, uint256, DataTypes.CommentWithSigData)
     );
 
     GatedReferenceData memory data = gatedReferenceDataPerPub[commentSig.profileIdPointed][commentSig.pubIdPointed];
@@ -147,6 +147,11 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
     // validate that remote check was against the contract/threshold defined
     if (data.remoteChainId != _srcChainId || data.balanceThreshold != threshold || data.tokenContract != token) {
       return error = "InvalidRemoteInput";
+    }
+
+    // validate that the balance check was against the one who signed the sig
+    if (IERC721(HUB).ownerOf(commentSig.profileId) != sender) {
+      return error = "InvalidSender";
     }
 
     // @TODO: hash the vars vs deeply nested?
@@ -166,9 +171,9 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
    * @return error an error string if the call failed, else empty string
    */
   function _handleMirror(uint16 _srcChainId, bytes memory _payload) internal returns (string memory error) {
-    (,address token, uint256 threshold, DataTypes.MirrorWithSigData memory mirrorSig) = abi.decode(
+    (,address sender, address token, uint256 threshold, DataTypes.MirrorWithSigData memory mirrorSig) = abi.decode(
       _payload,
-      (bool, address, uint256, DataTypes.MirrorWithSigData)
+      (bool, address, address, uint256, DataTypes.MirrorWithSigData)
     );
 
     GatedReferenceData memory data = gatedReferenceDataPerPub[mirrorSig.profileIdPointed][mirrorSig.pubIdPointed];
@@ -176,6 +181,11 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
     // validate that remote check was against the contract/threshold defined
     if (data.remoteChainId != _srcChainId || data.balanceThreshold != threshold || data.tokenContract != token) {
       return error = "InvalidRemoteInput";
+    }
+
+    // validate that the balance check was against the one who signed the sig
+    if (IERC721(HUB).ownerOf(mirrorSig.profileId) != sender) {
+      return error = "InvalidSender";
     }
 
     // @TODO: hash the vars vs deeply nested?

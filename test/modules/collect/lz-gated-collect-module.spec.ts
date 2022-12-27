@@ -234,7 +234,6 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
     it('reverts if the caller does not have sufficient balance', async () => {
       await expect(
         lzGatedProxy
-          .connect(anotherUser)
           .relayCollectWithSig(
             erc721.address,
             LZ_GATED_BALANCE_THRESHOLD,
@@ -247,7 +246,6 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
     it('reverts if the contract call for balanceOf() fails', async () => {
       await expect(
         lzGatedProxy
-          .connect(anotherUser)
           .relayCollectWithSig(
             lzEndpoint.address,
             LZ_GATED_BALANCE_THRESHOLD,
@@ -261,7 +259,6 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
       await erc721.safeMint(anotherUserAddress);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayCollectWithSig(
           erc721.address,
           0,
@@ -284,7 +281,6 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
       await erc20.mint(anotherUserAddress, LZ_GATED_BALANCE_THRESHOLD);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayCollectWithSig(
           erc20.address,
           LZ_GATED_BALANCE_THRESHOLD,
@@ -306,7 +302,6 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
       await erc721.safeMint(anotherUserAddress);
 
       const tx = lzGatedProxy
-        .connect(anotherUser)
         .relayCollectWithSig(
           erc721.address,
           LZ_GATED_BALANCE_THRESHOLD,
