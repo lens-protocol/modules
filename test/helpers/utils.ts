@@ -802,7 +802,7 @@ const buildCollectWithSigParams = (
 //   return utils.splitSignature(sig);
 // }
 
-function domain(): { name: string; version: string; chainId: number; verifyingContract: string } {
+export function domain(): { name: string; version: string; chainId: number; verifyingContract: string } {
   return {
     name: LENS_HUB_NFT_NAME,
     version: '1',
