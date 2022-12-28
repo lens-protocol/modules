@@ -14,7 +14,7 @@ task('deploy-proxy', 'Deploys, verifies and whitelists LZGatedProxy against a sp
   runtimeHRE = hre;
   const ethers = hre.ethers;
   const networkName = hre.network.name;
-  const [deployer, governance] = await ethers.getSigners();
+  const [deployer] = await ethers.getSigners();
 
   if (!LZ_CONFIG[networkName]) throw new Error(`invalid network: ${networkName}`);
 

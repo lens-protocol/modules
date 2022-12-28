@@ -60,7 +60,7 @@ task('deploy-modules', 'Deploys, verifies and whitelists LZGated* modules')
 
   if (networkName === 'mumbai') {
     const whitelistingContractAddress = mockSandboxGovernance || hub;
-    const whitelistingSigner = mockSandboxGovernance ? deployer : governance; // `governance` never has funds :shrug:
+    const whitelistingSigner = mockSandboxGovernance ? deployer : governance;
     const whitelistingContract = await LensHub__factory.connect(whitelistingContractAddress, whitelistingSigner);
 
     console.log('\n\n- - - - - - - - Whitelisting LZGatedFollowModule\n\n');
