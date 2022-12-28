@@ -36,9 +36,6 @@ task('set-follow-module', 'sets the LZGatedFollowModule on our sandbox profile')
     [TOKEN_CONTRACT, TOKEN_THRESHOLD, TOKEN_CHAIN_ID]
   );
 
-  // `SANDBOX_USER_PROFILE_ID` profile was created thru MockProfileCreationProxy, owned by `deployer`
-  // https://docs.lens.xyz/docs/deployed-contract-addresses#sandbox-mumbai-testnet-addresses
-
   console.log(`\n\n- - - - - - - - Setting follow module to be LZGatedFollowModule \n\n`);
   const tx = await LensHub__factory.connect(hub, deployer).setFollowModule(
     SANDBOX_USER_PROFILE_ID,
@@ -54,5 +51,5 @@ task('set-follow-module', 'sets the LZGatedFollowModule on our sandbox profile')
     .connect(contracts.LZGatedFollowModule, deployer)
     .gatedFollowPerProfile(SANDBOX_USER_PROFILE_ID);
 
-  console.log(res);
+  console.log(`gatedFollowPerProfile(profileId: ${SANDBOX_USER_PROFILE_ID}) =>`, res);
 });

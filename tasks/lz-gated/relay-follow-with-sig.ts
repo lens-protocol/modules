@@ -14,9 +14,8 @@ import {
   TOKEN_CHAIN_ID,
 } from './config';
 import getFollowWithSigParts from '../helpers/getFollowWithSigParts';
-import ILayerZeroMessagingLibrary from '../helpers/abi/ILayerZeroMessagingLibrary.json';
 
-// derived from `npx hardhat estimate-fee-follow` and accounting for potential follow nft deployment
+// derived from `npx hardhat estimate-fee`
 const ESTIMATED_FOLLOW_FEE_GWEI = '2500';
 const ESTIMATED_GAS_REMOTE = 500_000 // based on some tests...
 const GAS_LIMIT = 300_000; // based on some tests...

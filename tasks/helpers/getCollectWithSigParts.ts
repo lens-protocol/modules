@@ -9,18 +9,20 @@ import {
   LENS_DOMAIN_VERSION,
 } from './utils';
 
-const buildFollowWithSigParams = (
+const buildCollectWithSigParams = (
   chainId: number,
   lensHubAddress: string,
-  profileIds: BigNumber[] | string[],
-  datas: Bytes[] | string[],
+  profileId: number | string,
+  pubId: number | string,
+  data: Bytes | string,
   nonce: number,
   deadline: string
 ) => ({
   types: {
-    FollowWithSig: [
-      { name: 'profileIds', type: 'uint256[]' },
-      { name: 'datas', type: 'bytes[]' },
+    CollectWithSig: [
+      { name: 'profileId', type: 'uint256' },
+      { name: 'pubId', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
     ],
@@ -32,39 +34,43 @@ const buildFollowWithSigParams = (
     verifyingContract: lensHubAddress,
   },
   value: {
-    profileIds: profileIds,
-    datas: datas,
+    profileId,
+    pubId,
+    data,
     nonce: nonce,
     deadline: deadline,
   },
 });
 
-type FollowWithSigDataProps = {
+type CollectWithSigDataProps = {
   chainId: number;
   wallet: any; // Signer
   lensHubAddress: string;
-  profileIds: BigNumber[] | string[];
-  datas: Bytes[] | string[];
+  profileId: number | string,
+  pubId: number | string,
+  data: Bytes | string,
   nonce: number;
   deadline: string;
-  follower: string;
+  collector: string;
 };
 
 export default async ({
   chainId,
   wallet,
   lensHubAddress,
-  profileIds,
-  datas,
+  profileId,
+  pubId,
+  data,
   nonce,
   deadline,
-  follower
-}: FollowWithSigDataProps) => {
-  const msgParams = buildFollowWithSigParams(
+  collector,
+}: CollectWithSigDataProps) => {
+  const msgParams = buildCollectWithSigParams(
     chainId,
     lensHubAddress,
-    profileIds,
-    datas,
+    profileId,
+    pubId,
+    data,
     nonce,
     deadline
   );
@@ -72,9 +78,10 @@ export default async ({
   const { v, r, s } = utils.splitSignature(sig);
 
   return {
-    follower,
-    profileIds,
-    datas,
+    collector,
+    profileId,
+    pubId,
+    data,
     sig: {
       v,
       r,

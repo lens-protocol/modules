@@ -6,6 +6,9 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types';
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
+export const LENS_DOMAIN_NAME = 'Lens Protocol Profiles';
+export const LENS_DOMAIN_VERSION = '1';
+
 export enum ProtocolState {
   Unpaused,
   PublishingPaused,
@@ -84,9 +87,11 @@ export async function initEnv(hre: HardhatRuntimeEnvironment): Promise<SignerWit
 }
 
 export function getEnvFromNetworkName(networkName: string, sandbox: boolean = false): string {
-  return networkName === 'mumbai'
-    ? (sandbox ? 'sandbox' : 'testnet')
-    : 'mainnet';
+  if (networkName === 'mumbai') {
+    return sandbox ? 'sandbox' : 'testnet';
+  }
+
+  return 'mainnet';
 }
 
 async function delay(ms: number) {
