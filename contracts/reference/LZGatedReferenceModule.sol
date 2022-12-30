@@ -8,7 +8,7 @@ import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/mod
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {ILensHub} from "@aave/lens-protocol/contracts/interfaces/ILensHub.sol";
 import {DataTypes} from "@aave/lens-protocol/contracts/libraries/DataTypes.sol";
-import {LzApp} from "../lz/LzApp.sol";
+import {NonblockingLzApp} from "../lz/NonblockingLzApp.sol";
 
 /**
  * @title LZGatedReferenceModule
@@ -16,7 +16,7 @@ import {LzApp} from "../lz/LzApp.sol";
  * @notice A Lens Reference Module that allows publication creators to gate who can comment/mirror their post with
  * ERC20 or ERC721 balances held on other chains.
  */
-contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule, LzApp {
+contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule, NonblockingLzApp {
   struct GatedReferenceData {
     address tokenContract; // the remote contract to read from
     uint256 balanceThreshold; // result of balanceOf() should be greater than or equal to
@@ -26,6 +26,7 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
   event InitReferenceModule(uint256 indexed profileId, uint256 indexed pubId, address tokenContract, uint256 balanceThreshold, uint16 chainId);
 
   error CommentOrMirrorInvalid();
+  error InvalidSender();
 
   mapping (uint256 => mapping (uint256 => GatedReferenceData)) public gatedReferenceDataPerPub; // profileId => pubId => gated reference data
   mapping (uint256 => mapping (uint256 => mapping (uint256 => bool))) public validatedReferencers; // profileIdPointed => pubId => profiles which have been validated
@@ -42,7 +43,7 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
     address _lzEndpoint,
     uint16[] memory remoteChainIds,
     bytes[] memory remoteProxies
-  ) ModuleBase(hub) LzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
+  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
 
   /**
    * @notice Initialize this reference module for the given profile/publication
@@ -114,9 +115,8 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
   /**
    * @dev Callback from our `LZGatedProxy` contract deployed on a remote chain, signals that the comment/mirror
    * is validated
-   * NOTE: this function is actually non-blocking in that it does not explicitly revert and catches external errors
    */
-  function _blockingLzReceive(
+  function _nonblockingLzReceive(
     uint16 _srcChainId,
     bytes memory _srcAddress,
     uint64 _nonce,
@@ -125,18 +125,13 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
     (bool isComment,,,,) = abi.decode(_payload, (bool, address, address, uint256, bytes));
 
     // parse the payload for either #commentWithSig or #mirrorWithSig
-    string memory error = isComment ? _handleComment(_srcChainId, _payload) : _handleMirror(_srcChainId, _payload);
-
-    if (bytes(error).length > 0) {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, error);
-    }
+    isComment ? _handleComment(_srcChainId, _payload) : _handleMirror(_srcChainId, _payload);
   }
 
   /**
    * @dev Decodes the `payload` for Lens#commentWithSig
-   * @return error an error string if the call failed, else empty string
    */
-  function _handleComment(uint16 _srcChainId, bytes memory _payload) internal returns (string memory error) {
+  function _handleComment(uint16 _srcChainId, bytes memory _payload) internal {
     (,address sender, address token, uint256 threshold, DataTypes.CommentWithSigData memory commentSig) = abi.decode(
       _payload,
       (bool, address, address, uint256, DataTypes.CommentWithSigData)
@@ -146,31 +141,26 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
 
     // validate that remote check was against the contract/threshold defined
     if (data.remoteChainId != _srcChainId || data.balanceThreshold != threshold || data.tokenContract != token) {
-      return error = "InvalidRemoteInput";
+      revert InvalidRemoteInput();
     }
 
     // validate that the balance check was against the one who signed the sig
     if (IERC721(HUB).ownerOf(commentSig.profileId) != sender) {
-      return error = "InvalidSender";
+      revert InvalidSender();
     }
 
     // @TODO: hash the vars vs deeply nested?
     validatedReferencers[commentSig.profileIdPointed][commentSig.pubIdPointed][commentSig.profileId] = true;
 
-    try ILensHub(HUB).commentWithSig(commentSig) {
-      error = "";
-    } catch Error (string memory reason) {
-      error = reason;
-    }
+    ILensHub(HUB).commentWithSig(commentSig);
 
     delete validatedReferencers[commentSig.profileIdPointed][commentSig.pubIdPointed][commentSig.profileId];
   }
 
   /**
    * @dev Decodes the `payload` for Lens#mirrorWithSig
-   * @return error an error string if the call failed, else empty string
    */
-  function _handleMirror(uint16 _srcChainId, bytes memory _payload) internal returns (string memory error) {
+  function _handleMirror(uint16 _srcChainId, bytes memory _payload) internal {
     (,address sender, address token, uint256 threshold, DataTypes.MirrorWithSigData memory mirrorSig) = abi.decode(
       _payload,
       (bool, address, address, uint256, DataTypes.MirrorWithSigData)
@@ -180,22 +170,18 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
 
     // validate that remote check was against the contract/threshold defined
     if (data.remoteChainId != _srcChainId || data.balanceThreshold != threshold || data.tokenContract != token) {
-      return error = "InvalidRemoteInput";
+      revert InvalidRemoteInput();
     }
 
     // validate that the balance check was against the one who signed the sig
     if (IERC721(HUB).ownerOf(mirrorSig.profileId) != sender) {
-      return error = "InvalidSender";
+      revert InvalidSender();
     }
 
     // @TODO: hash the vars vs deeply nested?
     validatedReferencers[mirrorSig.profileIdPointed][mirrorSig.pubIdPointed][mirrorSig.profileId] = true;
 
-    try ILensHub(HUB).mirrorWithSig(mirrorSig) {
-      error = "";
-    } catch Error (string memory reason) {
-      error = reason;
-    }
+    ILensHub(HUB).mirrorWithSig(mirrorSig);
 
     delete validatedReferencers[mirrorSig.profileIdPointed][mirrorSig.pubIdPointed][mirrorSig.profileId];
   }

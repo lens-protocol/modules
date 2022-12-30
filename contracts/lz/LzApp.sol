@@ -16,10 +16,11 @@ abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationC
   error ArrayMismatch();
   error OnlyEndpoint();
   error RemoteNotFound();
-  error OnlyTrustedRemote();
+  // error OnlyTrustedRemote();
   error NotAccepting();
+  error InvalidRemoteInput();
 
-  event MessageFailed(uint16 _srcChainId, bytes _srcAddress, uint64 _nonce, bytes _payload, string _reason);
+  event MessageFailed(uint16 _srcChainId, bytes _srcAddress, uint64 _nonce, bytes _payload, bytes _reason);
 
   ILayerZeroEndpoint public immutable lzEndpoint;
 
@@ -59,8 +60,6 @@ abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationC
 
   /**
    * @dev receives a cross-chain message from the lz endpoint contract deployed on this chain
-   * NOTE: this is non-blocking in the sense that it does not explicitly revert, but of course does not catch all
-   * potential errors thrown.
    * @param _srcChainId: the remote chain id
    * @param _srcAddress: the remote contract sending the message
    * @param _nonce: the message nonce
@@ -73,12 +72,12 @@ abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationC
     bytes memory _payload
   ) public virtual override {
     if (msg.sender != address(lzEndpoint)) {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, 'OnlyEndpoint');
+      revert OnlyEndpoint();
     }
 
     bytes memory trustedRemote = _lzRemoteLookup[_srcChainId];
     if (_srcAddress.length != trustedRemote.length || keccak256(_srcAddress) != keccak256(trustedRemote)) {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, 'OnlyTrustedRemote');
+      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, bytes("OnlyTrustedRemote"));
     }
 
     _blockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);

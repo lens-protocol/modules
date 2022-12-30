@@ -8,7 +8,7 @@ import {
 } from "@aave/lens-protocol/contracts/core/modules/follow/FollowValidatorFollowModuleBase.sol";
 import {ILensHub} from "@aave/lens-protocol/contracts/interfaces/ILensHub.sol";
 import {DataTypes} from "@aave/lens-protocol/contracts/libraries/DataTypes.sol";
-import {LzApp} from "../lz/LzApp.sol";
+import {NonblockingLzApp} from "../lz/NonblockingLzApp.sol";
 
 /**
  * @title LZGatedFollowModule
@@ -16,7 +16,7 @@ import {LzApp} from "../lz/LzApp.sol";
  * @notice A Lens Follow Module that allows profiles to gate their following with ERC20 or ERC721 balances held
  * on other chains.
  */
-contract LZGatedFollowModule is FollowValidatorFollowModuleBase, LzApp {
+contract LZGatedFollowModule is FollowValidatorFollowModuleBase, NonblockingLzApp {
   struct GatedFollowData {
     address tokenContract; // the remote contract to read from
     uint256 balanceThreshold; // result of balanceOf() should be greater than or equal to
@@ -40,7 +40,7 @@ contract LZGatedFollowModule is FollowValidatorFollowModuleBase, LzApp {
     address _lzEndpoint,
     uint16[] memory remoteChainIds,
     bytes[] memory remoteProxies
-  ) ModuleBase(hub) LzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
+  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
 
   /**
    * @notice Initialize this follow module for the given profile
@@ -104,9 +104,8 @@ contract LZGatedFollowModule is FollowValidatorFollowModuleBase, LzApp {
 
   /**
    * @dev Callback from our `LZGatedProxy` contract deployed on a remote chain, signals that the follow is validated
-   * NOTE: this function is actually non-blocking in that it does not explicitly revert and catches external errors
    */
-  function _blockingLzReceive(
+  function _nonblockingLzReceive(
     uint16 _srcChainId,
     bytes memory _srcAddress,
     uint64 _nonce,
@@ -123,18 +122,14 @@ contract LZGatedFollowModule is FollowValidatorFollowModuleBase, LzApp {
 
     // validate that remote check was against the contract/threshold defined
     if (data.remoteChainId != _srcChainId || data.balanceThreshold != threshold || data.tokenContract != token) {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, 'InvalidRemoteInput');
-      return;
+      revert InvalidRemoteInput();
     }
 
     // allow the follow in the callback to #processFollow
     validatedFollowers[profileId][followSig.follower] = true;
 
     // use the signature to execute the follow
-    try ILensHub(HUB).followWithSig(followSig) {}
-    catch Error (string memory reason) {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, reason);
-    }
+    ILensHub(HUB).followWithSig(followSig);
 
     delete validatedFollowers[profileId][followSig.follower];
   }

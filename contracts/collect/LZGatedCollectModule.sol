@@ -7,7 +7,7 @@ import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectM
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 import {ILensHub} from "@aave/lens-protocol/contracts/interfaces/ILensHub.sol";
 import {DataTypes} from "@aave/lens-protocol/contracts/libraries/DataTypes.sol";
-import {LzApp} from "../lz/LzApp.sol";
+import {NonblockingLzApp} from "../lz/NonblockingLzApp.sol";
 
 /**
  * @title LZGatedCollectModule
@@ -15,7 +15,7 @@ import {LzApp} from "../lz/LzApp.sol";
  * @notice A Lens Collect Module that allows profiles to gate who can collect their post with ERC20 or ERC721 balances
  * held on other chains.
  */
-contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, LzApp {
+contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, NonblockingLzApp {
   struct GatedCollectData {
     address tokenContract; // the remote contract to read from
     uint256 balanceThreshold; // result of balanceOf() should be greater than or equal to
@@ -45,7 +45,7 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, LzA
     address _lzEndpoint,
     uint16[] memory remoteChainIds,
     bytes[] memory remoteProxies
-  ) ModuleBase(hub) LzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
+  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
 
   /**
    * @notice Initialize this collect module for the given profile/publication
@@ -101,9 +101,8 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, LzA
 
   /**
    * @dev Callback from our `LZGatedProxy` contract deployed on a remote chain, signals that the collect is validated
-   * NOTE: this function is actually non-blocking in that it does not explicitly revert and catches external errors
    */
-  function _blockingLzReceive(
+  function _nonblockingLzReceive(
     uint16 _srcChainId,
     bytes memory _srcAddress,
     uint64 _nonce,
@@ -119,18 +118,14 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, LzA
 
     // validate that remote check was against the contract/threshold defined
     if (data.remoteChainId != _srcChainId || data.balanceThreshold != threshold || data.tokenContract != token) {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, 'InvalidRemoteInput');
-      return;
+      revert InvalidRemoteInput();
     }
 
     // @TODO: hash the vars vs deeply nested?
     validatedCollectors[collectSig.profileId][collectSig.pubId][collectSig.collector] = true;
 
     // use the signature to execute the collect
-    try ILensHub(HUB).collectWithSig(collectSig) {}
-    catch Error (string memory reason) {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, reason);
-    }
+    ILensHub(HUB).collectWithSig(collectSig);
 
     delete validatedCollectors[collectSig.profileId][collectSig.pubId][collectSig.collector];
   }

@@ -45,7 +45,7 @@ task('relay-mirror-with-sig', 'try to mirror a post which has the reference modu
   const lensHub = await LensHub__factory.connect(hub, provider);
   const lzGatedProxy = await LZGatedProxy__factory.connect(contracts.lz[networkName].LZGatedProxy, deployer);
 
-  const sender = await deployer.getAddress(); // practice self-care and follow yourself :shrug:
+  const sender = await deployer.getAddress(); // practice self-care and mirror your own posts :shrug:
   const nonce = (await lensHub.sigNonces(sender)).toNumber();
   const { chainId } = await provider.getNetwork();
 

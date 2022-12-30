@@ -15,7 +15,7 @@ const FACTORIES = {
   LZGatedReferenceModule: LZGatedReferenceModule__factory
 };
 
-// worst case, in the case of a revert
+// worst case, in the case of a revert at the destination chain
 task('force-resume-receive', 'force our lz contract to receive new messages after a revert')
   .addOptionalParam('sandbox')
   .setAction(async ({ sandbox }, hre) => {

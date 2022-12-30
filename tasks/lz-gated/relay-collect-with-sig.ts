@@ -17,9 +17,9 @@ import {
 import getCollectWithSigParts from '../helpers/getCollectWithSigParts';
 
 // derived from `npx hardhat estimate-fee`
-const ESTIMATED_FEE_GWEI = '1200';
-const ESTIMATED_GAS_REMOTE = 500_000 // based on some tests...
-const GAS_LIMIT = 400_000; // based on some tests...
+const ESTIMATED_FEE_GWEI = '1500';
+const ESTIMATED_GAS_REMOTE = 600_000 // based on some tests...
+const GAS_LIMIT = 300_000; // based on some tests...
 
 export let runtimeHRE: HardhatRuntimeEnvironment;
 
@@ -45,7 +45,7 @@ task('relay-collect-with-sig', 'try to collect a post which has the collect modu
   const lensHub = await LensHub__factory.connect(hub, provider);
   const lzGatedProxy = await LZGatedProxy__factory.connect(contracts.lz[networkName].LZGatedProxy, deployer);
 
-  const collector = await deployer.getAddress(); // practice self-care and follow yourself :shrug:
+  const collector = await deployer.getAddress(); // practice self-care and collect your own posts :shrug:
   const nonce = (await lensHub.sigNonces(collector)).toNumber();
   const { chainId } = await provider.getNetwork();
 
