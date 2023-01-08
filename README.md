@@ -34,10 +34,10 @@ This repository contains both - Hardhat and Foundry tests. Foundry will be used 
 3. Follow the on-screen instructions to verify if everything is correct and confirm deployment & contract verification.
 4. If only the verification is needed of an existing deployed contract - use the `--verify-only` flag followed by ABI-Encoded constructor args.
 
-## Deployement addresses in `addresses.json`
+## Deployment addresses in `addresses.json`
 
 The `addresses.json` file in root contains all existing deployed contracts on all of target environments (mainnet/testnet/sandbox) on corresponding chains.
-After a succesful module deployment the new address will be added to `addresses.json`, overwriting the existing one (the script will ask for confirmation if you want to redeploy an already existing deployment).
+After a successful module deployment the new address will be added to `addresses.json`, overwriting the existing one (the script will ask for confirmation if you want to redeploy an already existing deployment).
 
 ## Coverage
 

@@ -19,7 +19,7 @@ import {Strings} from '@openzeppelin/contracts/utils/Strings.sol';
 /**
  * @notice A struct containing the necessary data to execute collect actions on a publication.
  *
- * @param ownershipTokenId The token ID of the ownership NFT asociated with the publication.
+ * @param ownershipTokenId The token ID of the ownership NFT associated with the publication.
  * @param amount The collecting cost associated with this publication.
  * @param currency The currency associated with this publication.
  * @param recipient The recipient address associated with this publication.

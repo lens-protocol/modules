@@ -39,8 +39,8 @@ abstract contract BaseFeeCollectModule is
 
     /**
      * @dev Processes a collect by:
-     *  1. Validating that collect action meets all needded criteria
-     *  2. Processing the collect action either with or withour referral
+     *  1. Validating that collect action meets all needed criteria
+     *  2. Processing the collect action either with or without referral
      *
      * @inheritdoc ICollectModule
      */
@@ -266,7 +266,7 @@ abstract contract BaseFeeCollectModule is
     }
 
     /**
-     * @dev Tranfers the fee to recipient(-s)
+     * @dev Transfers the fee to recipient(-s)
      *
      * Override this to add additional functionality (e.g. multiple recipients)
      *
@@ -291,7 +291,7 @@ abstract contract BaseFeeCollectModule is
     }
 
     /**
-     * @dev Tranfers the part of fee to referral(-s)
+     * @dev Transfers the part of fee to referral(-s)
      *
      * Override this to add additional functionality (e.g. multiple referrals)
      *

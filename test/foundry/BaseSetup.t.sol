@@ -122,7 +122,7 @@ contract BaseSetup is Test, ForkManagement {
         ///////////////////////////////////////// Start deployments.
         vm.startPrank(deployer);
 
-        // Precompute needed addresss.
+        // Precompute needed address.
         address followNFTAddr = computeCreateAddress(deployer, 1);
         address collectNFTAddr = computeCreateAddress(deployer, 2);
         hubProxyAddr = computeCreateAddress(deployer, 3);

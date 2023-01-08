@@ -264,7 +264,7 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
             .connect(publisher)
             .updateModuleParameters(ROOT_AUTHOR_PROFILE, FIRST_PUB_ID, false, false, 0);
           const txReceipt = await waitForTx(tx);
-          // Verifies the expected event has been emited
+          // Verifies the expected event has been emitted
           matchEvent(
             txReceipt,
             'ModuleParametersUpdated',
@@ -288,7 +288,7 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
               maxDegreesOfSeparation
             );
           const txReceipt = await waitForTx(tx);
-          // Verifies the expected event has been emited
+          // Verifies the expected event has been emitted
           matchEvent(
             txReceipt,
             'ModuleParametersUpdated',
@@ -549,7 +549,7 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
             signature
           );
           const txReceipt = await waitForTx(tx);
-          // Verifies the expected event has been emited
+          // Verifies the expected event has been emitted
           matchEvent(
             txReceipt,
             'ModuleParametersUpdated',
@@ -577,7 +577,7 @@ makeSuiteCleanRoom('DegreesOfSeparationReferenceModule', function () {
             signature
           );
           const txReceipt = await waitForTx(tx);
-          // Verifies the expected event has been emited
+          // Verifies the expected event has been emitted
           matchEvent(
             txReceipt,
             'ModuleParametersUpdated',

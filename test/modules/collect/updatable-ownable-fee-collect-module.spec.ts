@@ -497,7 +497,7 @@ makeSuiteCleanRoom('UpdatableOwnableFeeCollectModule', function () {
               true
             );
           const txReceipt = await waitForTx(tx);
-          // Verifies the expected event has been emited
+          // Verifies the expected event has been emitted
           matchEvent(
             txReceipt,
             'ModuleParametersUpdated',
@@ -931,7 +931,7 @@ makeSuiteCleanRoom('UpdatableOwnableFeeCollectModule', function () {
             })
           );
           const txReceipt = await waitForTx(tx);
-          // Verifies the expected event has been emited
+          // Verifies the expected event has been emitted
           matchEvent(
             txReceipt,
             'ModuleParametersUpdated',

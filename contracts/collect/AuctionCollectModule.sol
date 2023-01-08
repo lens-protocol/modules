@@ -223,7 +223,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
                 _auctionDataByPubByProfile[profileId][pubId].startTimestamp
             );
         } else if (data.length > 0) {
-            // Prevents `LensHub` from emiting `Collected` event with wrong `data` parameter.
+            // Prevents `LensHub` from emitting `Collected` event with wrong `data` parameter.
             revert Errors.ModuleDataMismatch();
         }
         _auctionDataByPubByProfile[profileId][pubId].collected = true;
@@ -530,7 +530,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
     }
 
     /**
-     * @notice Valides if the given bid is valid for the given auction.
+     * @notice Validates if the given bid is valid for the given auction.
      *
      * @param profileId The token ID of the profile associated with the underlying publication.
      * @param amount The bid amount to offer.
@@ -570,7 +570,7 @@ contract AuctionCollectModule is EIP712, FeeModuleBase, ModuleBase, ICollectModu
      * @param pubId The publication ID associated with the underlying publication.
      * @param newWinningBid The amount of the new winning bid.
      * @param newWinner The new winning bidder.
-     * @param prevAuctionState The state of the auction data before the bid, which will be overrided.
+     * @param prevAuctionState The state of the auction data before the bid, which will be overridden.
      *
      * @return A UNIX timestamp representing the `endTimestamp` of the new auction state.
      */
