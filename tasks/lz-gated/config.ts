@@ -22,5 +22,4 @@ export const TOKEN_CHAIN_ID = LZ_CONFIG.goerli.chainId; // where our `TOKEN_CONT
 export const SANDBOX_USER_PROFILE_ID = '322'; // thereisnosecondbest2.test
 export const SANDBOX_GATED_COLLECT_PUB_ID = 5;
 export const SANDBOX_GATED_REFERENCE_PUB_ID = 6;
-
 export const SAMPLE_CONTENT_URI = 'ipfs://QmVjCtnpFKZwpQUNYkP7nR8dDA1Q3Tv3bWUFozRE4EnaGS/Teddies2067.png';

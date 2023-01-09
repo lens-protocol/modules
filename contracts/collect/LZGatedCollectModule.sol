@@ -121,7 +121,6 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, Non
       revert InvalidRemoteInput();
     }
 
-    // @TODO: hash the vars vs deeply nested?
     validatedCollectors[collectSig.profileId][collectSig.pubId][collectSig.collector] = true;
 
     // use the signature to execute the collect

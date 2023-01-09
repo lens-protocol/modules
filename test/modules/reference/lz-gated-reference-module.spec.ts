@@ -205,6 +205,8 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     let commentWithSigData;
     let referenceModuleInitData;
     let collectModuleInitData;
+    let fees;
+    const lzCustomGasAmount = 750_000;
 
     beforeEach(async() => {
       collectModuleInitData = ethers.utils.defaultAbiCoder.encode(['bool'], [true]);
@@ -235,6 +237,14 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
         referenceModule: ZERO_ADDRESS,
         referenceModuleInitData: [],
       });
+
+      fees = await lzGatedProxy.estimateFeesComment(
+        anotherUserAddress,
+        erc721.address,
+        LZ_GATED_BALANCE_THRESHOLD,
+        lzCustomGasAmount,
+        commentWithSigData
+      );
     });
 
     it('reverts if called without going through lzGatedProxy', async () => {
@@ -250,7 +260,7 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
             anotherUserAddress,
             erc721.address,
             LZ_GATED_BALANCE_THRESHOLD,
-            0, // lzCustomGasAmount
+            lzCustomGasAmount,
             commentWithSigData
           )
       ).to.be.revertedWith('InsufficientBalance');
@@ -263,7 +273,7 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
             userAddress,
             lzEndpoint.address,
             LZ_GATED_BALANCE_THRESHOLD,
-            0, // lzCustomGasAmount
+            lzCustomGasAmount,
             commentWithSigData
           )
       ).to.be.revertedWith('InsufficientBalance');
@@ -277,8 +287,9 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           anotherUserAddress,
           erc721.address,
           0,
-          0, // lzCustomGasAmount
-          commentWithSigData
+          lzCustomGasAmount,
+          commentWithSigData,
+          { value: fees[0] }
         );
       const txReceipt = await waitForTx(tx);
       matchEvent(
@@ -299,8 +310,9 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           anotherUserAddress,
           erc20.address,
           LZ_GATED_BALANCE_THRESHOLD,
-          0, // lzCustomGasAmount
-          commentWithSigData
+          lzCustomGasAmount,
+          commentWithSigData,
+          { value: fees[0] }
         );
       const txReceipt = await waitForTx(tx);
       matchEvent(
@@ -320,8 +332,9 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           deployerAddress,
           erc721.address,
           LZ_GATED_BALANCE_THRESHOLD,
-          0, // lzCustomGasAmount
-          commentWithSigData
+          lzCustomGasAmount,
+          commentWithSigData,
+          { value: fees[0] }
         );
 
       const txReceipt = await waitForTx(tx);
@@ -342,8 +355,9 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           anotherUserAddress,
           erc721.address,
           LZ_GATED_BALANCE_THRESHOLD,
-          0, // lzCustomGasAmount
-          commentWithSigData
+          lzCustomGasAmount,
+          commentWithSigData,
+          { value: fees[0], gasLimit: lzCustomGasAmount }
         );
       const txReceipt = await waitForTx(tx);
       const timestamp = await getTimestamp();
@@ -372,6 +386,8 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     let mirrorWithSigData;
     let referenceModuleInitData;
     let collectModuleInitData;
+    let fees;
+    const customGasAmount = 600_000;
 
     beforeEach(async() => {
       collectModuleInitData = ethers.utils.defaultAbiCoder.encode(['bool'], [true]);
@@ -399,6 +415,14 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
         referenceModule: ZERO_ADDRESS,
         referenceModuleInitData: [],
       });
+
+      fees = await lzGatedProxy.estimateFeesMirror(
+        anotherUserAddress,
+        erc721.address,
+        LZ_GATED_BALANCE_THRESHOLD,
+        customGasAmount,
+        mirrorWithSigData
+      );
     });
 
     it('reverts if called without going through lzGatedProxy', async () => {
@@ -442,7 +466,8 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           erc721.address,
           0,
           0, // lzCustomGasAmount
-          mirrorWithSigData
+          mirrorWithSigData,
+          { value: fees[0] }
         );
 
       const txReceipt = await waitForTx(tx);
@@ -465,7 +490,8 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           erc20.address,
           LZ_GATED_BALANCE_THRESHOLD,
           0, // lzCustomGasAmount
-          mirrorWithSigData
+          mirrorWithSigData,
+          { value: fees[0] }
         );
 
       const txReceipt = await waitForTx(tx);
@@ -487,7 +513,8 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           erc721.address,
           LZ_GATED_BALANCE_THRESHOLD,
           0, // lzCustomGasAmount
-          mirrorWithSigData
+          mirrorWithSigData,
+          { value: fees[0] }
         );
 
       const txReceipt = await waitForTx(tx);
@@ -509,7 +536,8 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           erc721.address,
           LZ_GATED_BALANCE_THRESHOLD,
           0, // lzCustomGasAmount
-          mirrorWithSigData
+          mirrorWithSigData,
+          { value: fees[0] }
         );
       const txReceipt = await waitForTx(tx);
       const timestamp = await getTimestamp();

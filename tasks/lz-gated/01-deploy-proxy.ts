@@ -7,10 +7,9 @@ import { LZ_CONFIG } from './config';
 
 export let runtimeHRE: HardhatRuntimeEnvironment;
 
-task('deploy-proxy', 'Deploys, verifies and whitelists LZGatedProxy against a specific env [mainnet|testnet|sandbox]')
-  .addParam('hub')
+task('deploy-proxy', 'Deploys and whitelists LZGatedProxy against a specific env [mainnet|testnet|sandbox]')
   .addOptionalParam('sandbox')
-  .setAction(async ({ hub, sandbox }, hre) => {
+  .setAction(async ({ sandbox }, hre) => {
   runtimeHRE = hre;
   const ethers = hre.ethers;
   const networkName = hre.network.name;

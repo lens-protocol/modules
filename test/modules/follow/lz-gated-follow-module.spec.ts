@@ -182,6 +182,8 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
   describe('#processFollow (triggered from LZGatedProxy#relayFollowWithSig)', () => {
     let followWithSigData;
     let expectedPayload;
+    let fees;
+    const lzCustomGasAmount = 750_000;
 
     beforeEach(async() => {
       await setFollowModule({
@@ -193,8 +195,15 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
       followWithSigData = await signFollowWithSigData({
         signer: anotherUser,
         profileIds: [FIRST_PROFILE_ID],
-        datas: [[]]
+        datas: [EMPTY_BYTES]
       });
+
+      fees = await lzGatedProxy.estimateFeesFollow(
+        erc721.address,
+        LZ_GATED_BALANCE_THRESHOLD,
+        lzCustomGasAmount,
+        followWithSigData
+      );
     });
 
     it('reverts if called without going through lzGatedProxy', async () => {
@@ -209,7 +218,7 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
           .relayFollowWithSig(
             erc721.address,
             LZ_GATED_BALANCE_THRESHOLD,
-            0, // customGasAmount
+            lzCustomGasAmount,
             followWithSigData
           )
       ).to.be.revertedWith('InsufficientBalance');
@@ -221,7 +230,7 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
           .relayFollowWithSig(
             lzEndpoint.address,
             LZ_GATED_BALANCE_THRESHOLD,
-            0, // customGasAmount
+            lzCustomGasAmount,
             followWithSigData
           )
       ).to.be.revertedWith('InsufficientBalance');
@@ -234,8 +243,9 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
         .relayFollowWithSig(
           erc721.address,
           0,
-          0, // customGasAmount
-          followWithSigData
+          lzCustomGasAmount,
+          followWithSigData,
+          { value: fees[0] }
         );
 
       const txReceipt = await waitForTx(tx);
@@ -256,8 +266,9 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
         .relayFollowWithSig(
           erc20.address,
           LZ_GATED_BALANCE_THRESHOLD,
-          0, // customGasAmount
-          followWithSigData
+          lzCustomGasAmount,
+          followWithSigData,
+          { value: fees[0] }
         );
 
       const txReceipt = await waitForTx(tx);
@@ -272,6 +283,7 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
 
     // @TODO: started failing after the switch to NonblockingLzApp... but tx is successful on testnet...
     // https://mumbai.polygonscan.com/tx/0x3ffd89f21c0eb815047e98de68654be65bd5a31daa78e8802b3630a2920d799a
+    // might be related to the encoding of the dynamic profileIds[] => calldata
     it.skip('processes a valid follow', async () => {
       await erc721.safeMint(anotherUserAddress);
 
@@ -279,8 +291,9 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
         .relayFollowWithSig(
           erc721.address,
           LZ_GATED_BALANCE_THRESHOLD,
-          0, // customGasAmount
+          lzCustomGasAmount,
           followWithSigData,
+          { value: fees[0] }
         );
 
       const txReceipt = await waitForTx(tx);

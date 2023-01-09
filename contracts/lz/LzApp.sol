@@ -10,6 +10,7 @@ import "./interfaces/ILayerZeroEndpoint.sol";
 /**
  * @title LzApp
  * @notice LayerZero-enabled contract that can have multiple remote chain ids.
+ * @dev this is a modified contract from the layerzero suggested implementation
  */
 abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationConfig {
   error NotZeroAddress();
@@ -20,11 +21,13 @@ abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationC
   error NotAccepting();
   error InvalidRemoteInput();
 
+  event SetPrecrime(address precrime);
   event MessageFailed(uint16 _srcChainId, bytes _srcAddress, uint64 _nonce, bytes _payload, bytes _reason);
 
   ILayerZeroEndpoint public immutable lzEndpoint;
 
   address public zroPaymentAddress; // the address of the ZRO token holder who would pay for the transaction
+  address public precrime;
 
   mapping (uint16 => bytes) internal _lzRemoteLookup; // chainId (lz) => endpoint
 
@@ -76,7 +79,10 @@ abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationC
     }
 
     bytes memory trustedRemote = _lzRemoteLookup[_srcChainId];
-    if (_srcAddress.length != trustedRemote.length || keccak256(_srcAddress) != keccak256(trustedRemote)) {
+    if (_srcAddress.length != trustedRemote.length ||
+      trustedRemote.length == 0 ||
+      keccak256(_srcAddress) != keccak256(trustedRemote))
+    {
       emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, bytes("OnlyTrustedRemote"));
     }
 
@@ -107,6 +113,11 @@ abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationC
 
   function setZroPaymentAddress(address _zroPaymentAddress) external onlyOwner {
     zroPaymentAddress = _zroPaymentAddress;
+  }
+
+  function setPrecrime(address _precrime) external onlyOwner {
+    precrime = _precrime;
+    emit SetPrecrime(_precrime);
   }
 
   function forceResumeReceive(uint16 _srcChainId, bytes calldata _srcAddress) external override onlyOwner {

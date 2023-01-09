@@ -47,7 +47,7 @@ npx hardhat deploy-modules --hub 0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5 --mo
 ```
 2. deploy our `LZGatedProxy` contract on all the remote chains we want to support
 ```
-npx hardhat deploy-proxy --network goerli --sandbox true --hub 0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5
+npx hardhat deploy-proxy --network goerli --sandbox true
 ```
 
 3. set our trusted remotes

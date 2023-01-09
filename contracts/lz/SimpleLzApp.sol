@@ -53,17 +53,23 @@ abstract contract SimpleLzApp is Owned, ILayerZeroUserApplicationConfig {
   }
 
   /**
-   * @notice allows the contract owner to set the lz config for receive version
+   * @notice this contract does not receive messages
    */
-  function setReceiveVersion(uint16 _version) external override onlyOwner {
-    lzEndpoint.setReceiveVersion(_version);
-  }
+  function setReceiveVersion(uint16 _version) external override onlyOwner {}
 
   /**
    * @notice allows the contract owner to set the `_zroPaymentAddress` responsible for paying all transactions in ZRO
    */
   function setZroPaymentAddress(address _zroPaymentAddress) external onlyOwner {
     zroPaymentAddress = _zroPaymentAddress;
+  }
+
+  /**
+   * @notice allows the contract owner to set the remote chain id in the case of a change from LZ
+   * @param _chainId: the new trusted remote chain id
+   */
+  function setRemoteChainId(uint16 _chainId) external onlyOwner {
+    remoteChainId = _chainId;
   }
 
   /**
@@ -82,23 +88,20 @@ abstract contract SimpleLzApp is Owned, ILayerZeroUserApplicationConfig {
 
   /**
    * @dev sends a cross-chain message to the lz endpoint contract deployed on this chain, to be relayed
-   * @param _remoteContract: the trusted contract on the remote chain to receive the message
+   * @param _remoteContractPacked: the contract address on the remote chain to receive the message,
    * @param _payload: the actual message to be relayed
    * @param _refundAddress: the address on this chain to receive the refund - excess paid for gas
    * @param _adapterParams: the custom adapter params to use in sending this message
    */
   function _lzSend(
-    bytes storage _remoteContract,
+    bytes storage _remoteContractPacked,
     bytes memory _payload,
     address payable _refundAddress,
     bytes memory _adapterParams
   ) internal virtual {
-    // remote address concated with local address packed into 40 bytes
-    bytes memory remoteAndLocalAddresses = abi.encodePacked(_remoteContract, address(this));
-
     lzEndpoint.send{value: msg.value}(
       remoteChainId,
-      remoteAndLocalAddresses,
+      _remoteContractPacked,
       _payload,
       _refundAddress,
       zroPaymentAddress,

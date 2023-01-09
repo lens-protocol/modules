@@ -16,9 +16,7 @@ import {
 } from './config';
 import getCollectWithSigParts from '../helpers/getCollectWithSigParts';
 
-// derived from `npx hardhat estimate-fee`
-const ESTIMATED_FEE_GWEI = '1500';
-const ESTIMATED_GAS_REMOTE = 600_000 // based on some tests...
+const ESTIMATED_GAS_REMOTE = 500_000 // based on some tests...
 const GAS_LIMIT = 300_000; // based on some tests...
 
 export let runtimeHRE: HardhatRuntimeEnvironment;
@@ -64,13 +62,23 @@ task('relay-collect-with-sig', 'try to collect a post which has the collect modu
   console.log(`collectWithSigData:`);
   console.log(JSON.stringify(collectWithSigData,null,2));
 
+  const fees = await lzGatedProxy.estimateFeesCollect(
+    TOKEN_CONTRACT,
+    TOKEN_THRESHOLD,
+    ESTIMATED_GAS_REMOTE,
+    collectWithSigData,
+  );
+  console.log(
+    `nativeFee in ${['mumbai', 'polygon'].includes(networkName) ? 'matic' : 'ether'}`, ethers.utils.formatEther(fees[0])
+  );
+
   console.log('lzGatedProxy.relayCollectWithSig()');
   const tx = await lzGatedProxy.relayCollectWithSig(
     TOKEN_CONTRACT,
     TOKEN_THRESHOLD,
     ESTIMATED_GAS_REMOTE,
     collectWithSigData,
-    { value: ethers.utils.parseUnits(ESTIMATED_FEE_GWEI, 'gwei'), gasLimit: GAS_LIMIT }
+    { value: fees[0], gasLimit: GAS_LIMIT }
   );
   console.log(`tx: ${tx.hash}`);
   await tx.wait();

@@ -15,15 +15,12 @@ import {
 } from './config';
 import getFollowWithSigParts from '../helpers/getFollowWithSigParts';
 
-// derived from `npx hardhat estimate-fee`
-const ESTIMATED_FOLLOW_FEE_GWEI = '2500';
 const ESTIMATED_GAS_REMOTE = 500_000 // based on some tests...
 const GAS_LIMIT = 300_000; // based on some tests...
 
 export let runtimeHRE: HardhatRuntimeEnvironment;
 
-// the same can be done for LZGatedCollectModule + LZGatedReferenceModule, just need to setup the correct sig data
-task('relay-follow-with-sig', 'try to folllow a profile which has set their follow module to LZGatedFollowModule')
+task('relay-follow-with-sig', 'try to follow a profile which has set their follow module to LZGatedFollowModule')
   .addParam('hub')
   .addOptionalParam('sandbox')
   .setAction(async ({ hub, sandbox }, hre) => {
@@ -63,13 +60,23 @@ task('relay-follow-with-sig', 'try to folllow a profile which has set their foll
   console.log(`followWithSigData:`);
   console.log(JSON.stringify(followWithSigData,null,2));
 
+  const fees = await lzGatedProxy.estimateFeesFollow(
+    TOKEN_CONTRACT,
+    TOKEN_THRESHOLD,
+    ESTIMATED_GAS_REMOTE,
+    followWithSigData,
+  );
+  console.log(
+    `nativeFee in ${['mumbai', 'polygon'].includes(networkName) ? 'matic' : 'ether'}`, ethers.utils.formatEther(fees[0])
+  );
+
   console.log('lzGatedProxy.relayFollowWithSig()');
   const tx = await lzGatedProxy.relayFollowWithSig(
     TOKEN_CONTRACT,
     TOKEN_THRESHOLD,
     ESTIMATED_GAS_REMOTE,
     followWithSigData,
-    { value: ethers.utils.parseUnits(ESTIMATED_FOLLOW_FEE_GWEI, 'gwei'), gasLimit: GAS_LIMIT }
+    { value: fees[0], gasLimit: GAS_LIMIT }
   );
   console.log(`tx: ${tx.hash}`);
   await tx.wait();

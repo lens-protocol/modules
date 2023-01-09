@@ -18,6 +18,10 @@ contract LZGatedProxy is SimpleLzApp {
   bytes public remoteReferenceModule; // LZGatedReferenceModule
   bytes public remoteCollectModule; // LZGatedCollectModule
 
+  bytes internal remoteFollowModulePacked; // remote address concated with local address packed into 40 bytes
+  bytes internal remoteReferenceModulePacked;
+  bytes internal remoteCollectModulePacked;
+
   /**
    * @dev contract constructor
    * @param _lzEndpoint: The lz endpoint contract deployed on this chain
@@ -36,6 +40,10 @@ contract LZGatedProxy is SimpleLzApp {
     remoteFollowModule = _remoteFollowModule;
     remoteReferenceModule = _remoteReferenceModule;
     remoteCollectModule = _remoteCollectModule;
+
+    remoteFollowModulePacked = abi.encodePacked(_remoteFollowModule, address(this));
+    remoteReferenceModulePacked = abi.encodePacked(_remoteReferenceModule, address(this));
+    remoteCollectModulePacked = abi.encodePacked(_remoteCollectModule, address(this));
   }
 
   /**
@@ -58,7 +66,7 @@ contract LZGatedProxy is SimpleLzApp {
     if (!_checkThreshold(followSig.follower, tokenContract, balanceThreshold)) { revert InsufficientBalance(); }
 
     _lzSend(
-      remoteFollowModule,
+      remoteFollowModulePacked,
       abi.encode(
         tokenContract,
         balanceThreshold,
@@ -92,7 +100,7 @@ contract LZGatedProxy is SimpleLzApp {
     if (!_checkThreshold(sender, tokenContract, balanceThreshold)) { revert InsufficientBalance(); }
 
     _lzSend(
-      remoteReferenceModule,
+      remoteReferenceModulePacked,
       abi.encode(
         true, // isComment
         sender,
@@ -128,7 +136,7 @@ contract LZGatedProxy is SimpleLzApp {
     if (!_checkThreshold(sender, tokenContract, balanceThreshold)) { revert InsufficientBalance(); }
 
     _lzSend(
-      remoteReferenceModule,
+      remoteReferenceModulePacked,
       abi.encode(
         false, // isComment
         sender,
@@ -156,18 +164,112 @@ contract LZGatedProxy is SimpleLzApp {
     address tokenContract,
     uint256 balanceThreshold,
     uint256 lzCustomGasAmount,
-    DataTypes.CollectWithSigData memory collectSig
+    DataTypes.CollectWithSigData calldata collectSig
   ) external payable {
     if (!_checkThreshold(collectSig.collector, tokenContract, balanceThreshold)) { revert InsufficientBalance(); }
 
     _lzSend(
-      remoteCollectModule,
+      remoteCollectModulePacked,
       abi.encode(
         tokenContract,
         balanceThreshold,
         collectSig
       ),
       payable(msg.sender),
+      _getAdapterParams(lzCustomGasAmount)
+    );
+  }
+
+  /**
+   * notice Estimate the lz fees (native / ZRO) for #relayFollowWithSig
+   */
+  function estimateFeesFollow(
+    address tokenContract,
+    uint256 balanceThreshold,
+    uint256 lzCustomGasAmount,
+    DataTypes.FollowWithSigData memory followSig
+  ) external view returns (uint256 nativeFee, uint256 zroFee) {
+    (nativeFee, zroFee) = lzEndpoint.estimateFees(
+      remoteChainId,
+      address(this),
+      abi.encode(
+        tokenContract,
+        balanceThreshold,
+        followSig
+      ),
+      zroPaymentAddress != address(0), // _payInZRO
+      _getAdapterParams(lzCustomGasAmount)
+    );
+  }
+
+  /**
+   * @notice Estimate the lz fees (native / ZRO) for #relayCollectWithSig
+   */
+  function estimateFeesCollect(
+    address tokenContract,
+    uint256 balanceThreshold,
+    uint256 lzCustomGasAmount,
+    DataTypes.CollectWithSigData calldata collectSig
+  ) external view returns (uint256 nativeFee, uint256 zroFee) {
+    (nativeFee, zroFee) = lzEndpoint.estimateFees(
+      remoteChainId,
+      address(this),
+      abi.encode(
+        tokenContract,
+        balanceThreshold,
+        collectSig
+      ),
+      zroPaymentAddress != address(0), // _payInZRO
+      _getAdapterParams(lzCustomGasAmount)
+    );
+  }
+
+  /**
+   * notice Estimate the lz fees (native / ZRO) for #relayMirrorWithSig
+   */
+  function estimateFeesMirror(
+    address sender,
+    address tokenContract,
+    uint256 balanceThreshold,
+    uint256 lzCustomGasAmount,
+    DataTypes.MirrorWithSigData memory mirrorSig
+  ) external view returns (uint256 nativeFee, uint256 zroFee) {
+    (nativeFee, zroFee) = lzEndpoint.estimateFees(
+      remoteChainId,
+      address(this),
+      abi.encode(
+        false, // isComment
+        sender,
+        tokenContract,
+        balanceThreshold,
+        mirrorSig
+      ),
+      zroPaymentAddress != address(0), // _payInZRO
+      _getAdapterParams(lzCustomGasAmount)
+    );
+  }
+
+  /**
+   * notice Estimate the lz fees (native / ZRO) for #relayCommentWithSig
+   */
+  function estimateFeesComment(
+    address sender,
+    address tokenContract,
+    uint256 balanceThreshold,
+    uint256 lzCustomGasAmount,
+    DataTypes.CommentWithSigData memory commentSig
+  ) external view returns (uint256 nativeFee, uint256 zroFee) {
+    (nativeFee, zroFee) = lzEndpoint.estimateFees(
+      remoteChainId,
+      address(this),
+      abi.encode(
+        true, // isComment
+        sender,
+        tokenContract,
+        balanceThreshold,
+        commentSig
+      ),
+      zroPaymentAddress != address(0), // _payInZRO
       _getAdapterParams(lzCustomGasAmount)
     );
   }

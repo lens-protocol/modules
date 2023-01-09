@@ -16,8 +16,6 @@ import {
 } from './config';
 import getMirrorWithSigParts from '../helpers/getMirrorWithSigParts';
 
-// derived from `npx hardhat estimate-fee`
-const ESTIMATED_FEE_GWEI = '1200';
 const ESTIMATED_GAS_REMOTE = 500_000 // based on some tests...
 const GAS_LIMIT = 400_000; // based on some tests...
 
@@ -66,6 +64,17 @@ task('relay-mirror-with-sig', 'try to mirror a post which has the reference modu
   console.log(`mirrorWithSigData:`);
   console.log(JSON.stringify(mirrorWithSigData,null,2));
 
+  const fees = await lzGatedProxy.estimateFeesMirror(
+    sender,
+    TOKEN_CONTRACT,
+    TOKEN_THRESHOLD,
+    ESTIMATED_GAS_REMOTE,
+    mirrorWithSigData,
+  );
+  console.log(
+    `nativeFee in ${['mumbai', 'polygon'].includes(networkName) ? 'matic' : 'ether'}`, ethers.utils.formatEther(fees[0])
+  );
+
   console.log('lzGatedProxy.relayMirrorWithSig()');
   const tx = await lzGatedProxy.relayMirrorWithSig(
     sender,
@@ -73,7 +82,7 @@ task('relay-mirror-with-sig', 'try to mirror a post which has the reference modu
     TOKEN_THRESHOLD,
     ESTIMATED_GAS_REMOTE,
     mirrorWithSigData,
-    { value: ethers.utils.parseUnits(ESTIMATED_FEE_GWEI, 'gwei'), gasLimit: GAS_LIMIT }
+    { value: fees[0], gasLimit: GAS_LIMIT }
   );
   console.log(`tx: ${tx.hash}`);
   await tx.wait();

@@ -178,7 +178,6 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
       revert InvalidSender();
     }
 
-    // @TODO: hash the vars vs deeply nested?
     validatedReferencers[mirrorSig.profileIdPointed][mirrorSig.pubIdPointed][mirrorSig.profileId] = true;
 
     ILensHub(HUB).mirrorWithSig(mirrorSig);
