@@ -13,15 +13,16 @@ import {
   TOKEN_THRESHOLD,
   TOKEN_CHAIN_ID,
   SANDBOX_GATED_REFERENCE_PUB_ID,
+  SAMPLE_CONTENT_URI,
 } from './config';
-import getMirrorWithSigParts from '../helpers/getMirrorWithSigParts';
+import getCommentWithSigParts from '../helpers/getCommentWithSigParts';
 
 const ESTIMATED_GAS_REMOTE = 400_000 // based on some tests...
 const GAS_LIMIT = 400_000; // based on some tests...
 
 export let runtimeHRE: HardhatRuntimeEnvironment;
 
-task('relay-mirror-with-sig', 'try to mirror a post which has the reference module set to LZGatedReferenceModule')
+task('relay-comment-with-sig', 'try to comment on a post which has the reference module set to LZGatedReferenceModule')
   .addParam('hub')
   .addOptionalParam('sandbox')
   .setAction(async ({ hub, sandbox }, hre) => {
@@ -47,41 +48,49 @@ task('relay-mirror-with-sig', 'try to mirror a post which has the reference modu
   const nonce = (await lensHub.sigNonces(sender)).toNumber();
   const { chainId } = await provider.getNetwork();
 
-  const mirrorWithSigData = await getMirrorWithSigParts({
+  const collectModuleInitData = ethers.utils.defaultAbiCoder.encode(
+    ['bool'],
+    [false]
+  );
+
+  const commentWithSigData = await getCommentWithSigParts({
     chainId,
     wallet: deployer,
     lensHubAddress: lensHub.address,
     profileId: SANDBOX_USER_PROFILE_ID,
+    contentURI: SAMPLE_CONTENT_URI,
     profileIdPointed: SANDBOX_USER_PROFILE_ID,
     pubIdPointed: SANDBOX_GATED_REFERENCE_PUB_ID,
     referenceModuleData: [],
+    collectModule: contracts.FreeCollectModule,
+    collectModuleInitData,
     referenceModule: ethers.constants.AddressZero,
     referenceModuleInitData: [],
     nonce,
     deadline: ethers.constants.MaxUint256.toHexString(),
   });
 
-  console.log(`mirrorWithSigData:`);
-  console.log(JSON.stringify(mirrorWithSigData,null,2));
+  console.log(`commentWithSigData:`);
+  console.log(JSON.stringify(commentWithSigData,null,2));
 
-  const fees = await lzGatedProxy.estimateFeesMirror(
+  const fees = await lzGatedProxy.estimateFeesComment(
     sender,
     TOKEN_CONTRACT,
     TOKEN_THRESHOLD,
     ESTIMATED_GAS_REMOTE,
-    mirrorWithSigData,
+    commentWithSigData,
   );
   console.log(
     `nativeFee in ${['mumbai', 'polygon'].includes(networkName) ? 'matic' : 'ether'}`, ethers.utils.formatEther(fees[0])
   );
 
-  console.log('lzGatedProxy.relayMirrorWithSig()');
-  const tx = await lzGatedProxy.relayMirrorWithSig(
+  console.log('lzGatedProxy.relayCommentWithSig()');
+  const tx = await lzGatedProxy.relayCommentWithSig(
     sender,
     TOKEN_CONTRACT,
     TOKEN_THRESHOLD,
     ESTIMATED_GAS_REMOTE,
-    mirrorWithSigData,
+    commentWithSigData,
     { value: fees[0], gasLimit: GAS_LIMIT }
   );
   console.log(`tx: ${tx.hash}`);

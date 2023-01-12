@@ -20,7 +20,7 @@ import {
   freeCollectModule,
 } from './../../__setup.spec';
 import { ERRORS } from './../../helpers/errors';
-import { matchEvent, waitForTx, getTimestamp } from './../../helpers/utils';
+import { matchEvent, waitForTx, getTimestamp, matchLzMessageFailed } from './../../helpers/utils';
 import signCommentWithSigData from './../../helpers/signatures/core/sign-comment-with-sig-data';
 import signMirrorWithSigData from './../../helpers/signatures/core/sign-mirror-with-sig-data';
 import {
@@ -71,8 +71,8 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     referenceModule = await new LZGatedReferenceModule__factory(deployer).deploy(
       lensHub.address,
       lzEndpoint.address,
-      [LZ_GATED_REMOTE_CHAIN_ID],
-      [lzGatedProxy.address]
+      [],
+      []
     );
     erc721 = await new ERC721Mock__factory(deployer).deploy();
     erc20 = await new ERC20Mock__factory(deployer).deploy();
@@ -80,6 +80,9 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
     // use same lz endpoint mock
     await lzEndpoint.setDestLzEndpoint(referenceModule.address, lzEndpoint.address);
     await lzEndpoint.setDestLzEndpoint(lzGatedProxy.address, lzEndpoint.address);
+
+    const trustedRemote = ethers.utils.solidityPack(['address','address'], [lzGatedProxy.address, referenceModule.address]);
+    await referenceModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, trustedRemote);
 
     await lensHub.connect(governance).whitelistCollectModule(freeCollectModule.address, true)
     await lensHub.connect(governance).whitelistReferenceModule(referenceModule.address, true);
@@ -292,15 +295,12 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           { value: fees[0] }
         );
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         referenceModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
-
 
     it('[non-blocking] fails if the caller passed an invalid token contract', async () => {
       await erc20.mint(anotherUserAddress, LZ_GATED_BALANCE_THRESHOLD);
@@ -315,13 +315,11 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
           { value: fees[0] }
         );
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         referenceModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
 
     it('[non-blocking] fails if the balance check is done against an address other than the signer', async () => {
@@ -338,13 +336,33 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_SENDER_BYTES,
         referenceModule
       );
-      // expect(messageFailedReason).to.equal('InvalidSender');
+    });
+
+    it('[non-blocking] fails if the trusted remote was not set', async () => {
+      await referenceModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, []);
+      await erc721.safeMint(anotherUserAddress);
+
+      const tx = lzGatedProxy
+        .relayCommentWithSig(
+          anotherUserAddress,
+          erc721.address,
+          LZ_GATED_BALANCE_THRESHOLD,
+          lzCustomGasAmount,
+          commentWithSigData,
+          { value: fees[0] }
+        );
+
+      const txReceipt = await waitForTx(tx);
+      matchLzMessageFailed(
+        txReceipt,
+        ERRORS.ONLY_TRUSTED_REMOTE_BYTES,
+        referenceModule
+      );
     });
 
     it('processes a valid comment', async () => {
@@ -471,13 +489,11 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         referenceModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
 
 
@@ -495,13 +511,11 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         referenceModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
 
     it('[non-blocking] fails if the balance check is done against an address other than the signer', async () => {
@@ -518,13 +532,33 @@ makeSuiteCleanRoom('LZGatedReferenceModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_SENDER_BYTES,
         referenceModule
       );
-      // expect(messageFailedReason).to.equal('InvalidSender');
+    });
+
+    it('[non-blocking] fails if the trusted remote was not set', async () => {
+      await referenceModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, []);
+      await erc721.safeMint(anotherUserAddress);
+
+      const tx = lzGatedProxy
+        .relayMirrorWithSig(
+          anotherUserAddress,
+          erc721.address,
+          LZ_GATED_BALANCE_THRESHOLD,
+          0, // lzCustomGasAmount
+          mirrorWithSigData,
+          { value: fees[0] }
+        );
+
+      const txReceipt = await waitForTx(tx);
+      matchLzMessageFailed(
+        txReceipt,
+        ERRORS.ONLY_TRUSTED_REMOTE_BYTES,
+        referenceModule
+      );
     });
 
     it('processes a valid mirror', async () => {

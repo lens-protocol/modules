@@ -40,12 +40,12 @@
     "ERC4626FeeCollectModule": "0x31126c602cf88193825a99dcd1d17bf1124b1b4f",
     "AaveFeeCollectModule": "0x666e06215747879ee68b3e5a317dcd8411de1897",
     "TokenGatedReferenceModule": "0x86d35562ceb9f10d7c2c23c098dfeacb02f53853",
-    "LZGatedFollowModule": "0x4443173DFAb0B9135BfaE2634e41A7B113cE59A0",
-    "LZGatedReferenceModule": "0xb50447B3fC7AC3044879a60a92c8648954204ec8",
-    "LZGatedCollectModule": "0x30077722AB830DC3094087086Ccf9E83B2E9aBe5",
+    "LZGatedFollowModule": "0x55B31858522479Ed90A4D92159B2F66c4C2EF847",
+    "LZGatedReferenceModule": "0x5c202A503BEbD30D6F95fc1CE2656269a999B83b",
+    "LZGatedCollectModule": "0x39eedD6f83ecA281FF3b2D817026B575e2980c79",
     "lz": {
       "goerli": {
-        "LZGatedProxy": "0x65266408c959C5847D97a951D22e1c3A9Df74b4c"
+        "LZGatedProxy": "0x57F3C223FF7D508eb76725081560e4Aa24669b15"
       }
     }
   }

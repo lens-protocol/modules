@@ -55,6 +55,26 @@ npx hardhat deploy-proxy --network goerli --sandbox true
 npx hardhat set-trusted-remotes --network mumbai --sandbox true
 ```
 
+#### Testing on testnet
+To test any of the three modules, run one of the `set-*-module` tasks to initialize it before running the associated `relay-*-with-sig` task. For example, let's test the follow module.
+
+1. **You must update the variable `SANDBOX_USER_PROFILE_ID` in `tasks/lz-gated/config.ts`, and change the `TOKEN_*` variables to your desired configuration**. Anyone that wishes to follow `SANDBOX_USER_PROFILE_ID` must have a balance greater than or equal to `TOKEN_THRESHOLD` of an ERC20/ERC721 `TOKEN_CONTRACT` on the chain with lz chain id of `TOKEN_CHAIN_ID`
+```
+npx hardhat set-follow-module --network mumbai --hub 0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5 --sandbox true
+```
+
+2. Anyone wishing to follow must sign the message for `LensHub#followWithSig` and submit it to our `LZGatedProxy` contract deployed on the chain with lz chain id `TOKEN_CHAIN_ID`
+```
+npx hardhat relay-follow-with-sig --network goerli --hub 0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5 --sandbox true
+```
+
+#### Things to note
+- Anyone can submit the tx to `LZGatedProxy` on behalf of the signer, but the tx `value` must be sufficient to pay the lz fee
+- We accept a `lzCustomGasAmount` argument in each of the `#relay*` functions in `LZGatedProxy` for flexibility per transaction; it can be set to `0` which will default to the lz estimated gas. But if provided, tx `value` must cover this gas amount, and if _either_ the fee is not enough _or_ the gas is not enough for the execution, the tx at the destination chain will revert; [see more about lz adapter params](https://layerzero.gitbook.io/docs/evm-guides/advanced/relayer-adapter-parameters). Each task has an `ESTIMATED_GAS_REMOTE` to showcase the estimated gas per action
+- Our modules implement the `NonblockingLzApp` strategy in that we catch any reverts. We do this because layerzero would stop relaying messages to our receiver contract on the destination chain if any relayed messages are to revert; [see more in the lz docs](https://layerzero.gitbook.io/docs/evm-guides/advanced/nonblockinglzapp)
+- We have the testnet setup for relayed lz messages betweed goerli/mumbai, but more chains are supported; [see the list of lz supported chains](https://layerzero.gitbook.io/docs/technical-reference/mainnet/supported-chain-ids)
+- There is an "unused" variable in the `LzApp` contract called `zroPaymentAddress` - it set to the zero address. Assuming there will be a ZRO token, the contract deployer can set the variable to some paymaster address so that all relayed messages are sponsored and paid in ZRO tokens; [see more in the lz docs](https://layerzero.gitbook.io/docs/evm-guides/master/how-to-send-a-message)
+
 ## Deployment addresses in `addresses.json`
 
 The `addresses.json` file in root contains all existing deployed contracts on all of target environments (mainnet/testnet/sandbox) on corresponding chains.

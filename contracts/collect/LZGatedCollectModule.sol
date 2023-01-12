@@ -104,8 +104,8 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, Non
    */
   function _nonblockingLzReceive(
     uint16 _srcChainId,
-    bytes memory _srcAddress,
-    uint64 _nonce,
+    bytes memory, // _srcAddress
+    uint64, // _nonce
     bytes memory _payload
   ) internal override {
     (

@@ -55,7 +55,7 @@ task('set-trusted-remotes', 'Sets the trusted remotes for each module / remote p
     await tx.wait();
 
     trustedRemote = ethers.utils.solidityPack(['address','address'], [LZGatedProxy, collectModule.address]);
-    tx = await collectModule.setTrustedRemote(LZ_CONFIG[remote].chainId, LZGatedProxy);
+    tx = await collectModule.setTrustedRemote(LZ_CONFIG[remote].chainId, trustedRemote);
     console.log(`tx: ${tx.hash}`);
     await tx.wait();
   })));

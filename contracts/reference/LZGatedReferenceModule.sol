@@ -118,8 +118,8 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
    */
   function _nonblockingLzReceive(
     uint16 _srcChainId,
-    bytes memory _srcAddress,
-    uint64 _nonce,
+    bytes memory, // _srcAddress
+    uint64, // _nonce
     bytes memory _payload
   ) internal override {
     (bool isComment,,,,) = abi.decode(_payload, (bool, address, address, uint256, bytes));

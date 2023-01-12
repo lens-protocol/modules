@@ -810,3 +810,51 @@ export function domain(): { name: string; version: string; chainId: number; veri
     verifyingContract: lensHub.address,
   };
 }
+
+export function matchLzMessageFailed(
+  receipt: TransactionReceipt,
+  expectedReason: string,
+  eventContract: Contract
+) {
+  const events = receipt.logs;
+  const NAME = 'MessageFailed';
+
+  if (events != undefined) {
+    // match name from list of events in eventContract, when found, compute the sigHash
+    let sigHash: string | undefined;
+    for (let contractEvents of Object.keys(eventContract.interface.events)) {
+      if (contractEvents.startsWith(NAME) && contractEvents.charAt(NAME.length) == '(') {
+        sigHash = keccak256(toUtf8Bytes(contractEvents));
+        break;
+      }
+    }
+    // Throw if the sigHash was not found
+    if (!sigHash) {
+      logger.throwError(
+        `Event "${NAME}" not found in provided contract. \nAre you sure you're using the right contract?`
+      );
+    }
+
+    // Throw if the event is not the one we expect
+    if (events[0].topics[0] !== sigHash) {
+      logger.throwError(`Event does not match the sigHash for ${NAME}`);
+    }
+
+    // Throw if more than one event was emitted
+    if (events.length > 1) {
+      logger.throwError(
+        `More than one event was emitted. \nEither you forgot to early-return or the transaction did not actually fail.`
+      );
+    }
+
+    const event = eventContract.interface.parseLog(events[0]);
+    const reason = event.args[event.args.length - 1];
+
+    // Throw if expected reason does not match
+    if (reason !== expectedReason) {
+      logger.throwError(`Reason != expected reason (${reason} != ${expectedReason})`);
+    }
+  } else {
+    logger.throwError('No events were emitted');
+  }
+}

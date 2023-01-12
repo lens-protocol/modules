@@ -18,7 +18,7 @@ import {
   anotherUser,
 } from './../../__setup.spec';
 import { ERRORS } from './../../helpers/errors';
-import { matchEvent, waitForTx, getTimestamp } from './../../helpers/utils';
+import { matchEvent, waitForTx, getTimestamp, matchLzMessageFailed } from './../../helpers/utils';
 import signCollectWithSigData from './../../helpers/signatures/core/sign-collect-with-sig-data';
 import {
   ZERO_ADDRESS,
@@ -68,8 +68,8 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
     collectModule = await new LZGatedCollectModule__factory(deployer).deploy(
       lensHub.address,
       lzEndpoint.address,
-      [LZ_GATED_REMOTE_CHAIN_ID],
-      [lzGatedProxy.address]
+      [],
+      []
     );
     erc721 = await new ERC721Mock__factory(deployer).deploy();
     erc20 = await new ERC20Mock__factory(deployer).deploy();
@@ -77,6 +77,9 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
     // use same lz endpoint mock
     await lzEndpoint.setDestLzEndpoint(collectModule.address, lzEndpoint.address);
     await lzEndpoint.setDestLzEndpoint(lzGatedProxy.address, lzEndpoint.address);
+
+    const trustedRemote = ethers.utils.solidityPack(['address','address'], [lzGatedProxy.address, collectModule.address]);
+    await collectModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, trustedRemote);
 
     await lensHub.connect(governance).whitelistCollectModule(collectModule.address, true);
 
@@ -277,15 +280,12 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         collectModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
-
 
     it('[non-blocking] fails if the caller passed an invalid token contract', async () => {
       await erc20.mint(anotherUserAddress, LZ_GATED_BALANCE_THRESHOLD);
@@ -300,13 +300,32 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         collectModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
+    });
+
+    it('[non-blocking] fails if the trusted remote was not set', async () => {
+      await collectModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, []);
+      await erc721.safeMint(anotherUserAddress);
+
+      const tx = lzGatedProxy
+        .relayCollectWithSig(
+          erc721.address,
+          LZ_GATED_BALANCE_THRESHOLD,
+          customGasAmount,
+          collectWithSigData,
+          { value: fees[0] }
+        );
+
+      const txReceipt = await waitForTx(tx);
+      matchLzMessageFailed(
+        txReceipt,
+        ERRORS.ONLY_TRUSTED_REMOTE_BYTES,
+        collectModule
+      );
     });
 
     it('processes a valid collect', async () => {

@@ -83,10 +83,16 @@ abstract contract LzApp is Owned, ILayerZeroReceiver, ILayerZeroUserApplicationC
       trustedRemote.length == 0 ||
       keccak256(_srcAddress) != keccak256(trustedRemote))
     {
-      emit MessageFailed(_srcChainId, _srcAddress, _nonce, _payload, bytes("OnlyTrustedRemote"));
+      emit MessageFailed(
+        _srcChainId,
+        _srcAddress,
+        _nonce,
+        _payload,
+        bytes.concat(bytes4(keccak256("OnlyTrustedRemote()")))
+      );
+    } else {
+      _blockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
     }
-
-    _blockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
   }
 
   function setTrustedRemote(uint16 _srcChainId, bytes calldata _srcAddress) external onlyOwner {

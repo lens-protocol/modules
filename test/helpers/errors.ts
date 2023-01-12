@@ -66,4 +66,7 @@ export const ERRORS = {
   NOT_GOVERNANCE_OR_EMERGENCY_ADMIN: 'NotGovernanceOrEmergencyAdmin()',
   NO_REASON_ABI_DECODE:
     "Transaction reverted and Hardhat couldn't infer the reason. Please report this to help us improve Hardhat.",
+  INVALID_REMOTE_INPUT_BYTES: '0x55377bf7',
+  ONLY_TRUSTED_REMOTE_BYTES: '0xa83a91cf',
+  INVALID_SENDER_BYTES: '0xddb5de5e',
 };

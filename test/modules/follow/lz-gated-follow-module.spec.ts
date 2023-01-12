@@ -16,7 +16,7 @@ import {
   anotherUser,
 } from './../../__setup.spec';
 import { ERRORS } from './../../helpers/errors';
-import { matchEvent, waitForTx, getTimestamp } from './../../helpers/utils';
+import { matchEvent, waitForTx, getTimestamp, matchLzMessageFailed } from './../../helpers/utils';
 import signFollowWithSigData from './../../helpers/signatures/core/sign-follow-with-sig-data';
 import {
   ZERO_ADDRESS,
@@ -80,8 +80,8 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
     followModule = await new LZGatedFollowModule__factory(deployer).deploy(
       lensHub.address,
       lzEndpoint.address,
-      [LZ_GATED_REMOTE_CHAIN_ID],
-      [lzGatedProxy.address]
+      [],
+      []
     );
     erc721 = await new ERC721Mock__factory(deployer).deploy();
     erc20 = await new ERC20Mock__factory(deployer).deploy();
@@ -89,6 +89,9 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
     // use same lz endpoint mock
     await lzEndpoint.setDestLzEndpoint(followModule.address, lzEndpoint.address);
     await lzEndpoint.setDestLzEndpoint(lzGatedProxy.address, lzEndpoint.address);
+
+    const trustedRemote = ethers.utils.solidityPack(['address','address'], [lzGatedProxy.address, followModule.address]);
+    await followModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, trustedRemote);
 
     await lensHub.connect(governance).whitelistFollowModule(followModule.address, true);
 
@@ -249,15 +252,12 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         followModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
     });
-
 
     it('[non-blocking] fails if the caller passed an invalid token contract', async () => {
       await erc20.mint(anotherUserAddress, LZ_GATED_BALANCE_THRESHOLD);
@@ -272,13 +272,32 @@ makeSuiteCleanRoom('LZGatedFollowModule', function () {
         );
 
       const txReceipt = await waitForTx(tx);
-      matchEvent(
+      matchLzMessageFailed(
         txReceipt,
-        'MessageFailed',
-        undefined,
+        ERRORS.INVALID_REMOTE_INPUT_BYTES,
         followModule
       );
-      // expect(messageFailedReason).to.equal('InvalidRemoteInput');
+    });
+
+    it('[non-blocking] fails if the trusted remote was not set', async () => {
+      await followModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, []);
+      await erc721.safeMint(anotherUserAddress);
+
+      const tx = lzGatedProxy
+        .relayFollowWithSig(
+          erc721.address,
+          LZ_GATED_BALANCE_THRESHOLD,
+          lzCustomGasAmount,
+          followWithSigData,
+          { value: fees[0] }
+        );
+
+      const txReceipt = await waitForTx(tx);
+      matchLzMessageFailed(
+        txReceipt,
+        ERRORS.ONLY_TRUSTED_REMOTE_BYTES,
+        followModule
+      );
     });
 
     // @TODO: started failing after the switch to NonblockingLzApp... but tx is successful on testnet...
