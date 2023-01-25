@@ -30,15 +30,24 @@ const MNEMONIC = process.env.MNEMONIC || '';
 const MAINNET_FORK = process.env.MAINNET_FORK === 'true';
 const TRACK_GAS = process.env.TRACK_GAS === 'true';
 const BLOCK_EXPLORER_KEY = process.env.BLOCK_EXPLORER_KEY || '';
+const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
 
-const getCommonNetworkConfig = (networkName: eNetwork, networkId: number) => ({
-  url: NETWORKS_RPC_URL[networkName] ?? '',
-  accounts: {
+const deployerAccounts = () => {
+  if (PRIVATE_KEY) {
+    return [PRIVATE_KEY];
+  }
+
+  return {
     mnemonic: MNEMONIC,
     path: MNEMONIC_PATH,
     initialIndex: 0,
     count: 20,
-  },
+  }
+};
+
+const getCommonNetworkConfig = (networkName: eNetwork, networkId: number) => ({
+  url: NETWORKS_RPC_URL[networkName] ?? '',
+  accounts: deployerAccounts(),
 });
 
 const mainnetFork = MAINNET_FORK
