@@ -21,7 +21,6 @@ contract MadRewardCollectModule is ICollectModule, ModuleBase {
   mapping (uint256 => mapping (uint256 => uint256)) public activeCollectionPerPubId; // profileId => pubId => collectionId
 
   IMadSBT public madSBT;
-  uint128 public collectRewardUnit = 10; // default amount of reward tokens per collect
 
   error NoZeroAddress();
   error NotCollectionCreator();
@@ -91,7 +90,7 @@ contract MadRewardCollectModule is ICollectModule, ModuleBase {
    * @dev Process a collect by
    * - if the collector is not following the creator, revert
    * - if the post has an associated collectionId to be minted, attempt to mint it for the collector
-   * - else update the reward index for the collector by `collectRewardUnit`
+   * - else update the reward index for the collector by `madSBT.collectRewardUnit`
    */
   function processCollect(
     uint256, // referrerProfileId
@@ -100,10 +99,10 @@ contract MadRewardCollectModule is ICollectModule, ModuleBase {
     uint256 pubId,
     bytes calldata // data
   ) external override onlyHub {
-    uint256 collectionId = activeCollectionPerPubId[profileId][pubId];
-
     // must be following the creator
     if (!_isFollowing(profileId, collector)) revert NotFollowing();
+
+    uint256 collectionId = activeCollectionPerPubId[profileId][pubId];
 
     // attempt to mint the associated MadSBT collection
     if (madSBT.balanceOf(collector, collectionId) == 0) {
@@ -111,7 +110,7 @@ contract MadRewardCollectModule is ICollectModule, ModuleBase {
       if (!madSBT.mint(collector, collectionId, profileId)) revert Errors.CollectNotAllowed();
     } else {
       // simply update the rewards for existing MadSBT holder
-      madSBT.handleRewardsUpdate(collector, collectionId, profileId, collectRewardUnit);
+      madSBT.handleRewardsUpdate(collector, collectionId, profileId, madSBT.collectRewardUnit());
     }
   }
 
