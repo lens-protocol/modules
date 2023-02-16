@@ -7,7 +7,7 @@ import {ICollectModule} from '@aave/lens-protocol/contracts/interfaces/ICollectM
 import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/modules/FollowValidationModuleBase.sol';
 import {ILensHub} from "@aave/lens-protocol/contracts/interfaces/ILensHub.sol";
 import {DataTypes} from "@aave/lens-protocol/contracts/libraries/DataTypes.sol";
-import {NonblockingLzApp} from "../lz/NonblockingLzApp.sol";
+import {NonblockingLzApp} from "@layerzerolabs/solidity-examples/contracts/lzApp/NonblockingLzApp.sol";
 
 /**
  * @title LZGatedCollectModule
@@ -21,6 +21,8 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, Non
     uint256 balanceThreshold; // result of balanceOf() should be greater than or equal to
     uint16 remoteChainId; // the remote chainId to read against
   }
+
+  error InvalidRemoteInput();
 
   event InitCollectModule(
     uint256 indexed profileId,
@@ -37,15 +39,11 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, Non
    * @dev contract constructor
    * @param hub LensHub
    * @param _lzEndpoint: LayerZero endpoint on this chain to relay messages
-   * @param remoteChainIds: whitelisted destination chain ids (supported by LayerZero)
-   * @param remoteProxies: proxy destination contracts (deployed by us)
    */
   constructor(
     address hub,
-    address _lzEndpoint,
-    uint16[] memory remoteChainIds,
-    bytes[] memory remoteProxies
-  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
+    address _lzEndpoint
+  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint) {}
 
   /**
    * @notice Initialize this collect module for the given profile/publication
@@ -67,7 +65,7 @@ contract LZGatedCollectModule is FollowValidationModuleBase, ICollectModule, Non
       uint16 chainId
     ) = abi.decode(data, (address, uint256, uint16));
 
-    if (address(tokenContract) == address(0) || _lzRemoteLookup[chainId].length == 0) {
+    if (address(tokenContract) == address(0) || trustedRemoteLookup[chainId].length == 0) {
       revert Errors.InitParamsInvalid();
     }
 

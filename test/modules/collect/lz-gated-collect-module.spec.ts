@@ -34,10 +34,10 @@ import {
   LZGatedProxy__factory,
   LZEndpointMock,
   LZEndpointMock__factory,
-  ERC721Mock,
-  ERC721Mock__factory,
-  ERC20Mock,
-  ERC20Mock__factory,
+  NFT as ERC721Mock,
+  NFT__factory as ERC721Mock__factory,
+  ACurrency as ERC20Mock,
+  ACurrency__factory as ERC20Mock__factory,
   FollowNFT__factory,
 } from '../../../typechain';
 
@@ -67,9 +67,7 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
     );
     collectModule = await new LZGatedCollectModule__factory(deployer).deploy(
       lensHub.address,
-      lzEndpoint.address,
-      [],
-      []
+      lzEndpoint.address
     );
     erc721 = await new ERC721Mock__factory(deployer).deploy();
     erc20 = await new ERC20Mock__factory(deployer).deploy();
@@ -105,7 +103,7 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
   describe('#constructor', () => {
     it('reverts when the hub arg is the null address', async () => {
       expect(
-        new LZGatedCollectModule__factory(deployer).deploy(ZERO_ADDRESS, lzEndpoint.address, [], [])
+        new LZGatedCollectModule__factory(deployer).deploy(ZERO_ADDRESS, lzEndpoint.address)
       ).to.be.revertedWith('InitParamsInvalid');
     });
 
@@ -268,7 +266,7 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
     });
 
     it('[non-blocking] fails if the caller passed an invalid threshold', async () => {
-      await erc721.safeMint(anotherUserAddress);
+      await erc721.mint(anotherUserAddress, 1);
 
       const tx = lzGatedProxy
         .relayCollectWithSig(
@@ -307,9 +305,9 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
       );
     });
 
-    it('[non-blocking] fails if the trusted remote was not set', async () => {
-      await collectModule.setTrustedRemote(LZ_GATED_REMOTE_CHAIN_ID, []);
-      await erc721.safeMint(anotherUserAddress);
+    it('[non-blocking] reverts if the trusted remote was not set', async () => {
+      await collectModule.setTrustedRemoteAddress(LZ_GATED_REMOTE_CHAIN_ID, ZERO_ADDRESS);
+      await erc721.mint(anotherUserAddress, 1);
 
       const tx = lzGatedProxy
         .relayCollectWithSig(
@@ -323,13 +321,28 @@ makeSuiteCleanRoom('LZGatedCollectModule', function () {
       const txReceipt = await waitForTx(tx);
       matchLzMessageFailed(
         txReceipt,
-        ERRORS.ONLY_TRUSTED_REMOTE_BYTES,
-        collectModule
+        ERRORS.INVALID_SOURCE,
+        lzEndpoint,
+        'PayloadStored' // LZEndPointMock caught at the highest level
       );
     });
 
+    it('reverts if not enough native fee', async () => {
+      await erc721.mint(anotherUserAddress, 1);
+
+      await expect(
+        lzGatedProxy
+          .relayCollectWithSig(
+            erc721.address,
+            LZ_GATED_BALANCE_THRESHOLD,
+            customGasAmount,
+            collectWithSigData
+          )
+      ).to.be.revertedWith('LayerZeroMock: not enough native for fees');
+    });
+
     it('processes a valid collect', async () => {
-      await erc721.safeMint(anotherUserAddress);
+      await erc721.mint(anotherUserAddress, 1);
 
       const tx = lzGatedProxy
         .relayCollectWithSig(

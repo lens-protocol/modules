@@ -31,6 +31,7 @@ const MAINNET_FORK = process.env.MAINNET_FORK === 'true';
 const TRACK_GAS = process.env.TRACK_GAS === 'true';
 const BLOCK_EXPLORER_KEY = process.env.BLOCK_EXPLORER_KEY || '';
 const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
+const TYPECHAIN_INCLUDE_EXTERNALS = process.env.TYPECHAIN_INCLUDE_EXTERNALS === 'true';
 
 const deployerAccounts = () => {
   if (PRIVATE_KEY) {
@@ -120,6 +121,13 @@ const config: HardhatUserConfig = {
       '@aave/lens-protocol/contracts/upgradeability/TransparentUpgradeableProxy.sol',
     ],
   },
+  typechain: {
+    externalArtifacts: (
+      TYPECHAIN_INCLUDE_EXTERNALS
+        ? ['node_modules/@layerzerolabs/solidity-examples/artifacts/contracts/mocks/LZEndpointMock.sol/LZEndpointMock.json']
+        : []
+    )
+  }
 };
 
 export default config;

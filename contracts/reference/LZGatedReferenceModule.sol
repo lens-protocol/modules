@@ -8,7 +8,7 @@ import {FollowValidationModuleBase} from '@aave/lens-protocol/contracts/core/mod
 import {IERC721} from '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 import {ILensHub} from "@aave/lens-protocol/contracts/interfaces/ILensHub.sol";
 import {DataTypes} from "@aave/lens-protocol/contracts/libraries/DataTypes.sol";
-import {NonblockingLzApp} from "../lz/NonblockingLzApp.sol";
+import {NonblockingLzApp} from "@layerzerolabs/solidity-examples/contracts/lzApp/NonblockingLzApp.sol";
 
 /**
  * @title LZGatedReferenceModule
@@ -27,6 +27,7 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
 
   error CommentOrMirrorInvalid();
   error InvalidSender();
+  error InvalidRemoteInput();
 
   mapping (uint256 => mapping (uint256 => GatedReferenceData)) public gatedReferenceDataPerPub; // profileId => pubId => gated reference data
   mapping (uint256 => mapping (uint256 => mapping (uint256 => bool))) public validatedReferencers; // profileIdPointed => pubId => profiles which have been validated
@@ -35,15 +36,11 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
    * @dev contract constructor
    * @param hub LensHub
    * @param _lzEndpoint: LayerZero endpoint on this chain to relay messages
-   * @param remoteChainIds: whitelisted destination chain ids (supported by LayerZero)
-   * @param remoteProxies: proxy destination contracts (deployed by us)
    */
   constructor(
     address hub,
-    address _lzEndpoint,
-    uint16[] memory remoteChainIds,
-    bytes[] memory remoteProxies
-  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
+    address _lzEndpoint
+  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint) {}
 
   /**
    * @notice Initialize this reference module for the given profile/publication
@@ -66,7 +63,7 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
       uint16 chainId
     ) = abi.decode(data, (address, uint256, uint16));
 
-    if (address(tokenContract) == address(0) || _lzRemoteLookup[chainId].length == 0) {
+    if (address(tokenContract) == address(0) || trustedRemoteLookup[chainId].length == 0) {
       revert Errors.InitParamsInvalid();
     }
 

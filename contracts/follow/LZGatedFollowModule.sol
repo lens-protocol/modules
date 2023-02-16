@@ -8,7 +8,7 @@ import {
 } from "@aave/lens-protocol/contracts/core/modules/follow/FollowValidatorFollowModuleBase.sol";
 import {ILensHub} from "@aave/lens-protocol/contracts/interfaces/ILensHub.sol";
 import {DataTypes} from "@aave/lens-protocol/contracts/libraries/DataTypes.sol";
-import {NonblockingLzApp} from "../lz/NonblockingLzApp.sol";
+import {NonblockingLzApp} from "@layerzerolabs/solidity-examples/contracts/lzApp/NonblockingLzApp.sol";
 
 /**
  * @title LZGatedFollowModule
@@ -23,6 +23,8 @@ contract LZGatedFollowModule is FollowValidatorFollowModuleBase, NonblockingLzAp
     uint16 remoteChainId; // the remote chainId to read against
   }
 
+  error InvalidRemoteInput();
+
   event InitFollowModule(uint256 indexed profileId, address tokenContract, uint256 balanceThreshold, uint16 chainId);
 
   mapping (uint256 => GatedFollowData) public gatedFollowPerProfile; // profileId => gated follow data
@@ -32,15 +34,11 @@ contract LZGatedFollowModule is FollowValidatorFollowModuleBase, NonblockingLzAp
    * @dev contract constructor
    * @param hub LensHub
    * @param _lzEndpoint: LayerZero endpoint on this chain to relay messages
-   * @param remoteChainIds: whitelisted destination chain ids (supported by LayerZero)
-   * @param remoteProxies: proxy destination contracts (deployed by us)
    */
   constructor(
     address hub,
-    address _lzEndpoint,
-    uint16[] memory remoteChainIds,
-    bytes[] memory remoteProxies
-  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint, msg.sender, remoteChainIds, remoteProxies) {}
+    address _lzEndpoint
+  ) ModuleBase(hub) NonblockingLzApp(_lzEndpoint) {}
 
   /**
    * @notice Initialize this follow module for the given profile
@@ -62,7 +60,7 @@ contract LZGatedFollowModule is FollowValidatorFollowModuleBase, NonblockingLzAp
       uint16 chainId
     ) = abi.decode(data, (address, uint256, uint16));
 
-    if (address(tokenContract) == address(0) || _lzRemoteLookup[chainId].length == 0) {
+    if (address(tokenContract) == address(0) || trustedRemoteLookup[chainId].length == 0) {
       revert Errors.InitParamsInvalid();
     }
 

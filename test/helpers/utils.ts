@@ -814,10 +814,11 @@ export function domain(): { name: string; version: string; chainId: number; veri
 export function matchLzMessageFailed(
   receipt: TransactionReceipt,
   expectedReason: string,
-  eventContract: Contract
+  eventContract: Contract,
+  errorEventName?: string | undefined
 ) {
   const events = receipt.logs;
-  const NAME = 'MessageFailed';
+  const NAME = errorEventName || 'MessageFailed';
 
   if (events != undefined) {
     // match name from list of events in eventContract, when found, compute the sigHash

@@ -1,8 +1,8 @@
 {
   "name": "hardhat-project",
   "scripts": {
-    "test": "npm run compile && TRACK_GAS=true hardhat test",
-    "quick-test": "hardhat test",
+    "test": "npm run compile && TRACK_GAS=true TYPECHAIN_INCLUDE_EXTERNALS=true hardhat test",
+    "quick-test": "TYPECHAIN_INCLUDE_EXTERNALS=true hardhat test",
     "coverage": "npm run compile && SKIP_LOAD=true hardhat coverage",
     "compile": "SKIP_LOAD=true hardhat clean && SKIP_LOAD=true hardhat compile"
   },
@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "@aave/lens-protocol": "^1.0.2",
+    "@layerzerolabs/solidity-examples": "^0.0.8",
     "@openzeppelin/contracts": "^4.7.3",
     "solmate": "^6.6.1"
   }

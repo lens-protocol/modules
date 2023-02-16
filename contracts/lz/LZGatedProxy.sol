@@ -3,20 +3,23 @@
 pragma solidity 0.8.10;
 
 import {DataTypes} from "@aave/lens-protocol/contracts/libraries/DataTypes.sol";
-import "./SimpleLzApp.sol";
+import {LzApp} from "@layerzerolabs/solidity-examples/contracts/lzApp/LzApp.sol";
 
 /**
  * @title LZGatedProxy
  * @notice This contract acts as a proxy for our `LZGated*` Lens modules in order to read
  * token balances from remote contracts on any chain supported by LayerZero.
  */
-contract LZGatedProxy is SimpleLzApp {
+contract LZGatedProxy is LzApp {
   error InsufficientBalance();
   error NotAccepting();
 
   bytes public remoteFollowModule; // LZGatedFollowModule
   bytes public remoteReferenceModule; // LZGatedReferenceModule
   bytes public remoteCollectModule; // LZGatedCollectModule
+  uint16 public remoteChainId; // lz chain id
+
+  address public zroPaymentAddress; // the address of the ZRO token holder who would pay for all transactions
 
   bytes internal remoteFollowModulePacked; // remote address concated with local address packed into 40 bytes
   bytes internal remoteReferenceModulePacked;
@@ -36,10 +39,11 @@ contract LZGatedProxy is SimpleLzApp {
     bytes memory _remoteFollowModule,
     bytes memory _remoteReferenceModule,
     bytes memory _remoteCollectModule
-  ) SimpleLzApp(_lzEndpoint, msg.sender, _remoteChainId) {
+  ) LzApp(_lzEndpoint) {
     remoteFollowModule = _remoteFollowModule;
     remoteReferenceModule = _remoteReferenceModule;
     remoteCollectModule = _remoteCollectModule;
+    remoteChainId = _remoteChainId;
 
     remoteFollowModulePacked = abi.encodePacked(_remoteFollowModule, address(this));
     remoteReferenceModulePacked = abi.encodePacked(_remoteReferenceModule, address(this));
@@ -275,9 +279,53 @@ contract LZGatedProxy is SimpleLzApp {
   }
 
   /**
+   * @notice allows the contract owner to set the `_zroPaymentAddress` responsible for paying all transactions in ZRO
+   */
+  function setZroPaymentAddress(address _zroPaymentAddress) external onlyOwner {
+    zroPaymentAddress = _zroPaymentAddress;
+  }
+
+  /**
+   * @notice allows the contract owner to set the remote chain id in the case of a change from LZ
+   * @param _chainId: the new trusted remote chain id
+   */
+  function setRemoteChainId(uint16 _chainId) external onlyOwner {
+    remoteChainId = _chainId;
+  }
+
+  /**
    * @dev not accepting native tokens
    */
   receive() external payable { revert NotAccepting(); }
+
+  /**
+   * @dev sends a cross-chain message to the lz endpoint contract deployed on this chain, to be relayed
+   * NOTE: we override due to having multiple trusted remotes on `remoteChainId`
+   * @param _remoteContractPacked: the contract address on the remote chain to receive the message,
+   * @param _payload: the actual message to be relayed
+   * @param _refundAddress: the address on this chain to receive the refund - excess paid for gas
+   * @param _adapterParams: the custom adapter params to use in sending this message
+   */
+  function _lzSend(
+    bytes storage _remoteContractPacked,
+    bytes memory _payload,
+    address payable _refundAddress,
+    bytes memory _adapterParams
+  ) internal {
+    lzEndpoint.send{value: msg.value}(
+      remoteChainId,
+      _remoteContractPacked,
+      _payload,
+      _refundAddress,
+      zroPaymentAddress,
+      _adapterParams
+    );
+  }
+
+  /**
+   * @dev not processing messages received
+   */
+  function _blockingLzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) internal override {}
 
   /**
    * @dev Check that `account` meets the `balanceThreshold` of held tokens in `tokenContract`; we use the standard
