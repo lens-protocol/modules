@@ -146,7 +146,6 @@ contract LZGatedReferenceModule is FollowValidationModuleBase, IReferenceModule,
       revert InvalidSender();
     }
 
-    // @TODO: hash the vars vs deeply nested?
     validatedReferencers[commentSig.profileIdPointed][commentSig.pubIdPointed][commentSig.profileId] = true;
 
     ILensHub(HUB).commentWithSig(commentSig);
