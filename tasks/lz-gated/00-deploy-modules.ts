@@ -31,21 +31,21 @@ task('deploy-modules', 'Deploys, verifies and whitelists LZGated* modules')
 
   console.log('\n\n- - - - - - - - Deploying LZGatedFollowModule \n\n');
   const followModule = await deployWithVerify(
-    new LZGatedFollowModule__factory(deployer).deploy(hub, LZ_CONFIG[networkName].endpoint, [], []),
+    new LZGatedFollowModule__factory(deployer).deploy(hub, LZ_CONFIG[networkName].endpoint),
     [hub, LZ_CONFIG[networkName].endpoint],
     'contracts/follow/LZGatedFollowModule.sol:LZGatedFollowModule'
   );
 
   console.log('\n\n- - - - - - - - Deploying LZGatedReferenceModule \n\n');
   const referenceModule = await deployWithVerify(
-    new LZGatedReferenceModule__factory(deployer).deploy(hub, LZ_CONFIG[networkName].endpoint, [], []),
+    new LZGatedReferenceModule__factory(deployer).deploy(hub, LZ_CONFIG[networkName].endpoint),
     [hub, LZ_CONFIG[networkName].endpoint],
     'contracts/reference/LZGatedReferenceModule.sol:LZGatedReferenceModule'
   );
 
   console.log('\n\n- - - - - - - - Deploying LZGatedCollectModule \n\n');
   const collectModule = await deployWithVerify(
-    new LZGatedCollectModule__factory(deployer).deploy(hub, LZ_CONFIG[networkName].endpoint, [], []),
+    new LZGatedCollectModule__factory(deployer).deploy(hub, LZ_CONFIG[networkName].endpoint),
     [hub, LZ_CONFIG[networkName].endpoint],
     'contracts/collect/LZGatedCollectModule.sol:LZGatedCollectModule'
   );

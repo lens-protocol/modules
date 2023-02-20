@@ -58,14 +58,6 @@ const mainnetFork = MAINNET_FORK
     }
   : undefined;
 
-const typechainConfig = TYPECHAIN_INCLUDE_EXTERNALS
-  ? {
-      externalArtifacts: [
-        'node_modules/@layerzerolabs/solidity-examples/artifacts/contracts/mocks/LZEndpointMock.sol/LZEndpointMock.json'
-      ]
-    }
-  : undefined;
-
 const config: HardhatUserConfig = {
   solidity: {
     compilers: [
@@ -127,9 +119,9 @@ const config: HardhatUserConfig = {
       '@aave/lens-protocol/contracts/core/CollectNFT.sol',
       '@aave/lens-protocol/contracts/mocks/Currency.sol',
       '@aave/lens-protocol/contracts/upgradeability/TransparentUpgradeableProxy.sol',
+      '@layerzerolabs/solidity-examples/contracts/mocks/LZEndpointMock.sol',
     ],
   },
-  typechain: typechainConfig
 };
 
 export default config;
