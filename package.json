@@ -3,7 +3,7 @@
   "scripts": {
     "test": "npm run compile && TRACK_GAS=true TYPECHAIN_INCLUDE_EXTERNALS=true hardhat test",
     "quick-test": "TYPECHAIN_INCLUDE_EXTERNALS=true hardhat test",
-    "coverage": "npm run compile && SKIP_LOAD=true hardhat coverage",
+    "coverage": "npm run compile && SKIP_LOAD=true TYPECHAIN_INCLUDE_EXTERNALS=true hardhat coverage",
     "compile": "SKIP_LOAD=true hardhat clean && SKIP_LOAD=true hardhat compile"
   },
   "engines": {
