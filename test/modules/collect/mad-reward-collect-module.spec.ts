@@ -68,7 +68,7 @@ makeSuiteCleanRoom('MadRewardCollectModule', function () {
     });
   });
 
-  describe.only('#constructor', () => {
+  describe('#constructor', () => {
     it('reverts when the hub arg is the null address', async () => {
       expect(
         new MadRewardCollectModule__factory(deployer).deploy(ZERO_ADDRESS, madSBT.address)
@@ -88,7 +88,7 @@ makeSuiteCleanRoom('MadRewardCollectModule', function () {
     });
   });
 
-  describe.only('#initializePublicationCollectModule', () => {
+  describe('#initializePublicationCollectModule', () => {
     it('reverts when the caller is not LensHub', async () => {
       await expect(
         collectModule.initializePublicationCollectModule(FIRST_PROFILE_ID, 1, EMPTY_BYTES)
@@ -222,7 +222,7 @@ makeSuiteCleanRoom('MadRewardCollectModule', function () {
     });
   });
 
-  describe.only('#processCollect', () => {
+  describe('#processCollect', () => {
     let tx;
 
     beforeEach(async() => {
@@ -274,7 +274,7 @@ makeSuiteCleanRoom('MadRewardCollectModule', function () {
       });
 
       it('mints the collector an NFT from the collection and inits the reward units', async () => {
-        const balance = await madSBT.balanceOf(anotherUserAddress, FIRST_COLLECTION_ID);
+        const balance = await madSBT.balanceOf(anotherUserAddress);
         expect(balance.toNumber()).to.equal(1);
 
         const units = await madSBT.rewardUnitsOf(anotherUserAddress, FIRST_COLLECTION_ID);
@@ -334,7 +334,7 @@ makeSuiteCleanRoom('MadRewardCollectModule', function () {
       });
 
       it('does not mint them another nft and simply updates the reward units', async () => {
-        const balance = await madSBT.balanceOf(anotherUserAddress, FIRST_COLLECTION_ID);
+        const balance = await madSBT.balanceOf(anotherUserAddress);
         expect(balance.toNumber()).to.equal(1);
 
         const units = await madSBT.rewardUnitsOf(anotherUserAddress, FIRST_COLLECTION_ID);

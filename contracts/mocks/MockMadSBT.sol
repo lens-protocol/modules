@@ -2,24 +2,24 @@
 pragma solidity 0.8.10;
 
 import "@rari-capital/solmate/src/auth/Owned.sol";
-import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IMadSBT} from "@madfi/protocol/contracts/interfaces/IMadSBT.sol";
 
 /**
  * @title MockMadSBT
  * @dev Use with MadRewardCollectModule; keeps track of reward units per collection and its collectors. The actual
- * MadSBT is a modified ERC1155 without transfer functionality, but we can use the ERC1155 for testing
+ * MadSBT is a modified ERC721 without transfer functionality, but we can use the ERC721 for testing
  */
-contract MockMadSBT is IMadSBT, ERC1155, Owned {
+contract MockMadSBT is IMadSBT, ERC721, Owned {
   error OnlyCollectModule();
   error OnlyTokenOwner();
   error BadTokenOrHost();
 
   address public collectModule;
-  string public name;
-  string public symbol;
+  uint256 public genesisProfileId = 1; // // MadFi Collection
 
-  uint128 public mintRewardUnit = 100; // reward on MadSBT mint
+  uint128 public createRewardUnit = 100; // reward on #createCollection + Bounty create (only on 1st bid accepted)
+  uint128 public mintRewardUnit = 25; // reward on MadSBT mint
   uint128 public collectRewardUnit = 10; // reward on collect
 
   mapping (uint256 => CollectionData) public collectionData; // collectionId => MadSBT collection data
@@ -36,19 +36,18 @@ contract MockMadSBT is IMadSBT, ERC1155, Owned {
   /**
    * @dev contract constructor
    */
-  constructor() Owned(msg.sender) ERC1155("") {
-    name = "MadFi SBT";
-    symbol = "MAD-SBT";
-  }
+  constructor() ERC721("Mad Finance SBT", "MadSBT") Owned(msg.sender) {}
 
   /**
    * Creates a new collection with a fixed `uri` across tokens. Can only be called from our collect module.
    * Also creates an SF IDA index using `profileId` as the pointer
+   * @param creator the collection creator
    * @param profileId the lens profile collectionId of the collection creator
    * @param _availableSupply The available supply of tokens
    * @param _uri the metadata uri to be used for all tokens minted in this collection
    */
   function createCollection(
+    address creator,
     uint256 profileId,
     uint256 _availableSupply,
     string memory _uri
@@ -59,7 +58,7 @@ contract MockMadSBT is IMadSBT, ERC1155, Owned {
     collectionData[_collectionIdCounter].creatorId = profileId;
     collectionData[_collectionIdCounter].uri = _uri;
 
-    emit URI(_uri, _collectionIdCounter);
+    _handleRewardsUpdate(genesisProfileId, creator, createRewardUnit);
 
     return _collectionIdCounter;
   }
@@ -81,7 +80,7 @@ contract MockMadSBT is IMadSBT, ERC1155, Owned {
 
     unchecked { collectionData[collectionId].totalSupply++; }
 
-    _mint(account, collectionId, 1, ""); // mint them the soulbound nft
+    _mint(account, 1); // mint them the soulbound nft
     _handleRewardsUpdate(profileId, account, mintRewardUnit); // set their share of the rewards
 
     return true;
@@ -100,29 +99,30 @@ contract MockMadSBT is IMadSBT, ERC1155, Owned {
     uint256 profileId,
     uint128 amount
   ) external onlyCollectModule {
-    if (balanceOf(account, collectionId) == 0) return;
-
     uint128 currentUnits = _getCurrentRewards(collectionData[collectionId].creatorId, account);
 
-    // increment their share of the rewards
-    _handleRewardsUpdate(profileId, account, currentUnits + amount);
+    // it will be 0 if they don't own the NFT
+    if (currentUnits != 0) {
+      // increment their share of the rewards
+      _handleRewardsUpdate(profileId, account, currentUnits + amount);
+    }
   }
 
   /**
    * @notice Allows the user to burn their token
-   * @param collectionId: the token id from a collection
+   * @param tokenId: the token id from a collection
    */
-  function burn(uint256 collectionId) external override(IMadSBT) {
-    if (balanceOf(msg.sender, collectionId) == 0) revert OnlyTokenOwner();
+  function burn(uint256 tokenId) external override(IMadSBT) {
+    if (ownerOf(tokenId) != msg.sender) revert OnlyTokenOwner();
 
-    _burn(msg.sender, collectionId, 1);
+    _burn(tokenId);
 
     // remove their share of the rewards
-    _handleRewardsUpdate(collectionData[collectionId].creatorId, msg.sender, 0); // @TODO: maybe delete instead?
+    _handleRewardsUpdate(collectionData[tokenId].creatorId, msg.sender, 0); // @TODO: maybe delete instead?
 
     unchecked {
-      collectionData[collectionId].totalSupply--;
-      collectionData[collectionId].totalRedeemed++;
+      collectionData[tokenId].totalSupply--;
+      collectionData[tokenId].totalRedeemed++;
     }
   }
 
@@ -132,33 +132,23 @@ contract MockMadSBT is IMadSBT, ERC1155, Owned {
   // @dev not used in this mock
   function redeemInterimRewardUnits(uint256) external override {}
 
-  function uri(uint256 collectionId) public view override(IMadSBT, ERC1155) returns (string memory) {
-    return collectionData[collectionId].uri;
-  }
-
   function contractURI() external pure returns (string memory) {
     return "";
-  }
-
-  function totalSupply(uint256 collectionId) public view returns (uint256) {
-    return collectionData[collectionId].totalSupply;
-  }
-
-  function availableSupply(uint256 collectionId) public view returns (uint256) {
-    return collectionData[collectionId].availableSupply;
   }
 
   function creatorProfileId(uint256 collectionId) public view returns (uint256) {
     return collectionData[collectionId].creatorId;
   }
 
-  function balanceOf(address account, uint256 collectionId)
-    public
-    override(IMadSBT, ERC1155)
-    view
-    returns (uint256)
-  {
-    return ERC1155.balanceOf(account, collectionId);
+  /**
+   * @notice Returns true if the `account` has minted a token from `collectionId`
+   */
+  function hasMinted(address account, uint256 collectionId) public view returns (bool) {
+    if (collectionId > _collectionIdCounter) return false;
+
+    if (_getCurrentRewards(collectionData[collectionId].creatorId, account) == 0) return false;
+
+    return true;
   }
 
   function rewardUnitsOf(address account, uint256 collectionId) public view returns (uint128) {

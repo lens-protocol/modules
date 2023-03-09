@@ -71,6 +71,7 @@ contract MadRewardCollectModule is ICollectModule, ModuleBase {
       if (bytes(uri).length == 0 || availableSupply == 0) revert Errors.InitParamsInvalid();
 
       _collectionId = madSBT.createCollection(
+        IERC721(HUB).ownerOf(profileId),
         profileId,
         availableSupply,
         uri
@@ -105,7 +106,7 @@ contract MadRewardCollectModule is ICollectModule, ModuleBase {
     uint256 collectionId = activeCollectionPerPubId[profileId][pubId];
 
     // attempt to mint the associated MadSBT collection
-    if (madSBT.balanceOf(collector, collectionId) == 0) {
+    if (!madSBT.hasMinted(collector, collectionId)) {
       // revert if we are at the supply cap
       if (!madSBT.mint(collector, collectionId, profileId)) revert Errors.CollectNotAllowed();
     } else {
