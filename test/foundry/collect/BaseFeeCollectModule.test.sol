@@ -609,7 +609,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
     }
 
     function verifyFeesWithoutMirror(uint16 treasuryFee, uint128 amount) public {
-        vm.prank(governance);
+        vm.prank(modulesGovernance);
         moduleGlobals.setTreasuryFee(treasuryFee);
         (uint256 pubId, ) = hubPostAndMirror(0, amount);
 
@@ -676,7 +676,7 @@ contract BaseFeeCollectModule_FeeDistribution is BaseFeeCollectModuleBase {
         uint16 referralFee,
         uint128 amount
     ) public {
-        vm.prank(governance);
+        vm.prank(modulesGovernance);
         moduleGlobals.setTreasuryFee(treasuryFee);
         (, uint256 mirrorId) = hubPostAndMirror(referralFee, amount);
 

@@ -7,7 +7,9 @@ import {SimpleFeeCollectModule} from 'contracts/collect/SimpleFeeCollectModule.s
 import {BaseFeeCollectModuleInitData} from 'contracts/collect/base/IBaseFeeCollectModule.sol';
 
 contract BaseFeeCollectModuleBase is BaseSetup {
+    using stdJson for string;
     address baseFeeCollectModule;
+    SimpleFeeCollectModule simpleFeeCollectModule;
 
     BaseFeeCollectModuleInitData exampleInitData;
 
@@ -16,10 +18,21 @@ contract BaseFeeCollectModuleBase is BaseSetup {
 
     // Deploy & Whitelist BaseFeeCollectModule
     constructor() BaseSetup() {
-        vm.prank(deployer);
-        baseFeeCollectModule = address(
-            new SimpleFeeCollectModule(hubProxyAddr, address(moduleGlobals))
-        );
+        if (fork && keyExists(string(abi.encodePacked('.', forkEnv, '.SimpleFeeCollectModule')))) {
+            simpleFeeCollectModule = SimpleFeeCollectModule(
+                json.readAddress(string(abi.encodePacked('.', forkEnv, '.SimpleFeeCollectModule')))
+            );
+            baseFeeCollectModule = address(simpleFeeCollectModule);
+            console.log(
+                'Testing against already deployed module at:',
+                address(baseFeeCollectModule)
+            );
+        } else {
+            vm.prank(deployer);
+            baseFeeCollectModule = address(
+                new SimpleFeeCollectModule(hubProxyAddr, address(moduleGlobals))
+            );
+        }
         vm.prank(governance);
         hub.whitelistCollectModule(address(baseFeeCollectModule), true);
     }

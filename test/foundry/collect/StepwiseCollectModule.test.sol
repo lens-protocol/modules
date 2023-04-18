@@ -651,7 +651,7 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
     }
 
     function verifyFeesWithoutMirror(uint16 treasuryFee, uint128 amount) public {
-        vm.prank(governance);
+        vm.prank(modulesGovernance);
         moduleGlobals.setTreasuryFee(treasuryFee);
         (uint256 pubId, ) = hubPostAndMirror(exampleInitData, 0, amount);
 
@@ -718,7 +718,7 @@ contract StepwiseCollectModule_FeeDistribution is StepwiseCollectModuleBase {
         uint16 referralFee,
         uint128 amount
     ) public {
-        vm.prank(governance);
+        vm.prank(modulesGovernance);
         moduleGlobals.setTreasuryFee(treasuryFee);
         (uint256 pubId, uint256 mirrorId) = hubPostAndMirror(exampleInitData, referralFee, amount);
 
@@ -903,7 +903,7 @@ contract StepwiseCollectModule_StepwiseCurveFormula is StepwiseCollectModuleBase
             })
         );
 
-        vm.prank(governance);
+        vm.prank(modulesGovernance);
         moduleGlobals.setTreasuryFee(0);
     }
 
