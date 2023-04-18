@@ -11,7 +11,8 @@
     "StepwiseCollectModule": "0x210c94877dcfceda8238acd382372278844a54d7",
     "ERC4626FeeCollectModule": "0x394fd100b13197787023ef4cf318cde456545db7",
     "AaveFeeCollectModule": "0xa94713d0688c8a483c3352635cec4e0ce88d6a29",
-    "TokenGatedReferenceModule": "0x3d7f4f71a90fe5a9d13fab2716080f2917cf88f3"
+    "TokenGatedReferenceModule": "0x3d7f4f71a90fe5a9d13fab2716080f2917cf88f3",
+    "SimpleFeeCollectModule": "0x54325d507ed1b3776c146700eff61a98b45aec76"
   },
   "testnet": {
     "chainId": 80001,
@@ -25,7 +26,8 @@
     "StepwiseCollectModule": "0x7a7b8e7699e0492da1d3c7eab7e2f3bf1065aa40",
     "ERC4626FeeCollectModule": "0x79697402bd2caa19a53d615fb1a30a98e35b84d5",
     "AaveFeeCollectModule": "0x912860ed4ed6160c48a52d52fcab5c059d34fe5a",
-    "TokenGatedReferenceModule": "0xb4ba8dccd35bd3dcc5d58dbb9c7dff9c9268add9"
+    "TokenGatedReferenceModule": "0xb4ba8dccd35bd3dcc5d58dbb9c7dff9c9268add9",
+    "SimpleFeeCollectModule": "0xb4a9874adc790eec88fd086e43d329bbc9520efd"
   },
   "sandbox": {
     "chainId": 80001,
@@ -39,6 +41,7 @@
     "StepwiseCollectModule": "0x6928d6127dfa0da401737e6ff421fcf62d5617a3",
     "ERC4626FeeCollectModule": "0x31126c602cf88193825a99dcd1d17bf1124b1b4f",
     "AaveFeeCollectModule": "0x666e06215747879ee68b3e5a317dcd8411de1897",
-    "TokenGatedReferenceModule": "0x86d35562ceb9f10d7c2c23c098dfeacb02f53853"
+    "TokenGatedReferenceModule": "0x86d35562ceb9f10d7c2c23c098dfeacb02f53853",
+    "SimpleFeeCollectModule": "0xbeac9c00383d04054dbc82a44f8dc8d9be995fd8"
   }
 }
