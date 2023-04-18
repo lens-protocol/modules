@@ -192,11 +192,12 @@ contract BaseSetup is Test, ForkManagement {
 
         // Whitelist the test contract as a profile creator
         hub.whitelistProfileCreator(me, true);
+        vm.stopPrank();
 
         // Whitelist mock currency in ModuleGlobals
+        vm.prank(modulesGovernance);
         moduleGlobals.whitelistCurrency(address(currency), true);
 
-        vm.stopPrank();
         ///////////////////////////////////////// End governance actions.
     }
 
