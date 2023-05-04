@@ -296,7 +296,7 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
 
         expect(
           (await currencyContract.balanceOf(publisher.address)).toString()
-        ).to.equal(DEFAULT_BUDGET_PER_PROFILE);
+        ).to.equal(parseEther(DEFAULT_BUDGET_PER_PROFILE).toString());
 
         // sanity check, budget remaining
         const budgetRemaining = await referenceModule.getBudgetRemainingForPublication(FIRST_PROFILE_ID, FIRST_PUB_ID);

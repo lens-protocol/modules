@@ -260,12 +260,11 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     console.log("_validateMerkleProof");
     console.logBytes32(merkleRoot);
     console.logUint(profileId);
-    console.log(profileId.toHexString());
     console.logUint(index);
     console.log("merkleProof array 0,1");
     console.logBytes32(merkleProof[0]);
     console.logBytes32(merkleProof[1]);
-    bytes32 node = keccak256(abi.encodePacked(profileId.toHexString(), index));
+    bytes32 node = keccak256(abi.encodePacked(profileId, index));
 
     return MerkleProof.verify(merkleProof, merkleRoot, node);
   }
