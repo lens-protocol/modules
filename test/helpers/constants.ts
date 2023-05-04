@@ -16,3 +16,19 @@ export enum PubType {
   Mirror,
   Nonexistent,
 }
+
+export const CAMPAIGN_MERKLE_LEAF = {
+  interest: 'ART_ENTERTAINMENT__MUSIC',
+  root: '0xb6caf994e3edd909e5d47ec6351245ae6bdcc75058df6f053a5b62ecbc719895',
+  profileId: '0x01',
+  proof: [
+    '0x3c4386eaf082514302ddab653a5b8f9b9ac704ca897ad1c0515407ca6d1f9c4b',
+    '0x70640be0cb8df2f12d96150a9ab7e36bee600058353267866b69c49aa244daa6',
+    '0x828a6ef31f191765ea2154af6f57c97468dc1d53731aa34c246184c6737ddb1b',
+    '0x278fc646965283308bc0a1a871815a47997498943062882795040dd43ed92dd4',
+    '0xf9e4fb5f099251e7224b65ffc8cdcc0246b2e642d0c22072f97e44edab7f792b',
+    '0xc850b6b84de2247da1cb8b0d6216a0a30e2ac21dbb3be39cc97fce8b1298faa8',
+    '0x14e2b380475b14e347ab01bb5e6a06bf7a1588120c2eaaf27a67aa8dc6dd3da9'
+  ],
+  index: 15
+};

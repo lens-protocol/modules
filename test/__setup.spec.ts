@@ -49,6 +49,8 @@ import {
   DegreesOfSeparationReferenceModule__factory,
   StepwiseCollectModule,
   StepwiseCollectModule__factory,
+  TargetedCampaignReferenceModule,
+  TargetedCampaignReferenceModule__factory,
 } from '../typechain';
 import { LensHubLibraryAddresses } from '../typechain/factories/LensHub__factory';
 import { ProfileFollowModule__factory } from '../typechain/factories/ProfileFollowModule__factory';
@@ -80,6 +82,7 @@ export const MOCK_PROFILE_URI =
 export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 export const DEFAULT_AMOUNT = parseEther('2');
+export const CAMPAIGN_FEE_BPS = 1000;
 
 export let chainId: number;
 export let accounts: SignerWithAddress[];
@@ -123,6 +126,7 @@ export let erc4626FeeCollectModule: ERC4626FeeCollectModule;
 export let degreesOfSeparationReferenceModule: DegreesOfSeparationReferenceModule;
 
 export let tokenGatedReferenceModule: TokenGatedReferenceModule;
+export let targetedCampaignReferenceModule: TargetedCampaignReferenceModule;
 
 export function makeSuiteCleanRoom(name: string, tests: () => void) {
   describe(name, () => {
@@ -287,6 +291,15 @@ beforeEach(async function () {
   );
   await expect(
     lensHub.connect(governance).whitelistReferenceModule(tokenGatedReferenceModule.address, true)
+  ).to.not.be.reverted;
+
+  targetedCampaignReferenceModule = await new TargetedCampaignReferenceModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address,
+    CAMPAIGN_FEE_BPS
+  );
+  await expect(
+    lensHub.connect(governance).whitelistReferenceModule(targetedCampaignReferenceModule.address, true)
   ).to.not.be.reverted;
 
   // Collect modules
