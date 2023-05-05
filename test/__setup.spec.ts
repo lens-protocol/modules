@@ -83,6 +83,7 @@ export const MOCK_FOLLOW_NFT_URI =
   'https://ipfs.io/ipfs/QmU8Lv1fk31xYdghzFrLm6CiFcwVg7hdgV6BBWesu6EqLj';
 export const DEFAULT_AMOUNT = parseEther('2');
 export const CAMPAIGN_FEE_BPS = 1000;
+export const CAMPAIGN_CLIENT_FEE_BPS = 0;
 
 export let chainId: number;
 export let accounts: SignerWithAddress[];
@@ -296,7 +297,8 @@ beforeEach(async function () {
   targetedCampaignReferenceModule = await new TargetedCampaignReferenceModule__factory(deployer).deploy(
     lensHub.address,
     moduleGlobals.address,
-    CAMPAIGN_FEE_BPS
+    CAMPAIGN_FEE_BPS,
+    CAMPAIGN_CLIENT_FEE_BPS
   );
   await expect(
     lensHub.connect(governance).whitelistReferenceModule(targetedCampaignReferenceModule.address, true)

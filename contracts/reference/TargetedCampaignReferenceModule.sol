@@ -20,14 +20,18 @@ import {Strings} from '@openzeppelin/contracts/utils/Strings.sol';
  * @param currency The ERC20 payment token; must be whitelisted by Lens Protocol
  * @param budget The total amount of `currency` for the mirror reward pool (decrements)
  * @param totalProfiles The total profiles/mirrors the budget is allocated for
- * @param budgetPerProfile The amount of `currency` available per profile as the mirror reward
+ * @param budgetPerMirror The amount of `currency` available per profile as the mirror reward
+ * @param clientFees The total amount of `currency` reserved for client fees (decrements)
+ * @param clientFeePerMirror The amount of `currency` available as the client fee on each mirror
  */
 struct CampaignParams {
   bytes32 merkleRoot;
   address currency;
   uint256 budget;
   uint256 totalProfiles;
-  uint256 budgetPerProfile;
+  uint256 budgetPerMirror;
+  uint256 clientFees;
+  uint256 clientFeePerMirror;
 }
 
 /**
@@ -48,27 +52,36 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
   error NotEnoughBalance();
   error AboveMax();
   error NotFound();
+  error OnlyWhitelistedClients();
 
   event TargetedCampaignReferencePublicationCreated(
     uint256 profileId,
     uint256 pubId,
     address currency,
     uint256 budget,
-    uint256 budgetPerProfile
+    uint256 budgetPerMirror,
+    uint256 clientFeePerMirror
   );
   event TargetedCampaignReferencePublicationClosed(
     uint256 profileId,
     uint256 pubId,
-    uint256 budgetRemaining
+    uint256 budgetRemainingPlusFees
   );
   event SetProtocolFeeBps(uint256 value);
+  event SetClientFeeBps(uint256 value);
+  event SetClientWhitelist(address client, bool value);
   event WithdrawProtocolFees(address currency, uint256 value);
+  event WithdrawClientFees(address client, address currency, uint256 value);
 
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000; // 20%
+  uint256 public constant CLIENT_FEE_BPS_MAX = 1000; // 10%
   uint256 public protocolFeeBps;
+  uint256 public clientFeeBps;
 
   mapping (uint256 => mapping (uint256 => mapping (uint256 => bool))) public campaignRewardClaimed; // profileIdPointed => pubIdPointed => profileId => didClaim
   mapping (address => uint256) public protocolFeesPerCurrency; // token => fees accrued
+  mapping (address => mapping (address => uint256)) public clientFeesPerCurrency; // address => token => fees accrued
+  mapping (address => bool) public whitelistedClients; // address => isWhitelisted
 
   mapping (uint256 => mapping (uint256 => CampaignParams)) internal _campaignParamsPerProfilePerPub; // profileId => pubId => campaign
 
@@ -76,16 +89,20 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
    * @dev contract constructor
    * @param hub LensHub
    * @param moduleGlobals Module globals
-   * @param _protocolFeeBps Protocol fee bps to take on every mirror
+   * @param _protocolFeeBps Protocol fee bps to take on the campaign budget
+   * @param _protocolFeeBps Client fee bps to take on the campaign budget
    */
   constructor(
     address hub,
     address moduleGlobals,
-    uint256 _protocolFeeBps
+    uint256 _protocolFeeBps,
+    uint256 _clientFeeBps
   ) ModuleBase(hub) FeeModuleBase(moduleGlobals) Ownable() {
     protocolFeeBps = _protocolFeeBps;
+    clientFeeBps = _clientFeeBps;
 
     emit SetProtocolFeeBps(_protocolFeeBps);
+    emit SetClientFeeBps(_clientFeeBps);
   }
 
   /**
@@ -93,7 +110,7 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
    *
    * @param profileId The profile ID of the profile creating the pub
    * @param pubId The pub to init this reference module to
-   * @param data The arbitrary data parameter, which in this particular module contains data for `CampaignParams`
+   * @param data The arbitrary data parameter, which in this particular module contains some data for `CampaignParams`
    *
    * @return bytes Empty bytes.
    */
@@ -102,38 +119,48 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     uint256 pubId,
     bytes calldata data
   ) external override onlyHub returns (bytes memory) {
-    CampaignParams memory params = abi.decode(data, (CampaignParams));
+    (
+      bytes32 merkleRoot,
+      address currency,
+      uint256 budget,
+      uint256 totalProfiles
+    ) = abi.decode(data, (bytes32, address, uint256, uint256));
 
-    // validate the input
-    if (
-      !_currencyWhitelisted(params.currency) ||
-      params.budget == 0 ||
-      (params.budget / params.totalProfiles != params.budgetPerProfile) ||
-      params.merkleRoot == bytes32(0)
-    ) revert Errors.InitParamsInvalid();
+    _validateInitParams(merkleRoot, currency, budget, totalProfiles);
 
     address account = IERC721(HUB).ownerOf(profileId);
-    uint256 protocolFee = getProtocolFee(params.budget);
-    uint256 budgetPlusFee = params.budget + protocolFee;
+    uint256 protocolFee = getProtocolFee(budget);
+    uint256 clientFee = getClientFee(budget);
+    uint256 budgetPlusFees = budget + protocolFee + clientFee;
 
-    if (IERC20(params.currency).balanceOf(account) < budgetPlusFee)
-      revert NotEnoughBalance();
+    _validateBalanceAndAllowance(account, currency, budgetPlusFees);
 
-    if (IERC20(params.currency).allowance(account, address(this)) < budgetPlusFee)
-      revert NotEnoughAllowance();
+    uint256 budgetPerMirror = budget / totalProfiles;
+    uint256 clientFeePerMirror = clientFee / totalProfiles;
+
+    _storeCampaignParams(
+      profileId,
+      pubId,
+      merkleRoot,
+      currency,
+      budget,
+      totalProfiles,
+      budgetPerMirror,
+      clientFee,
+      clientFeePerMirror
+    );
 
     // transfer the full payment to this contract; we accrue fees
-    IERC20(params.currency).transferFrom(account, address(this), budgetPlusFee);
-
-    protocolFeesPerCurrency[params.currency] += protocolFee;
-    _campaignParamsPerProfilePerPub[profileId][pubId] = params;
+    IERC20(currency).transferFrom(account, address(this), budgetPlusFees);
+    protocolFeesPerCurrency[currency] += protocolFee;
 
     emit TargetedCampaignReferencePublicationCreated(
       profileId,
       pubId,
-      params.currency,
-      params.budget,
-      params.budgetPerProfile
+      currency,
+      budget,
+      budgetPerMirror,
+      clientFeePerMirror
     );
 
     return new bytes(0);
@@ -163,22 +190,38 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     // has this profile already claimed?
     if (campaignRewardClaimed[profileIdPointed][pubIdPointed][profileId]) return;
 
-    // @TODO: here decode the client and validate is whitelisted before sharing the fee
-    (bytes32[] memory merkleProof, uint256 index) = abi.decode(data, (bytes32[], uint256));
+    // decode input
+    (
+      bytes32[] memory merkleProof,
+      uint256 index,
+      address clientAddress
+    ) = abi.decode(data, (bytes32[], uint256, address));
 
     // if the profile is whitelisted to receive rewards
     if (_validateMerkleProof(params.merkleRoot, profileId, index, merkleProof)) {
       address account = IERC721(HUB).ownerOf(profileId);
 
       // send the rewards
-      IERC20(params.currency).transfer(account, params.budgetPerProfile);
+      IERC20(params.currency).transfer(account, params.budgetPerMirror);
+
+      // process the client fee, if any and if address is whitelisted
+      if (params.clientFees > 0 && whitelistedClients[clientAddress]) {
+        clientFeesPerCurrency[clientAddress][params.currency] += params.clientFeePerMirror;
+
+        params.clientFees = params.clientFees - params.clientFeePerMirror;
+      }
 
       // update storage
-      params.budget = params.budget - params.budgetPerProfile;
+      params.budget = params.budget - params.budgetPerMirror;
       campaignRewardClaimed[profileIdPointed][pubIdPointed][profileId] = true;
 
       // if no budget remaining, remove it from storage
       if (params.budget == 0) {
+        // keep the unclaimed client fees
+        if (params.clientFees > 0) {
+          protocolFeesPerCurrency[params.currency] += params.clientFees;
+        }
+
         delete _campaignParamsPerProfilePerPub[profileIdPointed][pubIdPointed];
 
         emit TargetedCampaignReferencePublicationClosed(profileIdPointed, pubIdPointed, 0);
@@ -212,9 +255,12 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
 
     delete _campaignParamsPerProfilePerPub[profileId][pubId];
 
-    IERC20(params.currency).transfer(msg.sender, params.budget);
+    uint256 protocolFee = getProtocolFee(params.budget); // the owed fees for the remaining budget
+    uint256 budgetPlusFees = params.budget + params.clientFees + protocolFee;
 
-    emit TargetedCampaignReferencePublicationClosed(profileId, pubId, params.budget);
+    IERC20(params.currency).transfer(msg.sender, budgetPlusFees);
+
+    emit TargetedCampaignReferencePublicationClosed(profileId, pubId, budgetPlusFees);
   }
 
   // @TODO: logImpressionWithSig
@@ -229,10 +275,29 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
   }
 
   /**
+   * @notice Returns the client fee per mirror for a publication
+   * @param profileId The profile id that created the campaign
+   * @param pubId The pub id
+   */
+  function getClientFeePerMirrorForPublication(uint256 profileId, uint256 pubId) public view returns (uint256) {
+    return _campaignParamsPerProfilePerPub[profileId][pubId].clientFeePerMirror;
+  }
+
+  /**
    * @notice Calculates and returns the protocol fee for the given `budget`
    */
   function getProtocolFee(uint256 budget) public view returns (uint256) {
     return (budget * protocolFeeBps) / 10000;
+  }
+
+  /**
+   * @notice Calculates and returns the client fee for the given `budget`; this is the incentive for lens apps to
+   * feature the promoted publications
+   */
+  function getClientFee(uint256 budget) public view returns (uint256) {
+    if (clientFeeBps == 0) return 0;
+
+    return (budget * clientFeeBps) / 10000;
   }
 
   /**
@@ -248,15 +313,119 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
   }
 
   /**
+   * @notice Allows the contract owner to set the client fee bps, provided it's below the defined max
+   * @param _clientFeeBps The new client fee bps
+   */
+  function setClientFeeBps(uint256 _clientFeeBps) external onlyOwner {
+    if (_clientFeeBps > CLIENT_FEE_BPS_MAX) revert AboveMax();
+
+    clientFeeBps = _clientFeeBps;
+
+    emit SetClientFeeBps(_clientFeeBps);
+  }
+
+  /**
+   * @notice Allows the contract owner toggle the whitelisting of a lens client for fees
+   * @param client The lens client
+   * @param isWhitelisted Whether the given client can claim mirror fees
+   */
+  function setClientWhitelist(address client, bool isWhitelisted) external onlyOwner {
+    whitelistedClients[client] = isWhitelisted;
+
+    emit SetClientWhitelist(client, isWhitelisted);
+  }
+
+  /**
+   * @notice Allows whitelisted clients to withdraw their fees for a given `currency`, if any
+   * @param currency The currency to withdraw fees for
+   */
+  function withdrawClientFees(address currency) external {
+    if (!whitelistedClients[msg.sender]) revert OnlyWhitelistedClients();
+
+    if (clientFeesPerCurrency[msg.sender][currency] > 0) {
+      uint256 fees = clientFeesPerCurrency[msg.sender][currency];
+
+      clientFeesPerCurrency[msg.sender][currency] = 0;
+
+      IERC20(currency).transfer(msg.sender, fees);
+
+      emit WithdrawClientFees(msg.sender, currency, fees);
+    }
+  }
+
+  /**
    * @notice Allows the contract owner to withdraw protocol fees for a given `currency`, if any
    * @param currency The currency to withdraw fees for
    */
   function withdrawProtocolFees(address currency) external onlyOwner {
     if (protocolFeesPerCurrency[currency] > 0) {
-      IERC20(currency).transfer(msg.sender, protocolFeesPerCurrency[currency]);
+      uint256 fees = protocolFeesPerCurrency[currency];
 
-      emit WithdrawProtocolFees(currency, protocolFeesPerCurrency[currency]);
+      protocolFeesPerCurrency[currency] = 0;
+
+      IERC20(currency).transfer(msg.sender, fees);
+
+      emit WithdrawProtocolFees(currency, fees);
     }
+  }
+
+  /**
+   * @dev Reverts if any of the module init params are invalid, ex: `currency` not whitelisted or empty values
+   */
+  function _validateInitParams(
+    bytes32 merkleRoot,
+    address currency,
+    uint256 budget,
+    uint256 totalProfiles
+  ) private view {
+    if (
+      !_currencyWhitelisted(currency) ||
+      budget == 0 ||
+      totalProfiles == 0 ||
+      merkleRoot == bytes32(0)
+    ) revert Errors.InitParamsInvalid();
+  }
+
+  /**
+   * @dev Reverts if
+   * - `account` does not have the balance to cover the budget + fees
+   * - `account` has not approved sufficient allowance
+   */
+  function _validateBalanceAndAllowance(
+    address account,
+    address currency,
+    uint256 budgetPlusFees
+  ) private view {
+    if (IERC20(currency).balanceOf(account) < budgetPlusFees)
+      revert NotEnoughBalance();
+
+    if (IERC20(currency).allowance(account, address(this)) < budgetPlusFees)
+      revert NotEnoughAllowance();
+  }
+
+  /**
+   * @dev Moves everything needed for `CampaignParams` into storage
+   */
+  function _storeCampaignParams(
+    uint256 profileId,
+    uint256 pubId,
+    bytes32 merkleRoot,
+    address currency,
+    uint256 budget,
+    uint256 totalProfiles,
+    uint256 budgetPerMirror,
+    uint256 clientFee,
+    uint256 clientFeePerMirror
+  ) private {
+    _campaignParamsPerProfilePerPub[profileId][pubId] = CampaignParams({
+      merkleRoot: merkleRoot,
+      currency: currency,
+      budget: budget,
+      totalProfiles: totalProfiles,
+      budgetPerMirror: budgetPerMirror,
+      clientFees: clientFee,
+      clientFeePerMirror: clientFeePerMirror
+    });
   }
 
   /**

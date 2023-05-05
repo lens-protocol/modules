@@ -41,23 +41,21 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
     currency: string;
     budget: BigNumber;
     totalProfiles: number;
-    budgetPerProfile: BigNumber;
   }
 
   async function getTargetedCampaignReferenceModuleInitData({
     merkleRoot = CAMPAIGN_MERKLE_LEAF.root,
     currency = currencyContract.address,
     budget = parseEther(DEFAULT_BUDGET),
-    totalProfiles = DEFAULT_TOTAL_PROFILES,
-    budgetPerProfile = parseEther(DEFAULT_BUDGET_PER_PROFILE)
+    totalProfiles = DEFAULT_TOTAL_PROFILES
   }: TargetedCampaignModuleInitData): Promise<string> {
     return abiCoder.encode(
-      ['bytes32', 'address', 'uint256', 'uint256', 'uint256'],
-      [merkleRoot, currency, budget, totalProfiles, budgetPerProfile]
+      ['bytes32', 'address', 'uint256', 'uint256'],
+      [merkleRoot, currency, budget, totalProfiles]
     );
   }
 
-  beforeEach(async function () {
+  beforeEach(async () => {
     await expect(
       lensHub.createProfile({
         to: publisher.address,
@@ -130,11 +128,9 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
         ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
       });
 
-      it('reverts with bad math on budget, totalProfiles, and budgetPerProfile values', async () => {
+      it('reverts when the totalProfiles is 0', async () => {
         const referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({
-          budget: BigNumber.from('10'),
-          totalProfiles: 10,
-          budgetPerProfile: BigNumber.from('10'), // should be 1
+          totalProfiles: 0
         });
 
         await expect(
@@ -216,7 +212,7 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
         await currencyContract.connect(publisher).approve(referenceModule.address, totalAmount);
       });
 
-      it('initializes the module, transfers the budget + fee to the contract, and accrues fees', async () => {
+      it('initializes the module, transfers the budget + fee to the contract, and sets protocol fees in storage', async () => {
         await expect(
           lensHub.connect(publisher).post({
             profileId: FIRST_PROFILE_ID,
@@ -255,10 +251,82 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
             FIRST_PUB_ID,
             currencyContract.address,
             parseEther(DEFAULT_BUDGET),
-            parseEther(DEFAULT_BUDGET_PER_PROFILE)
+            parseEther(DEFAULT_BUDGET_PER_PROFILE),
+            parseEther('0')
           ],
           referenceModule
         );
+      });
+    });
+
+    context('context: with client fees set to non-zero', () => {
+      let referenceModuleInitData;
+      let totalAmount;
+      let clientFee;
+      let totalAmountPlusClientFee;
+
+      beforeEach(async () => {
+        await referenceModule.setClientFeeBps(500) // 5%
+
+        referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({});
+        const budget = parseEther(DEFAULT_BUDGET);
+        const protocolFee = await referenceModule.getProtocolFee(budget);
+        clientFee = await referenceModule.getClientFee(budget);
+        totalAmount = budget.add(protocolFee);
+        totalAmountPlusClientFee = totalAmount.add(clientFee);
+      });
+
+      it('reverts when the caller does not have enough balance to cover the budget plus fees', async () => {
+        await currencyContract.mint(publisher.address, totalAmount);
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
+            referenceModule: referenceModule.address,
+            referenceModuleInitData,
+          })
+        ).to.be.revertedWith('NotEnoughBalance');
+      });
+
+      it('reverts when the caller has not approved the transfer of the budget plus fee', async () => {
+        await currencyContract.mint(publisher.address, totalAmountPlusClientFee);
+        await currencyContract.connect(publisher).approve(referenceModule.address, totalAmount);
+
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
+            referenceModule: referenceModule.address,
+            referenceModuleInitData,
+          })
+        ).to.be.revertedWith('NotEnoughAllowance');
+      });
+
+      it('initializes the module, transfers the budget + fee to the contract, and sets client fees in storage', async () => {
+        await currencyContract.mint(publisher.address, totalAmountPlusClientFee);
+        await currencyContract.connect(publisher).approve(referenceModule.address, totalAmountPlusClientFee);
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
+            referenceModule: referenceModule.address,
+            referenceModuleInitData,
+          })
+        ).to.not.be.reverted;
+
+        expect(
+          (await currencyContract.balanceOf(referenceModule.address)).toString()
+        ).to.equal(totalAmountPlusClientFee.toString());
+
+        expect(
+          (await referenceModule.getClientFeePerMirrorForPublication(FIRST_PROFILE_ID, FIRST_PUB_ID)).toString()
+        ).to.equal(clientFee.div(BigNumber.from(DEFAULT_TOTAL_PROFILES.toString())).toString());
       });
     });
   });
@@ -289,7 +357,10 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
       it('mirrors the post, distributes from the reward pool, and updates storage', async () => {
         // the publisher has profileId = 0x01, which we have the merkle proof for
         const { proof, index } = CAMPAIGN_MERKLE_LEAF;
-        const referenceModuleData = abiCoder.encode(['bytes32[]', 'uint256'], [proof, index]);
+        const referenceModuleData = abiCoder.encode(
+          ['bytes32[]', 'uint256', 'address'],
+          [proof, index, ethers.constants.AddressZero]
+        );
         await expect(
           lensHub.connect(publisher).mirror({
             profileId: FIRST_PROFILE_ID, // we can mirror our own pub
@@ -318,7 +389,10 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
       it('does not distribute the reward again on a successive mirror from the same profile', async () => {
         // the publisher has profileId = 0x01, which we have the merkle proof for
         const { proof, index } = CAMPAIGN_MERKLE_LEAF;
-        const referenceModuleData = abiCoder.encode(['bytes32[]', 'uint256'], [proof, index]);
+        const referenceModuleData = abiCoder.encode(
+          ['bytes32[]', 'uint256', 'address'],
+          [proof, index, ethers.constants.AddressZero]
+        );
         await expect(
           lensHub.connect(publisher).mirror({
             profileId: FIRST_PROFILE_ID, // we can mirror our own pub
@@ -356,7 +430,10 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
       it('does not distribute the reward for another profile submitting a proof for another tree', async () => {
         // the user has profileId = 0x02, which we a the merkle proof for - but it's a different tree
         const { proof, index } = CAMPAIGN_MERKLE_LEAF_TWO;
-        const referenceModuleData = abiCoder.encode(['bytes32[]', 'uint256'], [proof, index]);
+        const referenceModuleData = abiCoder.encode(
+          ['bytes32[]', 'uint256', 'address'],
+          [proof, index, ethers.constants.AddressZero]
+        );
         await expect(
           lensHub.connect(user).mirror({
             profileId: SECOND_PROFILE_ID,
@@ -409,7 +486,7 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
       });
 
       it('reverts when given malformed data', async () => {
-        const referenceModuleData = abiCoder.encode(['uint256', 'address'], [1, user.address]);
+        const referenceModuleData = abiCoder.encode(['uint256', 'address', 'address'], [1, user.address, user.address]);
         await expect(
           lensHub.connect(user).mirror({
             profileId: SECOND_PROFILE_ID,
@@ -432,8 +509,7 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
         const referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({
           merkleRoot: CAMPAIGN_MERKLE_LEAF_TWO.root, // we have two leaves for this root
           budget,
-          totalProfiles: 2,
-          budgetPerProfile
+          totalProfiles: 2
         });
 
         const protocolFee = await referenceModule.getProtocolFee(budget);
@@ -467,8 +543,8 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
 
         // user mirrors
         const referenceModuleData = abiCoder.encode(
-          ['bytes32[]', 'uint256'],
-          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index]
+          ['bytes32[]', 'uint256', 'address'],
+          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index, ethers.constants.AddressZero]
         );
         await expect(
           lensHub.connect(user).mirror({
@@ -483,8 +559,8 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
 
         // another user mirrors
         const referenceModuleDataTwo = abiCoder.encode(
-          ['bytes32[]', 'uint256'],
-          [CAMPAIGN_MERKLE_LEAF_THREE.proof, CAMPAIGN_MERKLE_LEAF_THREE.index]
+          ['bytes32[]', 'uint256', 'address'],
+          [CAMPAIGN_MERKLE_LEAF_THREE.proof, CAMPAIGN_MERKLE_LEAF_THREE.index, ethers.constants.AddressZero]
         );
 
         const tx = lensHub.connect(anotherUser).mirror({
@@ -530,8 +606,8 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
 
       it('allows another mirror but does not distribute more rewards', async () => {
         const referenceModuleData = abiCoder.encode(
-          ['bytes32[]', 'uint256'],
-          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index]
+          ['bytes32[]', 'uint256', 'address'],
+          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index, ethers.constants.AddressZero]
         );
         await expect(
           lensHub.connect(user).mirror({
@@ -547,6 +623,127 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
         expect(
           (await currencyContract.balanceOf(user.address)).toString()
         ).to.equal(budgetPerProfile.toString());
+      });
+    });
+
+    context('context: with client fees set to non-zero...two mirrors', () => {
+      const budget = parseEther('2');
+      const budgetPerProfile = parseEther('1');
+      let protocolFee;
+      let clientFee; // the total fee for this campaign
+
+      beforeEach(async () => {
+        await referenceModule.setClientFeeBps(500) // 5%
+
+        // whitelist the client
+        await referenceModule.setClientWhitelist(deployer.address, true);
+
+        const referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({
+          merkleRoot: CAMPAIGN_MERKLE_LEAF_TWO.root, // we have two leaves for this root
+          budget,
+          totalProfiles: 2
+        });
+
+        protocolFee = await referenceModule.getProtocolFee(budget);
+        clientFee = await referenceModule.getClientFee(budget);
+        const totalAmount = budget.add(protocolFee).add(clientFee);
+
+        await currencyContract.mint(publisher.address, totalAmount);
+        await currencyContract.connect(publisher).approve(referenceModule.address, totalAmount);
+
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
+            referenceModule: referenceModule.address,
+            referenceModuleInitData,
+          })
+        ).to.not.be.reverted;
+
+        // need another profile
+        await expect(
+          lensHub.createProfile({
+            to: anotherUser.address,
+            handle: 'anotheruser',
+            imageURI: OTHER_MOCK_URI,
+            followModule: ethers.constants.AddressZero,
+            followModuleInitData: [],
+            followNFTURI: MOCK_FOLLOW_NFT_URI,
+          })
+        ).to.not.be.reverted;
+
+        // user mirrors
+        const referenceModuleData = abiCoder.encode(
+          ['bytes32[]', 'uint256', 'address'],
+          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index, deployer.address]
+        );
+        await expect(
+          lensHub.connect(user).mirror({
+            profileId: SECOND_PROFILE_ID,
+            profileIdPointed: FIRST_PROFILE_ID,
+            pubIdPointed: FIRST_PUB_ID,
+            referenceModuleData,
+            referenceModule: ethers.constants.AddressZero,
+            referenceModuleInitData: '0x',
+          })
+        ).to.not.be.reverted;
+      });
+
+      context('context: with a non-whitelisted client address encoded in the module data', () => {
+        it('only accrues client fees for one mirror and keeps the unclaimed client fees for the protocol', async () => {
+          // another user mirrors
+          const referenceModuleDataTwo = abiCoder.encode(
+            ['bytes32[]', 'uint256', 'address'],
+            [CAMPAIGN_MERKLE_LEAF_THREE.proof, CAMPAIGN_MERKLE_LEAF_THREE.index, user.address]
+          );
+
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: THIRD_PROFILE_ID,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: referenceModuleDataTwo,
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: '0x',
+            })
+          ).to.not.be.reverted;
+
+          const singleClientFee = clientFee.div(BigNumber.from('2'));
+          expect(
+            (await referenceModule.clientFeesPerCurrency(deployer.address, currencyContract.address)).toString()
+          ).to.equal(singleClientFee.toString());
+
+          expect(
+            (await referenceModule.protocolFeesPerCurrency(currencyContract.address)).toString()
+          ).to.equal(protocolFee.add(singleClientFee));
+        });
+      });
+
+      context('context: with a whitelisted client address encoded in the module data', () => {
+        it('accrues client fees for both mirrors', async () => {
+          // another user mirrors
+          const referenceModuleDataTwo = abiCoder.encode(
+            ['bytes32[]', 'uint256', 'address'],
+            [CAMPAIGN_MERKLE_LEAF_THREE.proof, CAMPAIGN_MERKLE_LEAF_THREE.index, deployer.address]
+          );
+
+          await expect(
+            lensHub.connect(anotherUser).mirror({
+              profileId: THIRD_PROFILE_ID,
+              profileIdPointed: FIRST_PROFILE_ID,
+              pubIdPointed: FIRST_PUB_ID,
+              referenceModuleData: referenceModuleDataTwo,
+              referenceModule: ethers.constants.AddressZero,
+              referenceModuleInitData: '0x',
+            })
+          ).to.not.be.reverted;
+
+          expect(
+            (await referenceModule.clientFeesPerCurrency(deployer.address, currencyContract.address)).toString()
+          ).to.equal(clientFee.toString());
+        });
       });
     });
   });
@@ -565,13 +762,18 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
     });
 
     context('context: with an active campaign', async () => {
+      let expectedRefund;
+
       beforeEach(async () => {
+        await referenceModule.setClientFeeBps(500) // 5%
+        await referenceModule.setClientWhitelist(deployer.address, true);
         const referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({
           merkleRoot: CAMPAIGN_MERKLE_LEAF_TWO.root, // for user to mirror
         });
         const budget = parseEther(DEFAULT_BUDGET);
         const protocolFee = await referenceModule.getProtocolFee(budget);
-        const totalAmount = budget.add(protocolFee);
+        const clientFee = await referenceModule.getClientFee(budget);
+        const totalAmount = budget.add(protocolFee).add(clientFee);
 
         await currencyContract.mint(publisher.address, totalAmount);
         await currencyContract.connect(publisher).approve(referenceModule.address, totalAmount);
@@ -589,8 +791,8 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
 
         // user mirrors
         const referenceModuleData = abiCoder.encode(
-          ['bytes32[]', 'uint256'],
-          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index]
+          ['bytes32[]', 'uint256', 'address'],
+          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index, deployer.address]
         );
         await expect(
           lensHub.connect(user).mirror({
@@ -602,14 +804,22 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
             referenceModuleInitData: '0x',
           })
         ).to.not.be.reverted;
+
+        const budgetRemaining = await referenceModule.getBudgetRemainingForPublication(FIRST_PROFILE_ID, FIRST_PUB_ID);
+        const protocolFeeRemaining = await referenceModule.getProtocolFee(budgetRemaining);
+        const clientFeeRemaining =  await referenceModule.getClientFee(budgetRemaining);
+        expectedRefund = parseEther(DEFAULT_BUDGET)
+          .sub(parseEther(DEFAULT_BUDGET_PER_PROFILE))
+          .add(protocolFeeRemaining)
+          .add(clientFeeRemaining);
       });
 
-      it('closes the campaign and transfers the remaining budget back to the creator', async () => {
+      it('closes the campaign and transfers the remaining budget (plus fees) back to the creator', async () => {
         await referenceModule.connect(publisher).withdrawBudgetForPublication(FIRST_PROFILE_ID, FIRST_PUB_ID);
-        const expected = parseEther(DEFAULT_BUDGET).sub(parseEther(DEFAULT_BUDGET_PER_PROFILE));
+
         expect(
           (await currencyContract.balanceOf(publisher.address)).toString()
-        ).to.equal(expected.toString());
+        ).to.equal(expectedRefund.toString());
 
         const budgetRemaining = await referenceModule.getBudgetRemainingForPublication(FIRST_PROFILE_ID, FIRST_PUB_ID);
         expect(budgetRemaining.toString()).to.equal('0');
@@ -622,7 +832,7 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
         matchEvent(
           txReceipt,
           'TargetedCampaignReferencePublicationClosed',
-          [FIRST_PROFILE_ID, FIRST_PUB_ID, parseEther(DEFAULT_BUDGET).sub(parseEther(DEFAULT_BUDGET_PER_PROFILE))],
+          [FIRST_PROFILE_ID, FIRST_PUB_ID, expectedRefund],
           referenceModule
         );
       });
@@ -654,6 +864,59 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
         txReceipt,
         'SetProtocolFeeBps',
         [BigNumber.from(value.toString())],
+        referenceModule
+      );
+    });
+  });
+
+  describe('#setClientFeeBps', () => {
+    it('reverts when the caller is not the contract owner', async () => {
+      await expect(
+        referenceModule.connect(user).setClientFeeBps(100)
+      ).to.be.revertedWith('Ownable: caller is not the owner');
+    });
+
+    it('reverts when setting a value above the allowed max', async () => {
+      const max = await referenceModule.CLIENT_FEE_BPS_MAX();
+      await expect(
+        referenceModule.setClientFeeBps(max+1)
+      ).to.be.revertedWith('AboveMax');
+    });
+
+    it('updates storage and emits an event', async () => {
+      const value = 100;
+      const tx = referenceModule.setClientFeeBps(value);
+      const txReceipt = await waitForTx(tx);
+
+      expect((await referenceModule.clientFeeBps()).toString()).to.equal(value.toString());
+
+      matchEvent(
+        txReceipt,
+        'SetClientFeeBps',
+        [BigNumber.from(value.toString())],
+        referenceModule
+      );
+    });
+  });
+
+  describe('#setClientWhitelist', () => {
+    it('reverts when the caller is not the contract owner', async () => {
+      await expect(
+        referenceModule.connect(user).setClientWhitelist(deployer.address, true)
+      ).to.be.revertedWith('Ownable: caller is not the owner');
+    });
+
+    it('updates storage and emits an event', async () => {
+      const value = true;
+      const tx = referenceModule.setClientWhitelist(deployer.address, value);
+      const txReceipt = await waitForTx(tx);
+
+      expect(await referenceModule.whitelistedClients(deployer.address)).to.equal(value);
+
+      matchEvent(
+        txReceipt,
+        'SetClientWhitelist',
+        [deployer.address, value],
         referenceModule
       );
     });
@@ -701,8 +964,8 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
 
         // user mirrors
         const referenceModuleData = abiCoder.encode(
-          ['bytes32[]', 'uint256'],
-          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index]
+          ['bytes32[]', 'uint256', 'address'],
+          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index, ethers.constants.AddressZero]
         );
         await expect(
           lensHub.connect(user).mirror({
@@ -719,6 +982,9 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
       it('transfers the fees without affecting the remaining budget, and emits an event', async () => {
         const tx = referenceModule.withdrawProtocolFees(currencyContract.address);
         const txReceipt = await waitForTx(tx);
+        const budgetRemaining = await parseEther(DEFAULT_BUDGET)
+          .sub(parseEther(DEFAULT_BUDGET_PER_PROFILE))
+          .toString();
 
         expect(
           (await currencyContract.balanceOf(deployer.address)).toString()
@@ -726,12 +992,100 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
 
         expect(
           (await referenceModule.getBudgetRemainingForPublication(FIRST_PROFILE_ID, FIRST_PUB_ID)).toString()
-        ).to.equal(parseEther(DEFAULT_BUDGET).sub(parseEther(DEFAULT_BUDGET_PER_PROFILE)).toString());
+        ).to.equal(budgetRemaining);
+
+        expect(
+          (await currencyContract.balanceOf(referenceModule.address)).toString()
+        ).to.equal(budgetRemaining);
 
         matchEvent(
           txReceipt,
           'WithdrawProtocolFees',
           [currencyContract.address, protocolFee],
+          referenceModule
+        );
+      });
+    });
+  });
+
+  describe('#withdrawClientFees', () => {
+    it('reverts when the caller is not a whitelisted client', async () => {
+      await expect(
+        referenceModule.connect(user).withdrawClientFees(currencyContract.address)
+      ).to.be.revertedWith('OnlyWhitelistedClients');
+    });
+
+    it('does nothing when there is no balance to withdraw', async () => {
+      await referenceModule.setClientWhitelist(deployer.address, true);
+      await expect(
+        referenceModule.withdrawClientFees(currencyContract.address)
+      ).to.not.be.reverted;
+
+      expect((await currencyContract.balanceOf(deployer.address)).toString()).to.equal('0');
+    });
+
+    context('context: when there are fees accrued... 1 mirror', async () => {
+      let clientFee;
+
+      beforeEach(async () => {
+        await referenceModule.setClientFeeBps(500) // 5%
+        await referenceModule.setClientWhitelist(deployer.address, true);
+
+        const referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({
+          merkleRoot: CAMPAIGN_MERKLE_LEAF_TWO.root, // for user to mirror
+          totalProfiles: 1
+        });
+        const budget = parseEther(DEFAULT_BUDGET);
+        const protocolFee = await referenceModule.getProtocolFee(budget);
+        clientFee = await referenceModule.getClientFee(budget);
+        const totalAmount = budget.add(protocolFee).add(clientFee);
+
+        await currencyContract.mint(publisher.address, totalAmount);
+        await currencyContract.connect(publisher).approve(referenceModule.address, totalAmount);
+
+        await expect(
+          lensHub.connect(publisher).post({
+            profileId: FIRST_PROFILE_ID,
+            contentURI: MOCK_URI,
+            collectModule: freeCollectModule.address,
+            collectModuleInitData: abiCoder.encode(['bool'], [true]),
+            referenceModule: referenceModule.address,
+            referenceModuleInitData,
+          })
+        ).to.not.be.reverted;
+
+        // user mirrors
+        const referenceModuleData = abiCoder.encode(
+          ['bytes32[]', 'uint256', 'address'],
+          [CAMPAIGN_MERKLE_LEAF_TWO.proof, CAMPAIGN_MERKLE_LEAF_TWO.index, deployer.address]
+        );
+        await expect(
+          lensHub.connect(user).mirror({
+            profileId: SECOND_PROFILE_ID,
+            profileIdPointed: FIRST_PROFILE_ID,
+            pubIdPointed: FIRST_PUB_ID,
+            referenceModuleData,
+            referenceModule: ethers.constants.AddressZero,
+            referenceModuleInitData: '0x',
+          })
+        ).to.not.be.reverted;
+      });
+
+      it('transfers the fees to the client and emits an event', async () => {
+        const tx = referenceModule.withdrawClientFees(currencyContract.address);
+        const txReceipt = await waitForTx(tx);
+        const budgetRemaining = await parseEther(DEFAULT_BUDGET)
+          .sub(parseEther(DEFAULT_BUDGET_PER_PROFILE))
+          .toString();
+
+        expect(
+          (await currencyContract.balanceOf(deployer.address)).toString()
+        ).to.equal(clientFee.toString());
+
+        matchEvent(
+          txReceipt,
+          'WithdrawClientFees',
+          [deployer.address, currencyContract.address, clientFee],
           referenceModule
         );
       });
