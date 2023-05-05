@@ -13,8 +13,6 @@ import {FeeModuleBase} from '@aave/lens-protocol/contracts/core/modules/FeeModul
 import {MerkleProof} from '@openzeppelin/contracts/utils/cryptography/MerkleProof.sol';
 import {Strings} from '@openzeppelin/contracts/utils/Strings.sol';
 
-import "hardhat/console.sol";
-
 /**
  * @notice A struct for the campaign parameters
  *
@@ -34,6 +32,7 @@ struct CampaignParams {
 
 /**
  * @title TargetedCampaignModule
+ * @author Carlos Beltran <carlos@madfinance.xyz>
  *
  * @notice A Lens Reference Module that allows publication creators to incentivize mirrors on their publication for
  * targeted campaigns - based on profile interests. When initializing this module, the creator provides the merkle root
@@ -62,6 +61,8 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     uint256 pubId,
     uint256 budgetRemaining
   );
+  event SetProtocolFeeBps(uint256 value);
+  event WithdrawProtocolFees(address currency, uint256 value);
 
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000; // 20%
   uint256 public protocolFeeBps;
@@ -83,6 +84,8 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     uint256 _protocolFeeBps
   ) ModuleBase(hub) FeeModuleBase(moduleGlobals) Ownable() {
     protocolFeeBps = _protocolFeeBps;
+
+    emit SetProtocolFeeBps(_protocolFeeBps);
   }
 
   /**
@@ -154,6 +157,9 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     // this catches two cases 1) nothing in storage for this pub and 2) no rewards left to distribute
     if (params.budget == 0) return;
 
+    // if they chose not to include data, just process the mirror. if they include malformed data, that's on them
+    if (data.length == 0) return;
+
     // has this profile already claimed?
     if (campaignRewardClaimed[profileIdPointed][pubIdPointed][profileId]) return;
 
@@ -162,7 +168,6 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
 
     // if the profile is whitelisted to receive rewards
     if (_validateMerkleProof(params.merkleRoot, profileId, index, merkleProof)) {
-      console.log("we in this biatch");
       address account = IERC721(HUB).ownerOf(profileId);
 
       // send the rewards
@@ -201,7 +206,7 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
 
     if (msg.sender != account) revert Errors.NotProfileOwner();
 
-    CampaignParams storage params = _campaignParamsPerProfilePerPub[profileId][pubId];
+    CampaignParams memory params = _campaignParamsPerProfilePerPub[profileId][pubId];
 
     if (params.budget == 0) revert NotFound();
 
@@ -211,6 +216,8 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
 
     emit TargetedCampaignReferencePublicationClosed(profileId, pubId, params.budget);
   }
+
+  // @TODO: logImpressionWithSig
 
   /**
    * @notice Returns the remaining budget for a publication's campaign, if any
@@ -236,6 +243,8 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     if (_protocolFeeBps > PROTOCOL_FEE_BPS_MAX) revert AboveMax();
 
     protocolFeeBps = _protocolFeeBps;
+
+    emit SetProtocolFeeBps(_protocolFeeBps);
   }
 
   /**
@@ -245,6 +254,8 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
   function withdrawProtocolFees(address currency) external onlyOwner {
     if (protocolFeesPerCurrency[currency] > 0) {
       IERC20(currency).transfer(msg.sender, protocolFeesPerCurrency[currency]);
+
+      emit WithdrawProtocolFees(currency, protocolFeesPerCurrency[currency]);
     }
   }
 
@@ -256,14 +267,7 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     uint256 profileId,
     uint256 index,
     bytes32[] memory merkleProof
-  ) internal view returns (bool) {
-    console.log("_validateMerkleProof");
-    console.logBytes32(merkleRoot);
-    console.logUint(profileId);
-    console.logUint(index);
-    console.log("merkleProof array 0,1");
-    console.logBytes32(merkleProof[0]);
-    console.logBytes32(merkleProof[1]);
+  ) internal pure returns (bool) {
     bytes32 node = keccak256(abi.encodePacked(profileId, index));
 
     return MerkleProof.verify(merkleProof, merkleRoot, node);

@@ -18,7 +18,7 @@ export enum PubType {
 }
 
 export const CAMPAIGN_MERKLE_LEAF = {
-  interest: 'ART_ENTERTAINMENT__ART',
+  interest: 'ART_ENTERTAINMENT__MUSIC',
   root: '0x6a49f3b42906e3057e364d5f79f3fa1b79384f5972d419c34409ab21c7c8fe0d',
   profileId: '0x01',
   proof: [
@@ -31,4 +31,38 @@ export const CAMPAIGN_MERKLE_LEAF = {
     '0x8d03617b07325c098f3ef1d2822de7ddb74597d9074bb445d4e7445958e295bd',
   ],
   index: 15,
+};
+
+// different root from above
+export const CAMPAIGN_MERKLE_LEAF_TWO = {
+  interest: 'CRYPTO__DEFI',
+  root: '0x7a358b67a379eaabc13d1f3329ac75da3059787c331bb070897c5bd3859f7744',
+  profileId: '0x02',
+  proof: [
+    '0xa6442d8ab90212669d3375ee7dd4af73ffcafee469427ff8277f1602b27cc784',
+    '0x9b4fdc112c0841f1fb38de898028d6b32e5145cea6a9f377bb220ea45270f378',
+    '0xffedb9dcbf76b3ac831b2a634879b8dda1f8a30c61c4a55e07c9ab59f7e6199c',
+    '0x01d8c1519c0dc62acc6fc7d3e7771c70cc61a189340593dc2697268819a82884',
+    '0xe7b555c5e5454fcf627852662ea55b2b0fd3573c14027e874a52279ba961b75b',
+    '0x23f78edc4ab037f8e136f0e413ea38ac3da9466fad334205542d0e063e000c69',
+    '0xa106e5a265191ca8f082c8aeb72f0e54f7533aab843f546e18af5b1f92ea54a5'
+  ],
+  index: 82
+};
+
+// same root as above
+export const CAMPAIGN_MERKLE_LEAF_THREE = {
+  interest: 'CRYPTO__DEFI',
+  root: '0x7a358b67a379eaabc13d1f3329ac75da3059787c331bb070897c5bd3859f7744',
+  profileId: '0x03',
+  proof: [
+    '0x9484b314cc336e3a780c22c5da3ec01f64e916f68a4e24d647eb045f5f3633b0',
+    '0xface71a988488daeccc5492274e47e67b29f6bcb095ecddb2294f679fef97bf6',
+    '0x446658c65cc8c8c6d832cbb9ada55b178343a34a3d7d0131ae8124c82edd8f25',
+    '0x8547ab67cd3779155bfbef0559f26becd3b6fee896d9e173a8c04d64fbdb9208',
+    '0xf2bc69d25271dfd7603ddbb0207b944ab44e0a1b3dae6295ae5ac1c1401a9807',
+    '0x23f78edc4ab037f8e136f0e413ea38ac3da9466fad334205542d0e063e000c69',
+    '0xa106e5a265191ca8f082c8aeb72f0e54f7533aab843f546e18af5b1f92ea54a5'
+  ],
+  index: 63
 };
