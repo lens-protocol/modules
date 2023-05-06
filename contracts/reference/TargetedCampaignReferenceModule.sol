@@ -35,7 +35,7 @@ struct CampaignParams {
 }
 
 /**
- * @title TargetedCampaignModule
+ * @title TargetedCampaignReferenceModule
  * @author Carlos Beltran <carlos@madfinance.xyz>
  *
  * @notice A Lens Reference Module that allows publication creators to incentivize mirrors on their publication for
