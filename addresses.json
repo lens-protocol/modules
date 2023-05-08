@@ -39,6 +39,7 @@
     "StepwiseCollectModule": "0x6928d6127dfa0da401737e6ff421fcf62d5617a3",
     "ERC4626FeeCollectModule": "0x31126c602cf88193825a99dcd1d17bf1124b1b4f",
     "AaveFeeCollectModule": "0x666e06215747879ee68b3e5a317dcd8411de1897",
-    "TokenGatedReferenceModule": "0x86d35562ceb9f10d7c2c23c098dfeacb02f53853"
+    "TokenGatedReferenceModule": "0x86d35562ceb9f10d7c2c23c098dfeacb02f53853",
+    "TargetedCampaignReferenceModule": "0xE5E5a247Ea5FaB6098D724523e6d8f2aaCB707A9"
   }
 }
