@@ -94,23 +94,6 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
     });
 
     context('context: with invalid params', () => {
-      it('reverts when the currency provided is not whitelisted', async () => {
-        const referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({
-          currency: ethers.constants.AddressZero
-        });
-
-        await expect(
-          lensHub.connect(publisher).post({
-            profileId: FIRST_PROFILE_ID,
-            contentURI: MOCK_URI,
-            collectModule: freeCollectModule.address,
-            collectModuleInitData: abiCoder.encode(['bool'], [true]),
-            referenceModule: referenceModule.address,
-            referenceModuleInitData,
-          })
-        ).to.be.revertedWith(ERRORS.INIT_PARAMS_INVALID);
-      });
-
       it('reverts when the budget is 0', async () => {
         const referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({
           budget: BigNumber.from('0')

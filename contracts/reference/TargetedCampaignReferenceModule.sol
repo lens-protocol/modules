@@ -379,7 +379,6 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     uint256 totalProfiles
   ) private view {
     if (
-      !_currencyWhitelisted(currency) ||
       budget == 0 ||
       totalProfiles == 0 ||
       merkleRoot == bytes32(0)
