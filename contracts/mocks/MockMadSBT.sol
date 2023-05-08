@@ -159,12 +159,20 @@ contract MockMadSBT is IMadSBT, ERC721, Owned {
     collectModule = _collectModule;
   }
 
-  function setMintRewardUnit(uint128 _mintRewardUnit) external onlyOwner {
-    mintRewardUnit = _mintRewardUnit;
+  // @dev this is only called in `#processCollect`
+  function handleRewardsUpdate(address account, uint256 collectionId, uint256 profileId, Action) external {
+    uint128 currentUnits = _getCurrentRewards(collectionData[collectionId].creatorId, account);
+    uint128 collectRewardUnit = 10;
+    _handleRewardsUpdate(profileId, account, currentUnits + collectRewardUnit);
   }
 
-  function setCollectRewardUnit(uint128 _collectRewardUnit) external onlyOwner {
-    collectRewardUnit = _collectRewardUnit;
+  // @dev not used in this mock
+  function actionToRewardUnits(Action _action) public view returns (uint128) {
+    return 1;
+  }
+
+  function tokenToCollection(uint256 tokenId) public view returns (uint256) {
+    return 1;
   }
 
   function _handleRewardsUpdate(uint256 indexId, address subscriber, uint128 newUnits) internal {

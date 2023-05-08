@@ -604,10 +604,10 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
-"@madfi/protocol@^0.1.4":
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/@madfi/protocol/-/protocol-0.1.4.tgz#b64e84915f4f6eeb41ab05fd563018289c6c2055"
-  integrity sha512-bsIdsR1IotiZCNXJvoolsOzmBlx9LxsIchCajtTdsOyahZ+ZYt9b8qNaUzVukySpePgkgI41Egwfo8S+BLBAgg==
+"@madfi/protocol@^0.1.5":
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/@madfi/protocol/-/protocol-0.1.5.tgz#bebdfb5373389b5eff36e4b55831182d91a99356"
+  integrity sha512-ryLZzAMRYC0w9hmT0ThTNj/yx7fmYntm+AnrDAIyBRZTuk6Gc1Elk/0DgKeAHozJxf4lFNKwleohHVLpXmzBVQ==
   dependencies:
     "@aave/lens-protocol" "^1.0.2"
     "@openzeppelin/contracts" "4.5.0"

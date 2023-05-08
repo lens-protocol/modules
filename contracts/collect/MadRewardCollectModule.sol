@@ -111,7 +111,12 @@ contract MadRewardCollectModule is ICollectModule, ModuleBase {
       if (!madSBT.mint(collector, collectionId, profileId)) revert Errors.CollectNotAllowed();
     } else {
       // simply update the rewards for existing MadSBT holder
-      madSBT.handleRewardsUpdate(collector, collectionId, profileId, madSBT.collectRewardUnit());
+      madSBT.handleRewardsUpdate(
+        collector,
+        collectionId,
+        profileId,
+        IMadSBT.Action.COLLECTED_BID_POST
+      );
     }
   }
 
