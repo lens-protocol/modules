@@ -185,6 +185,7 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
       let referenceModuleInitData;
       let protocolFee;
       let totalAmount;
+      let txReceipt;
 
       beforeEach(async () => {
         referenceModuleInitData = getTargetedCampaignReferenceModuleInitData({});
@@ -193,20 +194,20 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
         totalAmount = budget.add(protocolFee);
         await currencyContract.mint(publisher.address, totalAmount);
         await currencyContract.connect(publisher).approve(referenceModule.address, totalAmount);
+
+        const tx = lensHub.connect(publisher).post({
+          profileId: FIRST_PROFILE_ID,
+          contentURI: MOCK_URI,
+          collectModule: freeCollectModule.address,
+          collectModuleInitData: abiCoder.encode(['bool'], [true]),
+          referenceModule: referenceModule.address,
+          referenceModuleInitData,
+        });
+
+        txReceipt = await waitForTx(tx);
       });
 
       it('initializes the module, transfers the budget + fee to the contract, and sets protocol fees in storage', async () => {
-        await expect(
-          lensHub.connect(publisher).post({
-            profileId: FIRST_PROFILE_ID,
-            contentURI: MOCK_URI,
-            collectModule: freeCollectModule.address,
-            collectModuleInitData: abiCoder.encode(['bool'], [true]),
-            referenceModule: referenceModule.address,
-            referenceModuleInitData,
-          })
-        ).to.not.be.reverted;
-
         expect(
           (await currencyContract.balanceOf(referenceModule.address)).toString()
         ).to.equal(totalAmount.toString());
@@ -217,15 +218,6 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
       });
 
       it('emits an event', async () => {
-        const tx = lensHub.connect(publisher).post({
-          profileId: FIRST_PROFILE_ID,
-          contentURI: MOCK_URI,
-          collectModule: freeCollectModule.address,
-          collectModuleInitData: abiCoder.encode(['bool'], [true]),
-          referenceModule: referenceModule.address,
-          referenceModuleInitData,
-        });
-        const txReceipt = await waitForTx(tx);
         matchEvent(
           txReceipt,
           'TargetedCampaignReferencePublicationCreated',
@@ -239,6 +231,13 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
           ],
           referenceModule
         );
+      });
+
+      describe('#getMerkleRootForPublication', () => {
+        it('returns the correct merkle root', async () => {
+          const res = await referenceModule.getMerkleRootForPublication(FIRST_PROFILE_ID, FIRST_PUB_ID);
+          expect(res).to.equal(CAMPAIGN_MERKLE_LEAF.root);
+        });
       });
     });
 

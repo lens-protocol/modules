@@ -284,6 +284,15 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
   }
 
   /**
+   * @notice Returns the merkle root for a publication's campaign, if any
+   * @param profileId The profile id that created the campaign
+   * @param pubId The pub id
+   */
+  function getMerkleRootForPublication(uint256 profileId, uint256 pubId) public view returns (bytes32) {
+    return _campaignParamsPerProfilePerPub[profileId][pubId].merkleRoot;
+  }
+
+  /**
    * @notice Calculates and returns the protocol fee for the given `budget`
    */
   function getProtocolFee(uint256 budget) public view returns (uint256) {
