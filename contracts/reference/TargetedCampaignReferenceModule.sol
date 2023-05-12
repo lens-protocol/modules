@@ -293,6 +293,28 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
   }
 
   /**
+   * @notice Returns whether the given proof is valid for an active campaign
+   * @param profileId The profile id to validate the proof for
+   * @param profileIdPointed The profile id that created the campaign
+   * @param pubIdPointed The publication with this reference module set
+   * @param index The merkle proof index
+   * @param merkleProof The merkle proof
+   */
+  function validateMerkleProofForPublication(
+    uint256 profileId,
+    uint256 profileIdPointed,
+    uint256 pubIdPointed,
+    uint256 index,
+    bytes32[] calldata merkleProof
+  ) public view returns (bool) {
+    CampaignParams memory params = _campaignParamsPerProfilePerPub[profileIdPointed][pubIdPointed];
+
+    if (params.budget == 0) return false; // catches non-campaign publications + already ended campaigns
+
+    return _validateMerkleProof(params.merkleRoot, profileId, index, merkleProof);
+  }
+
+  /**
    * @notice Calculates and returns the protocol fee for the given `budget`
    */
   function getProtocolFee(uint256 budget) public view returns (uint256) {
@@ -388,6 +410,7 @@ contract TargetedCampaignReferenceModule is ModuleBase, FeeModuleBase, Ownable, 
     uint256 totalProfiles
   ) private view {
     if (
+      !_currencyWhitelisted(currency) ||
       budget == 0 ||
       totalProfiles == 0 ||
       merkleRoot == bytes32(0)

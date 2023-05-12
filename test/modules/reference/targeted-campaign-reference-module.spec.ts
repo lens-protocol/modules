@@ -239,6 +239,41 @@ makeSuiteCleanRoom('TargetedCampaignReferenceModule', function () {
           expect(res).to.equal(CAMPAIGN_MERKLE_LEAF.root);
         });
       });
+
+      describe('#validateMerkleProofForPublication', () => {
+        it('returns false with an invalid proof', async () => {
+          const res = await referenceModule.validateMerkleProofForPublication(
+            FIRST_PROFILE_ID,
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID,
+            CAMPAIGN_MERKLE_LEAF_TWO.index,
+            CAMPAIGN_MERKLE_LEAF_TWO.proof
+          );
+          expect(res).to.equal(false);
+        });
+
+        it('returns false for a non-valid campaign', async () => {
+          const res = await referenceModule.validateMerkleProofForPublication(
+            FIRST_PROFILE_ID,
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID + 1,
+            CAMPAIGN_MERKLE_LEAF.index,
+            CAMPAIGN_MERKLE_LEAF.proof
+          );
+          expect(res).to.equal(false);
+        });
+
+        it('returns true with a valid proof', async () => {
+          const res = await referenceModule.validateMerkleProofForPublication(
+            FIRST_PROFILE_ID,
+            FIRST_PROFILE_ID,
+            FIRST_PUB_ID,
+            CAMPAIGN_MERKLE_LEAF.index,
+            CAMPAIGN_MERKLE_LEAF.proof
+          );
+          expect(res).to.equal(true);
+        });
+      });
     });
 
     context('context: with client fees set to non-zero', () => {

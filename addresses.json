@@ -40,6 +40,6 @@
     "ERC4626FeeCollectModule": "0x31126c602cf88193825a99dcd1d17bf1124b1b4f",
     "AaveFeeCollectModule": "0x666e06215747879ee68b3e5a317dcd8411de1897",
     "TokenGatedReferenceModule": "0x86d35562ceb9f10d7c2c23c098dfeacb02f53853",
-    "TargetedCampaignReferenceModule": "0x0ee1C843a15D8899AbE5C241ddAc5B1CA2339f94"
+    "TargetedCampaignReferenceModule": "0x12A218bCB4EDfd2303281cc7E4e6bdBE0b8738F6"
   }
 }
