@@ -1,5 +1,6 @@
 {
-  "name": "hardhat-project",
+  "name": "@lens-protocol/modules",
+  "version": "1.0.0",
   "scripts": {
     "test": "npm run compile && TRACK_GAS=true hardhat test",
     "quick-test": "hardhat test",
