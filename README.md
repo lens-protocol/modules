@@ -34,10 +34,51 @@ This repository contains both - Hardhat and Foundry tests. Foundry will be used 
 3. Follow the on-screen instructions to verify if everything is correct and confirm deployment & contract verification.
 4. If only the verification is needed of an existing deployed contract - use the `--verify-only` flag followed by ABI-Encoded constructor args.
 
-## Deployement addresses in `addresses.json`
+### Deployment of LZGated* Modules
+All the hardhat tasks related to the deployment of `LZGatedFollowModule`, `LZGatedReferenceModule`, and `LZGatedCollectModule` can be found under [**tasks/lz-gated/**](./tasks/lz-gated)
+
+First, we deploy the modules on the source chain (ex: `mumbai`) and we deploy our `LZGatedProxy` contract to all the remote chains we want to support (ex: `goerli`). Finally, we set the trusted remotes for each module. All the lz config can be found under [**tasks/lz-gated/config.ts**](./tasks/lz-gated/config.ts).
+
+Contract addresses for new deployments will be written to `addresses.json`. For the contracts deployed to remote chains, a special property `lz` contains an object with those contract addresses.
+
+1. deploy our modules on the same chain as the lens protocol, using the mock sandbox governance contract to whitelist.
+```
+npx hardhat deploy-modules --hub 0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5 --mock-sandbox-governance 0x1677d9cc4861f1c85ac7009d5f06f49c928ca2ad --network mumbai
+```
+2. deploy our `LZGatedProxy` contract on all the remote chains we want to support
+```
+npx hardhat deploy-proxy --network goerli --sandbox true
+```
+
+3. set our trusted remotes
+```
+npx hardhat set-trusted-remotes --network mumbai --sandbox true
+```
+
+#### Testing on testnet
+To test any of the three modules, run one of the `set-*-module` tasks to initialize it before running the associated `relay-*-with-sig` task. For example, let's test the follow module.
+
+1. **You must update the variable `SANDBOX_USER_PROFILE_ID` in `tasks/lz-gated/config.ts`, and change the `TOKEN_*` variables to your desired configuration**. Anyone that wishes to follow `SANDBOX_USER_PROFILE_ID` must have a balance greater than or equal to `TOKEN_THRESHOLD` of an ERC20/ERC721 `TOKEN_CONTRACT` on the chain with lz chain id of `TOKEN_CHAIN_ID`
+```
+npx hardhat set-follow-module --network mumbai --hub 0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5 --sandbox true
+```
+
+2. Anyone wishing to follow must sign the message for `LensHub#followWithSig` and submit it to our `LZGatedProxy` contract deployed on the chain with lz chain id `TOKEN_CHAIN_ID`
+```
+npx hardhat relay-follow-with-sig --network goerli --hub 0x7582177F9E536aB0b6c721e11f383C326F2Ad1D5 --sandbox true
+```
+
+#### Things to note
+- Anyone can submit the tx to `LZGatedProxy` on behalf of the signer, but the tx `value` must be sufficient to pay the lz fee
+- We accept a `lzCustomGasAmount` argument in each of the `#relay*` functions in `LZGatedProxy` for flexibility per transaction; it can be set to `0` which will default to the lz estimated gas. But if provided, tx `value` must cover this gas amount, and if _either_ the fee is not enough _or_ the gas is not enough for the execution, the tx at the destination chain will revert; [see more about lz adapter params](https://layerzero.gitbook.io/docs/evm-guides/advanced/relayer-adapter-parameters). Each task has an `ESTIMATED_GAS_REMOTE` to showcase the estimated gas per action
+- Our modules implement the `NonblockingLzApp` strategy in that we catch any reverts. We do this because layerzero would stop relaying messages to our receiver contract on the destination chain if any relayed messages are to revert; [see more in the lz docs](https://layerzero.gitbook.io/docs/evm-guides/advanced/nonblockinglzapp)
+- We have the testnet setup for relayed lz messages betweed goerli/mumbai, but more chains are supported; [see the list of lz supported chains](https://layerzero.gitbook.io/docs/technical-reference/mainnet/supported-chain-ids)
+- There is an "unused" variable in the `LzApp` contract called `zroPaymentAddress` - it set to the zero address. Assuming there will be a ZRO token, the contract deployer can set the variable to some paymaster address so that all relayed messages are sponsored and paid in ZRO tokens; [see more in the lz docs](https://layerzero.gitbook.io/docs/evm-guides/master/how-to-send-a-message)
+
+## Deployment addresses in `addresses.json`
 
 The `addresses.json` file in root contains all existing deployed contracts on all of target environments (mainnet/testnet/sandbox) on corresponding chains.
-After a succesful module deployment the new address will be added to `addresses.json`, overwriting the existing one (the script will ask for confirmation if you want to redeploy an already existing deployment).
+After a successful module deployment the new address will be added to `addresses.json`, overwriting the existing one (the script will ask for confirmation if you want to redeploy an already existing deployment).
 
 ## Coverage
 
@@ -54,10 +95,13 @@ After a succesful module deployment the new address will be added to `addresses.
 - [**Multirecipient Fee Collect Module**](./contracts/collect/MultirecipientFeeCollectModule.sol): Fee Collect module that allows multiple recipients (up to 5) with different proportions of fees payout.
 - [**Simple Fee Collect Module**](./contracts/collect/SimpleFeeCollectModule.sol): A simple fee collect module implementation, as an example of using base fee collect module abstract contract.
 - [**Updatable Ownable Fee Collect Module**](./contracts/collect/UpdatableOwnableFeeCollectModule.sol): A fee collect module that, for each publication that uses it, mints an ERC-721 ownership-NFT to its author. Whoever owns the ownership-NFT has the rights to update the parameters required to do a successful collect operation over its underlying publication.
+- [**LayerZero Gated Collect Module**](./contracts/collect/LZGatedCollectModule.sol): A Lens Collect Module that allows publication creators to gate who can collect their post with ERC20 or ERC721 balances held on other chains. To execute a collect on a post that has this module set, the collector must generate the signature for `LensHub#collectWithSig` and call `#relayCollectWithSig` on the `LZGatedProxy` contract deployed on the chain where the token balance check is done.
 
 ## Follow modules
+- [**LayerZero Gated Follow Module**](./contracts/follow/LZGatedFollowModule.sol): A Lens Follow Module that allows profile holders to gate their following with ERC20 or ERC721 balances held on other chains. To execute a follow on a profile that has this module set, the follower must generate the signature for `LensHub#followWithSig` and call `#relayFollowWithSig` on the `LZGatedProxy` contract deployed on the chain where the token balance check is done.
 
 ## Reference modules
 
 - [**Degrees Of Separation Reference Module**](./contracts/reference/DegreesOfSeparationReferenceModule.sol): This reference module allows to set a degree of separation `n`, and then allows to comment/mirror only to profiles that are at most at `n` degrees of separation from the author of the root publication.
 - [**Token Gated Reference Module**](./contracts/reference/TokenGatedReferenceModule.sol): A reference module that validates that the user who tries to reference has a required minimum balance of ERC20/ERC721 token.
+- [**LayerZero Gated Reference Module**](./contracts/reference/LZGatedReferenceModule.sol): A Lens Reference Module that allows publication creators to gate who can comment/mirror their post with ERC20 or ERC721 balances held on other chains. To execute a comment or mirror on a post that has this module set, the commentor/mirrorer must generate the signature for `LensHub#commentWithSig`/`LensHub#mirrorWithSig` and call `#relayCommentWithSig`/`#relayMirrorWithSig` on the `LZGatedProxy` contract deployed on the chain where the token balance check is done.

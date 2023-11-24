@@ -6,6 +6,9 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types';
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
+export const LENS_DOMAIN_NAME = 'Lens Protocol Profiles';
+export const LENS_DOMAIN_VERSION = '1';
+
 export enum ProtocolState {
   Unpaused,
   PublishingPaused,
@@ -16,6 +19,11 @@ export function getAddrs(): any {
   const json = fs.readFileSync('addresses.json', 'utf8');
   const addrs = JSON.parse(json);
   return addrs;
+}
+
+export function saveAddrs(json: any) {
+  fs.writeFileSync('addresses.json', JSON.stringify(json, null, 2) + '\n');
+  console.log('Updated `addresses.json`');
 }
 
 export async function waitForTx(tx: Promise<ContractTransaction>) {
@@ -76,6 +84,14 @@ export async function initEnv(hre: HardhatRuntimeEnvironment): Promise<SignerWit
   const user = accounts[3];
 
   return [governance, treasury, user];
+}
+
+export function getEnvFromNetworkName(networkName: string, sandbox: boolean = false): string {
+  if (networkName === 'mumbai') {
+    return sandbox ? 'sandbox' : 'testnet';
+  }
+
+  return 'mainnet';
 }
 
 async function delay(ms: number) {

@@ -30,15 +30,25 @@ const MNEMONIC = process.env.MNEMONIC || '';
 const MAINNET_FORK = process.env.MAINNET_FORK === 'true';
 const TRACK_GAS = process.env.TRACK_GAS === 'true';
 const BLOCK_EXPLORER_KEY = process.env.BLOCK_EXPLORER_KEY || '';
+const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
+const TYPECHAIN_INCLUDE_EXTERNALS = process.env.TYPECHAIN_INCLUDE_EXTERNALS === 'true';
 
-const getCommonNetworkConfig = (networkName: eNetwork, networkId: number) => ({
-  url: NETWORKS_RPC_URL[networkName] ?? '',
-  accounts: {
+const deployerAccounts = () => {
+  if (PRIVATE_KEY) {
+    return [PRIVATE_KEY];
+  }
+
+  return {
     mnemonic: MNEMONIC,
     path: MNEMONIC_PATH,
     initialIndex: 0,
     count: 20,
-  },
+  }
+};
+
+const getCommonNetworkConfig = (networkName: eNetwork, networkId: number) => ({
+  url: NETWORKS_RPC_URL[networkName] ?? '',
+  accounts: deployerAccounts(),
 });
 
 const mainnetFork = MAINNET_FORK
@@ -73,6 +83,7 @@ const config: HardhatUserConfig = {
     matic: getCommonNetworkConfig(ePolygonNetwork.matic, 137),
     mumbai: getCommonNetworkConfig(ePolygonNetwork.mumbai, 80001),
     xdai: getCommonNetworkConfig(eXDaiNetwork.xdai, 100),
+    goerli: getCommonNetworkConfig(eEthereumNetwork.goerli, 5),
     hardhat: {
       hardfork: 'london',
       blockGasLimit: DEFAULT_BLOCK_GAS_LIMIT,
@@ -108,6 +119,7 @@ const config: HardhatUserConfig = {
       '@aave/lens-protocol/contracts/core/CollectNFT.sol',
       '@aave/lens-protocol/contracts/mocks/Currency.sol',
       '@aave/lens-protocol/contracts/upgradeability/TransparentUpgradeableProxy.sol',
+      '@layerzerolabs/solidity-examples/contracts/mocks/LZEndpointMock.sol',
     ],
   },
 };
