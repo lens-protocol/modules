@@ -4,6 +4,7 @@ pragma solidity ^0.8.10;
 import 'forge-std/Script.sol';
 import 'forge-std/StdJson.sol';
 import {StepwiseCollectModule} from 'contracts/collect/StepwiseCollectModule.sol';
+import {SimpleFeeCollectModule} from 'contracts/collect/SimpleFeeCollectModule.sol';
 import {MultirecipientFeeCollectModule} from 'contracts/collect/MultirecipientFeeCollectModule.sol';
 import {AaveFeeCollectModule} from 'contracts/collect/AaveFeeCollectModule.sol';
 import {ERC4626FeeCollectModule} from 'contracts/collect/ERC4626FeeCollectModule.sol';
@@ -85,6 +86,24 @@ contract DeployMultirecipientFeeCollectModule is DeployBase {
             lensHubProxy,
             moduleGlobals
         );
+        vm.stopBroadcast();
+
+        console.log('Constructor arguments:');
+        console.logBytes(abi.encode(lensHubProxy, moduleGlobals));
+
+        return address(module);
+    }
+}
+
+contract DeploySimpleFeeCollectModule is DeployBase {
+    function deploy() internal override returns (address) {
+        console.log('\nContract: SimpleFeeCollectModule');
+        console.log('Init params:');
+        console.log('\tLensHubProxy:', lensHubProxy);
+        console.log('\tModuleGlobals:', moduleGlobals);
+
+        vm.startBroadcast(deployerPrivateKey);
+        SimpleFeeCollectModule module = new SimpleFeeCollectModule(lensHubProxy, moduleGlobals);
         vm.stopBroadcast();
 
         console.log('Constructor arguments:');

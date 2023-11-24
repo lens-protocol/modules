@@ -29,6 +29,7 @@ contract BaseSetup is Test, ForkManagement {
     uint256 firstProfileId;
     address deployer;
     address governance;
+    address modulesGovernance;
     address treasury;
 
     address constant publisher = address(4);
@@ -109,6 +110,7 @@ contract BaseSetup is Test, ForkManagement {
 
         governance = hub.getGovernance();
         treasury = moduleGlobals.getTreasury();
+        modulesGovernance = moduleGlobals.getGovernance();
 
         TREASURY_FEE_BPS = moduleGlobals.getTreasuryFee();
     }
@@ -118,6 +120,7 @@ contract BaseSetup is Test, ForkManagement {
         deployer = address(1);
         governance = address(2);
         treasury = address(3);
+        modulesGovernance = address(4);
 
         TREASURY_FEE_BPS = 50;
 
@@ -149,7 +152,7 @@ contract BaseSetup is Test, ForkManagement {
         // Deploy the FreeCollectModule.
         freeCollectModule = new FreeCollectModule(hubProxyAddr);
 
-        moduleGlobals = new ModuleGlobals(governance, treasury, TREASURY_FEE_BPS);
+        moduleGlobals = new ModuleGlobals(modulesGovernance, treasury, TREASURY_FEE_BPS);
 
         currency = new Currency();
         nft = new NFT();
@@ -189,11 +192,12 @@ contract BaseSetup is Test, ForkManagement {
 
         // Whitelist the test contract as a profile creator
         hub.whitelistProfileCreator(me, true);
+        vm.stopPrank();
 
         // Whitelist mock currency in ModuleGlobals
+        vm.prank(modulesGovernance);
         moduleGlobals.whitelistCurrency(address(currency), true);
 
-        vm.stopPrank();
         ///////////////////////////////////////// End governance actions.
     }
 
